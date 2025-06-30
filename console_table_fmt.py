@@ -49,7 +49,7 @@ class SimpleProgressTable:
         ):
             result = "DRY-RUN"
         else:
-            result = "✅ PASS" if getattr(test_result, "passed", False) else "❌ FAIL"
+            result = "PASS" if getattr(test_result, "passed", False) else "FAIL"
 
         row_data = [host, sheet, test_name, method, result, duration]
 
@@ -102,7 +102,7 @@ class ClearAndReprintTable:
             if hasattr(r, "result") and getattr(r, "result", "") == "DRY-RUN":
                 result = "DRY-RUN"
             else:
-                result = "✅ PASS" if getattr(r, "passed", False) else "❌ FAIL"
+                result = "PASS" if getattr(r, "passed", False) else "FAIL"
 
             table_data.append([host, sheet, test_name, method, result, duration])
 
@@ -181,7 +181,7 @@ class LiveUpdateTable:
         ):
             result = "DRY-RUN"
         else:
-            result = "✅ PASS" if getattr(test_result, "passed", False) else "❌ FAIL"
+            result = "PASS" if getattr(test_result, "passed", False) else "FAIL"
 
         # Print the new row at the current position
         row_data = [host, sheet, test_name, method, result, duration]
@@ -190,7 +190,7 @@ class LiveUpdateTable:
         # Update summary at the bottom
         passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
         failed = len(self.all_results) - passed
-        print(f"\nSUMMARY: ✅ {passed} passed, ❌ {failed} failed, 🔄 Running...")
+        print(f"\nSUMMARY: {passed} passed, {failed} failed, Running...")
 
 
 # =============================================================================
@@ -246,9 +246,9 @@ try:
                 if hasattr(r, "result") and getattr(r, "result", "") == "DRY-RUN":
                     result = Text("DRY-RUN", style="yellow")
                 elif getattr(r, "passed", False):
-                    result = Text("✅ PASS", style="green")
+                    result = Text("PASS", style="green")
                 else:
-                    result = Text("❌ FAIL", style="red")
+                    result = Text("FAIL", style="red")
 
                 table.add_row(host, sheet, test_name, method, result, duration)
 
@@ -256,7 +256,7 @@ try:
             if self.all_results:
                 passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
                 failed = len(self.all_results) - passed
-                table.caption = f"Summary: ✅ {passed} passed, ❌ {failed} failed"
+                table.caption = f"Summary: {passed} passed, {failed} failed"
 
             return table
 
@@ -306,7 +306,7 @@ class LiveProgressTable:
         """Print table headers once at the beginning"""
         if not self.headers_printed:
             print("\n" + "=" * 120)
-            print("🚀 TEST EXECUTION PROGRESS")
+            print("TEST EXECUTION PROGRESS")
             print("=" * 120)
 
             # Print header row with proper formatting
@@ -351,11 +351,11 @@ class LiveProgressTable:
             hasattr(test_result, "result")
             and getattr(test_result, "result", "") == "DRY-RUN"
         ):
-            result = "🔍 DRY-RUN"
+            result = "DRY-RUN"
         elif getattr(test_result, "passed", False):
-            result = "✅ PASS"
+            result = "PASS"
         else:
-            result = "❌ FAIL"
+            result = "FAIL"
 
         # Print formatted row
         row = "| {:<15} | {:<12} | {:<20} | {:<8} | {:<12} | {:<12} |".format(
@@ -371,7 +371,7 @@ class LiveProgressTable:
 
     def _print_mini_summary(self):
         """Print a brief summary line"""
-        print(f"    └─ {self.results_count} tests completed...")
+        print(f"    {self.results_count} tests completed...")
 
     def print_final_summary(self, all_results):
         """Print final summary at the end"""
@@ -383,6 +383,6 @@ class LiveProgressTable:
 
         print("\n" + "=" * 120)
         print(
-            f"🏁 FINAL SUMMARY: ✅ {passed} PASSED | ❌ {failed} FAILED | 📊 {len(all_results)} TOTAL"
+            f"FINAL SUMMARY: {passed} PASSED | {failed} FAILED | {len(all_results)} TOTAL"
         )
         print("=" * 120)

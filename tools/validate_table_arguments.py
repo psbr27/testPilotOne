@@ -172,9 +172,9 @@ def test_live_progress_table():
         try:
             table = LiveProgressTable()
             table.add_result(test_result)
-            print("  ✅ Successfully added to table")
+            print("  Successfully added to table")
         except Exception as e:
-            print(f"  ❌ Error adding to table: {e}")
+            print(f"  Error adding to table: {e}")
         
         print()
 
@@ -197,9 +197,9 @@ def test_dataclass_consistency():
             missing_in_dataclass.append(field)
     
     if missing_in_dataclass:
-        print(f"❌ Missing fields in TestResult dataclass: {missing_in_dataclass}")
+        print(f"Missing fields in TestResult dataclass: {missing_in_dataclass}")
     else:
-        print("✅ All required fields are present in TestResult dataclass")
+        print("All required fields are present in TestResult dataclass")
     
     print(f"Table required fields: {table_required_fields}")
     print()

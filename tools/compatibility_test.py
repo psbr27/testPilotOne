@@ -11,9 +11,9 @@ def test_python_version():
     """Test minimum Python version requirement."""
     print(f"Python version: {sys.version}")
     if sys.version_info < (3, 8):
-        print("❌ FAIL: Python 3.8+ required")
+        print("FAIL: Python 3.8+ required")
         return False
-    print("✅ PASS: Python version compatible")
+    print("PASS: Python version compatible")
     return True
 
 def test_imports():
@@ -36,12 +36,12 @@ def test_imports():
     for module in modules_to_test:
         try:
             importlib.import_module(module)
-            print(f"✅ PASS: {module}")
+            print(f"PASS: {module}")
         except ImportError as e:
-            print(f"❌ FAIL: {module} - {e}")
+            print(f"FAIL: {module} - {e}")
             failed_imports.append(module)
         except Exception as e:
-            print(f"⚠️  WARNING: {module} - {e}")
+            print(f"WARNING: {module} - {e}")
     
     return len(failed_imports) == 0
 
@@ -60,9 +60,9 @@ def test_dependencies():
     for dep in required_deps:
         try:
             importlib.import_module(dep)
-            print(f"✅ PASS: {dep}")
+            print(f"PASS: {dep}")
         except ImportError:
-            print(f"❌ FAIL: {dep} not installed")
+            print(f"FAIL: {dep} not installed")
             failed_deps.append(dep)
     
     if failed_deps:
@@ -92,7 +92,7 @@ def main():
     if all_passed:
         print("🎉 ALL TESTS PASSED - TestPilot is Python 3.8+ compatible!")
     else:
-        print("❌ SOME TESTS FAILED - Check requirements and dependencies")
+        print("SOME TESTS FAILED - Check requirements and dependencies")
         sys.exit(1)
 
 if __name__ == "__main__":

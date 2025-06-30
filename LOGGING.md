@@ -18,9 +18,9 @@ When TestPilot runs, it creates several types of logs:
 
 ```
 logs/
-├── testpilot_YYYYMMDD_HHMMSS.log           # General log file
-├── testpilot_failures_YYYYMMDD_HHMMSS.log  # All failures and errors
-└── test_failures_YYYYMMDD_HHMMSS.log       # Structured failure data
+- testpilot_YYYYMMDD_HHMMSS.log           # General log file
+- testpilot_failures_YYYYMMDD_HHMMSS.log  # All failures and errors
+- test_failures_YYYYMMDD_HHMMSS.log       # Structured failure data
 ```
 
 ## 🔍 Log File Contents
@@ -50,7 +50,7 @@ Machine-readable format for automated analysis:
 2024-01-15 10:30:16|ERROR|SHEET=Sheet1|ROW=5|HOST=host1|TEST_NAME=User_API_Test|COMMAND=curl -X GET https://api.example.com/users|REASON=Status mismatch: 404 vs 200|EXPECTED_STATUS=200|ACTUAL_STATUS=404|PATTERN_MATCH=|PATTERN_FOUND=None|OUTPUT_LENGTH=156|ERROR_LENGTH=0
 ```
 
-## ⚙️ Command Line Options
+## Command Line Options
 
 Control logging behavior with these options:
 
