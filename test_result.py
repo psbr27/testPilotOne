@@ -15,6 +15,10 @@ class TestResult:
     pattern_found: Optional[bool]
     passed: bool
     fail_reason: Optional[str]
+    # Additional fields that are set dynamically
+    test_name: Optional[str] = None
+    duration: float = 0.0
+    method: str = "GET"
 
 class TestStep:
     def __init__(self, row_idx: int, method: str, url: str, payload: Any, headers: Dict, expected_status: Any, pattern_match: Any, other_fields: Dict = None):

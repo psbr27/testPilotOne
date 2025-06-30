@@ -3,6 +3,7 @@ import json
 import jsondiff
 import pandas as pd
 import logging
+from typing import Dict, Any, Tuple, Optional, Union
 from parse_utils import extract_request_json_manual
 import parse_instant_utils as piu
 logger = logging.getLogger("TestPilot.ResponseParser")
@@ -133,6 +134,139 @@ def check_pod_logs(output, pattern_match):
         logger.error(f"Pattern match not found in pod logs for pattern: {pattern_match}")
     return False
 
+def _validate_get_method_comparison(
+    response_payload: Any,
+    server_output: Any,
+    compare_with_payload: Any,
+    compare_with_key: Optional[str]
+) -> Tuple[bool, Optional[str]]:
+    """Validate GET method response against reference payload."""
+    try:
+        ref_payload = compare_with_payload
+        if isinstance(ref_payload, str):
+            ref_payload = json.loads(ref_payload)
+        
+        # If response_payload is None, compare with server_output
+        if response_payload is None:
+            # check server_output is a string if so convert to JSON
+            if isinstance(server_output, str):
+                try:
+                    server_output = json.loads(server_output)
+                except json.JSONDecodeError:
+                    logger.debug("server_output is not valid JSON, using as-is")
+            diff_result = jsondiff.diff(server_output, ref_payload)
+        else:
+            diff_result = jsondiff.diff(response_payload, ref_payload)
+        
+        if diff_result:
+            fail_reason = f"GET response does not match {compare_with_key or 'reference payload'}. Diff: {diff_result}"
+            return False, fail_reason
+        else:
+            logger.info(f"GET response matches {compare_with_key or 'reference payload'}.")
+            return True, None
+    except Exception as e:
+        logger.error(f"Workflow compare failed: {e}")
+        return False, f"Workflow compare error: {e}"
+
+
+def _validate_status_code(
+    actual_status: Optional[int],
+    expected_status: Any,
+    method: Optional[str]
+) -> Tuple[bool, Optional[str]]:
+    """Validate HTTP status code against expected value."""
+    if expected_status is None or pd.isna(expected_status):
+        return True, None
+    
+    try:
+        expected_status_int = int(expected_status)
+        actual_status_int = int(actual_status or 0)
+        
+        # For PUT, accept both 200 and 201 as pass if expected is either
+        logger.info(f"{method} Comparing actual status {actual_status_int} with expected status {expected_status_int}")
+        
+        if method and method.upper() == "PUT":
+            if (expected_status_int in (200, 201)) and (actual_status_int in (200, 201)):
+                return True, None
+            elif actual_status_int != expected_status_int:
+                return False, f"Status mismatch: {actual_status_int} vs {expected_status_int}"
+        else:
+            if actual_status_int != expected_status_int:
+                return False, f"Status mismatch: {actual_status_int} vs {expected_status_int}"
+        
+        return True, None
+    except Exception:
+        return False, f"Unable to compare status: {actual_status} vs {expected_status}"
+
+
+def _parse_pattern_as_json(pattern_match: Any) -> Tuple[Optional[Union[dict, list]], bool]:
+    """Try to parse pattern_match as JSON."""
+    if isinstance(pattern_match, (dict, list)):
+        return pattern_match, True
+    elif isinstance(pattern_match, str):
+        pattern_match_str = pattern_match.strip()
+        if (pattern_match_str.startswith('{') and pattern_match_str.endswith('}')) or \
+           (pattern_match_str.startswith('[') and pattern_match_str.endswith(']')):
+            try:
+                return json.loads(pattern_match_str), True
+            except Exception as e:
+                logger.debug(f"pattern_match looks like JSON but failed to parse: {e}")
+    return None, False
+
+
+def _validate_pattern_match(
+    pattern_match: Any,
+    output: Optional[str],
+    response_payload: Any,
+    compare_with_payload: Any,
+    is_kubectl_logs: bool
+) -> Tuple[bool, Optional[str], Optional[bool]]:
+    """Validate pattern matching in output or response payload."""
+    if not pattern_match:
+        return True, None, None
+    
+    pattern_json, pattern_json_valid = _parse_pattern_as_json(pattern_match)
+    pattern_found = None
+    
+    # Use JSON diff if both are JSON
+    if pattern_json_valid and isinstance(response_payload, (dict, list)):
+        diff_result = jsondiff.diff(response_payload, pattern_json)
+        pattern_found = (not diff_result)
+        logger.debug(f"Pattern JSON diff: {diff_result}")
+        if not pattern_found:
+            return False, f"Pattern JSON not found in response. Diff: {diff_result}", pattern_found
+    else:
+        # Convert output to string if needed
+        if isinstance(output, (dict, list)):
+            output = json.dumps(output, ensure_ascii=False)
+        
+        # Check in output first
+        pattern_found = check_pod_logs(output, pattern_match)
+        logger.debug(f"Pattern search in output: found={pattern_found}")
+        
+        # Check in response payload if not found
+        if not pattern_found and response_payload is not None:
+            pattern_found = str(pattern_match) in str(response_payload)
+            logger.debug(f"Pattern search in response_payload: found={pattern_found}")
+        
+        # Check in compare_with_payload if still not found
+        if not pattern_found and compare_with_payload is not None:
+            compare_payload_str = json.dumps(compare_with_payload, ensure_ascii=False) if isinstance(compare_with_payload, (dict, list)) else str(compare_with_payload)
+            pattern_found = str(pattern_match) in compare_payload_str
+            if pattern_found:
+                logger.debug(f"Pattern '{pattern_match}' found in compare_with_payload")
+        
+        # Final check for kubectl logs
+        if not pattern_found and is_kubectl_logs and output:
+            pattern_found = check_pod_logs(output, pattern_match)
+            logger.debug(f"Pattern search in kubectl logs output: found={pattern_found}")
+        
+        if not pattern_found:
+            return False, f"Pattern '{pattern_match}' not found in response", pattern_found
+    
+    return True, None, pattern_found
+
+
 def validate_test_result(parsed, expected_status=None, pattern_match=None, output=None, error=None, compare_with_payload=None, compare_with_key=None, method=None):
     """
     Validate parsed response against expected status and/or pattern_match substring.
@@ -140,125 +274,47 @@ def validate_test_result(parsed, expected_status=None, pattern_match=None, outpu
     Returns: passed (bool), fail_reason (str or None), pattern_found (bool or None)
     """
     logger.debug(f"Validating test result: expected_status={expected_status}, pattern_match={pattern_match}")
+    
+    # Extract data from parsed response
     actual_status = parsed.get("http_status")
     response_payload = parsed.get("response_payload")
     server_output = parsed.get("raw_output")
+    is_kubectl_logs = parsed.get('is_kubectl_logs', False)
+    
     logger.debug(f"Actual HTTP status: {actual_status}")
+    
     passed = True
     fail_reason = None
     pattern_found = None
-    # Workflow-aware GET/compare logic
+    
+    # Step 1: Validate GET method comparison if applicable
     if method and method.upper() == "GET" and compare_with_payload is not None:
-        try:
-            ref_payload = compare_with_payload
-            if isinstance(ref_payload, str):
-                ref_payload = json.loads(ref_payload)
-            
-            # If response_payload is None, compare with server_output
-            if response_payload is None:
-                # check server_output is a string if so convert to JSON
-                if isinstance(server_output, str):
-                    try:
-                        server_output = json.loads(server_output)
-                    except json.JSONDecodeError:
-                        logger.debug("server_output is not valid JSON, using as-is")
-                diff_result = jsondiff.diff(server_output, ref_payload)
-            else:
-                diff_result = jsondiff.diff(response_payload, ref_payload)
-            if diff_result:
-                passed = False
-                fail_reason = f"GET response does not match {compare_with_key or 'reference payload'}. Diff: {diff_result}"
-            else:
-                logger.info(f"GET response matches {compare_with_key or 'reference payload'}.")
-        except Exception as e:
-            logger.error(f"Workflow compare failed: {e}")
-            passed = False
-            fail_reason = f"Workflow compare error: {e}"
-    # Check status (handle NaN or non-int gracefully)
-    if passed and expected_status is not None and pd.notna(expected_status):
-        try:
-            expected_status_int = int(expected_status)
-            # For PUT, accept both 200 and 201 as pass if expected is either
-            logger.info(f"{method} Comparing actual status {actual_status} with expected status {expected_status_int}")
-            if method and method.upper() == "PUT":
-                actual_status_int = int(actual_status or 0)
-                if (expected_status_int in (200, 201)) and (actual_status_int in (200, 201)):
-                    passed = True
-                else:
-                    passed = actual_status_int == expected_status_int
-            else:
-                passed = int(actual_status or 0) == expected_status_int
-        except Exception:
-            passed = False
-            fail_reason = f"Unable to compare status: {actual_status} vs {expected_status}"
+        passed, fail_reason = _validate_get_method_comparison(
+            response_payload, server_output, compare_with_payload, compare_with_key
+        )
+        if not passed:
             return passed, fail_reason, pattern_found
-    # Pattern matching: always search as substring in output, then payload
-    if passed and pattern_match:
-        # If pattern_match is a string that looks like JSON, try to parse it
-        pattern_json = None
-        pattern_json_valid = False
-        if isinstance(pattern_match, (dict, list)):
-            pattern_json = pattern_match
-            pattern_json_valid = True
-        elif isinstance(pattern_match, str):
-            pattern_match_str = pattern_match.strip()
-            if (pattern_match_str.startswith('{') and pattern_match_str.endswith('}')) or \
-               (pattern_match_str.startswith('[') and pattern_match_str.endswith(']')):
-                try:
-                    pattern_json = json.loads(pattern_match_str)
-                    pattern_json_valid = True
-                except Exception as e:
-                    logger.debug(f"pattern_match looks like JSON but failed to parse: {e}")
-                    pattern_json_valid = False
-        # Use JSON diff if both are JSON
-        if pattern_json_valid and isinstance(response_payload, (dict, list)):
-            diff_result = jsondiff.diff(response_payload, pattern_json)
-            pattern_found = (not diff_result)
-            logger.debug(f"Pattern JSON diff: {diff_result}")
-            if not pattern_found:
-                passed = False
-                fail_reason = f"Pattern JSON not found in response. Diff: {diff_result}"
-        else:
-            # if output is a dict or list, convert to string for substring search
-            if isinstance(output, (dict, list)):
-                output = json.dumps(output, ensure_ascii=False)
-            pattern_found = check_pod_logs(output, pattern_match)
-            logger.debug(f"Pattern search in output: found={pattern_found}")
-            if not pattern_found and response_payload is not None:
-                pattern_found = str(pattern_match) in str(response_payload)
-                logger.debug(f"Pattern search in response_payload: found={pattern_found}")
-            if not pattern_found:
-                passed = False
-                fail_reason = f"Pattern '{pattern_match}' not found in response"
     
-    # if pattern_found is false; we have to find response_payload and pattern_match 
-    # both are present if so just find the pattern_match from response_payload
-    logger.debug(f"Trying next validation if both response_payload and pattern_match found: passed={passed}, fail_reason={fail_reason}, pattern_found={pattern_found}")
-    if not pattern_found and compare_with_payload is not None and pattern_match is not None:
-        # check response payload is a dict if so convert to JSON 
-        if isinstance(compare_with_payload, (dict, list)):
-            compare_payload_str = json.dumps(compare_with_payload, ensure_ascii=False)
-        else:
-            compare_payload_str = str(compare_with_payload)
-        # If pattern_match is a string then find this string in compare_payload_str
-        pattern_found = str(pattern_match) in compare_payload_str
-        if pattern_found:
-            logger.debug(f"Pattern '{pattern_match}' found in compare_with_payload")
-            passed = True
+    # Step 2: Validate status code
+    status_passed, status_fail_reason = _validate_status_code(
+        actual_status, expected_status, method
+    )
+    if not status_passed:
+        return status_passed, status_fail_reason, pattern_found
     
-    # if only pattern_match presents for kubectl logs command
-    logger.debug(f"Final validation for kubectl logs output: passed={passed}, fail_reason={fail_reason}, pattern_found={pattern_found}")
-    if not pattern_found and output and pattern_match:
-        # Check if this is kubectl logs output
-        if parsed.get('is_kubectl_logs', False):
-            pattern_found = check_pod_logs(output, pattern_match)
-            logger.debug(f"Pattern search in kubectl logs output: found={pattern_found}")
-            if not pattern_found:
-                passed = False
-                fail_reason = f"Pattern '{pattern_match}' not found in kubectl logs output"
-    # Check error
+    # Step 3: Validate pattern matching
+    if pattern_match:
+        pattern_passed, pattern_fail_reason, pattern_found = _validate_pattern_match(
+            pattern_match, output, response_payload, compare_with_payload, is_kubectl_logs
+        )
+        if not pattern_passed:
+            passed = False
+            fail_reason = pattern_fail_reason
+    
+    # Step 4: Check for errors
     if error:
         passed = False
         fail_reason = fail_reason or error
+    
     return passed, fail_reason, pattern_found
 

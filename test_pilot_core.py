@@ -7,27 +7,37 @@ import pandas as pd
 import subprocess
 import re
 import time
+import sys
+from typing import Dict, List, Any, Optional, Tuple, Union
 from response_parser import parse_curl_output, validate_test_result
-from test_result import TestResult
+from test_result import TestResult, TestFlow, TestStep
 from curl_builder import build_ssh_k8s_curl_command
-from logger import get_logger
+from logger import get_logger, get_failure_logger
+
+# Python 3.8+ compatibility for Pattern type
+if sys.version_info >= (3, 9):
+    PatternType = re.Pattern[str]
+else:
+    from typing import Pattern
+    PatternType = Pattern[str]
 
 logger = get_logger("TestPilot.Core")
+failure_logger = get_failure_logger("TestPilot.Failures")
 
-def safe_str(val):
+def safe_str(val: Any) -> str:
 
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return ""
     return str(val)
 
-def substitute_placeholders(command, svc_map, placeholder_pattern):
-
+def substitute_placeholders(command: str, svc_map: Dict[str, str], placeholder_pattern: PatternType) -> str:
+    """Substitute placeholders in command with values from service map."""
     def repl(match):
         key = match.group(1)
         return svc_map.get(key, match.group(0))
     return placeholder_pattern.sub(repl, command)
 
-def extract_step_data(step):
+def extract_step_data(step: TestStep) -> Dict[str, Any]:
     """Extract and prepare all data from a TestStep object."""
     command = step.other_fields.get("Command")
     from_excel_response_payload = step.other_fields.get("Response_Payload")
@@ -63,7 +73,8 @@ def extract_step_data(step):
         "compare_with_key": compare_with_key,
     }
 
-def manage_workflow_context(flow, step_data):
+def manage_workflow_context(flow: TestFlow, step_data: Dict[str, Any]) -> None:
+    """Manage workflow context for storing payloads between steps."""
     method = step_data["method"]
     request_payload = step_data["request_payload"]
     if method.upper() in ["PUT", "POST"]:
@@ -72,7 +83,7 @@ def manage_workflow_context(flow, step_data):
         if request_payload:
             flow.context[save_key] = request_payload
 
-def resolve_namespace(connector, host):
+def resolve_namespace(connector, host: str) -> Optional[str]:
     """Resolve namespace for a given host."""
     if connector.use_ssh:
         host_cfg = connector.get_host_config(host)
@@ -98,7 +109,14 @@ def resolve_namespace(connector, host):
             logger.warning(f"Could not fetch namespace from config: {e}")
         return None
 
-def build_url_based_command(step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host):
+def build_url_based_command(
+    step_data: Dict[str, Any], 
+    svc_map: Dict[str, str], 
+    placeholder_pattern: PatternType, 
+    namespace: Optional[str], 
+    host_cli_map: Optional[Dict[str, str]], 
+    host: str
+) -> Optional[str]:
     """Build curl command for URL-based API calls."""
     url = step_data["url"]
     method = step_data["method"]
@@ -217,19 +235,38 @@ def validate_and_create_result(step, flow, step_data, parsed_output, output, err
         pattern_found=pattern_found,
         passed=passed,
         fail_reason=fail_reason,
+        # Now included in dataclass definition
+        test_name=flow.test_name,
+        duration=duration,
+        method=method,
     )
-    setattr(test_result, "test_name", flow.test_name)
-    setattr(test_result, "duration", duration)
-    setattr(test_result, "method", method)
     return test_result
 
-def log_test_result(test_result, flow, step):
-    """Log test result with appropriate level."""
+def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> None:
+    """Log test result with appropriate level and structured failure logging."""
     if not test_result.passed:
+        # Standard console/file logging
         logger.error(f"[FAIL][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
         logger.error(f"Reason: {test_result.fail_reason}")
         logger.error(f"Output: {test_result.output}")
         logger.error(f"Error: {test_result.error}")
+        
+        # Structured failure logging for automated analysis
+        structured_failure = (
+            f"SHEET={flow.sheet}|"
+            f"ROW={step.row_idx}|"
+            f"HOST={test_result.host}|"
+            f"TEST_NAME={getattr(flow, 'test_name', 'Unknown')}|"
+            f"COMMAND={test_result.command}|"
+            f"REASON={test_result.fail_reason}|"
+            f"EXPECTED_STATUS={test_result.expected_status}|"
+            f"ACTUAL_STATUS={test_result.actual_status}|"
+            f"PATTERN_MATCH={test_result.pattern_match}|"
+            f"PATTERN_FOUND={test_result.pattern_found}|"
+            f"OUTPUT_LENGTH={len(test_result.output) if test_result.output else 0}|"
+            f"ERROR_LENGTH={len(test_result.error) if test_result.error else 0}"
+        )
+        failure_logger.error(structured_failure)
     else:
         logger.info(f"[PASS][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
 

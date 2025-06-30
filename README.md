@@ -1,6 +1,11 @@
-# TestPilotOne
+# TestPilot
 
 A modular, workflow-aware test automation framework for orchestrating multi-step, multi-host API and Kubernetes validation scenarios. Built for flexibility, maintainability, and extensibility in modern cloud-native environments.
+
+## 🔧 Requirements
+
+- **Python 3.8+** (tested on Python 3.8, 3.9, 3.10, 3.11, 3.12)
+- Dependencies listed in `requirements.txt`
 
 ---
 
@@ -34,24 +39,48 @@ A modular, workflow-aware test automation framework for orchestrating multi-step
 
 ---
 
-## Quickstart
+## 🚀 Quickstart
 
-1. **Install Requirements**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Installation
 
-2. **Prepare Configuration**
+**Option 1: Direct Installation**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Test compatibility
+python compatibility_test.py
+```
+
+**Option 2: Package Installation**
+```bash
+# Install as package
+pip install -e .
+```
+
+### Setup
+
+1. **Prepare Configuration**
    - Edit `config/hosts.json` to specify your hosts, SSH credentials, and namespaces.
 
-3. **Prepare Test Cases**
+2. **Prepare Test Cases**
    - Author your test scenarios in Excel (`.xlsx`), one sheet per workflow.
    - See `examples/` or below for template.
 
-4. **Run TestPilotOne**
+3. **Run TestPilot**
    ```bash
-   python test_pilot.py --input path/to/testcases.xlsx
+   python test_pilot.py --input path/to/testcases.xlsx --module your_module
+   
+   # Or if installed as package
+   testpilot --input path/to/testcases.xlsx --module your_module
    ```
+
+### Compatibility Check
+
+Before running TestPilot, you can verify your environment:
+```bash
+python compatibility_test.py
+```
 
 ---
 

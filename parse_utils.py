@@ -1,8 +1,13 @@
 import json
 import re
+import logging
+from typing import Optional, Dict, Any, List
+
+logger = logging.getLogger("ParseUtils")
 
 # Method 1: Use regex to extract the JSON string after "request":
-def extract_request_json_regex(pattern_match):
+def extract_request_json_regex(pattern_match: str) -> Optional[Dict[str, Any]]:
+    """Extract JSON from pattern using regex approach."""
     try:
         # Use regex to find the JSON string after "request":"
         match = re.search(r'"request":"(.+)"$', pattern_match)
@@ -11,11 +16,19 @@ def extract_request_json_regex(pattern_match):
             return json.loads(json_str)
         return None
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON with regex method: {e}")
+        logger.debug(f"Error parsing JSON with regex method: {e}")
+        return None
+    except (AttributeError, TypeError) as e:
+        logger.debug(f"Invalid input for regex extraction: {e}")
         return None
 
 # Method 2: Manual parsing approach
-def extract_request_json_manual(pattern_match):
+def extract_request_json_manual(pattern_match: str) -> Optional[Dict[str, Any]]:
+    """Extract JSON from pattern using manual parsing approach."""
+    if not isinstance(pattern_match, str):
+        logger.debug("Invalid input: pattern_match must be a string")
+        return None
+        
     try:
         # Find the start of the JSON after "request":"
         start_marker = '"request":"'
@@ -44,24 +57,39 @@ def extract_request_json_manual(pattern_match):
         return json.loads(json_str)
         
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON with manual method: {e}")
+        logger.debug(f"Error parsing JSON with manual method: {e}")
+        return None
+    except (IndexError, ValueError) as e:
+        logger.debug(f"Error in manual parsing logic: {e}")
         return None
 
 # Method 3: Split approach (simplest)
-def extract_request_json_split(pattern_match):
+def extract_request_json_split(pattern_match: str) -> Optional[Dict[str, Any]]:
+    """Extract JSON from pattern using split approach."""
+    if not isinstance(pattern_match, str):
+        logger.debug("Invalid input: pattern_match must be a string")
+        return None
+        
     try:
         # Split on "request":" and take the second part, then remove the last quote
         parts = pattern_match.split('"request":"', 1)
         if len(parts) == 2:
-            json_str = parts[1][:-1]  # Remove the trailing quote
+            json_str = parts[1]
+            # Check if there's a trailing quote and remove it
+            if json_str.endswith('"'):
+                json_str = json_str[:-1]
             return json.loads(json_str)
         return None
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON with split method: {e}")
+        logger.debug(f"Error parsing JSON with split method: {e}")
+        return None
+    except (IndexError, AttributeError) as e:
+        logger.debug(f"Error in split parsing logic: {e}")
         return None
 
-def check_flexible_log_pattern(output, pattern_match):
-    if not output:
+def check_flexible_log_pattern(output: str, pattern_match: str) -> bool:
+    """Check if pattern matches in log output using flexible criteria."""
+    if not output or not pattern_match:
         return False
     
     try:
@@ -93,6 +121,10 @@ def check_flexible_log_pattern(output, pattern_match):
                 
         return False
         
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.debug(f"Pattern is not valid JSON, falling back to string matching: {e}")
         # Fallback to simple string matching
         return pattern_match in output
+    except (AttributeError, TypeError) as e:
+        logger.debug(f"Error in pattern matching logic: {e}")
+        return False

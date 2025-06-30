@@ -1,0 +1,28 @@
+{
+  "use_ssh": true,
+  "ssh_settings": {
+    "auto_add_hosts": false,
+    "known_hosts_file": "~/.ssh/known_hosts",
+    "max_retries": 3,
+    "retry_delay": 2
+  },
+  "connect_to": "example-host",
+  "hosts": [
+    {
+      "name": "example-host",
+      "hostname": "192.168.1.100",
+      "username": "your-username",
+      "key_file": "~/.ssh/id_rsa",
+      "port": 22,
+      "namespace": "default"
+    },
+    {
+      "name": "dev-server",
+      "hostname": "dev.example.com",
+      "username": "devuser",
+      "password": "your-password",
+      "port": 22,
+      "namespace": "development"
+    }
+  ]
+}

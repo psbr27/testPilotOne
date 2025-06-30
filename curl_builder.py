@@ -1,16 +1,20 @@
 import os
 import json
 import logging
+import shlex
+from typing import Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger("CurlBuilder")
 
 def build_curl_command(
-    url,
-    method="GET",
-    headers=None,
-    payload=None,
-    payloads_folder="payloads",
-    extra_curl_args=None,
-    direct_json_allowed=True,
-):
+    url: str,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    payload: Optional[Union[str, Dict, List]] = None,
+    payloads_folder: str = "payloads",
+    extra_curl_args: Optional[List[str]] = None,
+    direct_json_allowed: bool = True,
+) -> Tuple[str, Optional[str]]:
     """
     Returns a tuple (curl_command_str, resolved_payload_str) for local execution.
     If payload is a filename (endswith .json), loads from payloads_folder.
@@ -27,40 +31,70 @@ def build_curl_command(
             payload_path = os.path.join(payloads_folder, payload.strip())
             if not os.path.isfile(payload_path):
                 raise FileNotFoundError(f"Payload file not found: {payload_path}")
-            with open(payload_path, "r", encoding="utf-8") as f:
-                resolved_payload = f.read().strip()
+            try:
+                with open(payload_path, "r", encoding="utf-8") as f:
+                    resolved_payload = f.read().strip()
+            except (IOError, OSError) as e:
+                logger.error(f"Failed to read payload file {payload_path}: {e}")
+                raise
         elif direct_json_allowed:
             # Try to pretty-print if valid JSON, else use as-is
-            try:
-                resolved_payload = json.dumps(json.loads(payload), separators=(",", ":"))
-            except Exception:
-                resolved_payload = payload.strip()
+            if isinstance(payload, (dict, list)):
+                try:
+                    resolved_payload = json.dumps(payload, separators=(",", ":"))
+                except (TypeError, ValueError) as e:
+                    logger.warning(f"Failed to serialize payload to JSON: {e}")
+                    resolved_payload = str(payload)
+            elif isinstance(payload, str):
+                try:
+                    # Validate and reformat JSON string
+                    parsed = json.loads(payload)
+                    resolved_payload = json.dumps(parsed, separators=(",", ":"))
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.debug(f"Payload is not valid JSON, using as-is: {e}")
+                    resolved_payload = payload.strip()
+            else:
+                resolved_payload = str(payload)
         else:
             resolved_payload = None
         if resolved_payload:
-            payload_arg = f"-d '{resolved_payload}'"
+            payload_arg = f"-d {shlex.quote(resolved_payload)}"
 
-    # Handle headers
-    header_args = [f"-H '{k}: {v}'" for k, v in headers.items()]
+    # Handle headers - escape each header value to prevent injection
+    header_args = []
+    for k, v in headers.items():
+        # Escape both key and value for safety
+        safe_header = f"{k}: {v}"
+        header_args.append(f"-H {shlex.quote(safe_header)}")
+    
     header_str = " ".join(header_args)
     if not header_str:
         header_str = "-H 'Content-Type: application/json'"  # Default header if none provided
-    extra_args = " ".join(extra_curl_args)
-    curl_cmd = f"curl -v --http2-prior-knowledge -X {method} '{url}' {header_str} {payload_arg} {extra_args}".strip()
+    
+    # Escape extra arguments if provided
+    extra_args = ""
+    if extra_curl_args:
+        extra_args = " ".join(shlex.quote(arg) for arg in extra_curl_args)
+    
+    # Escape URL and method to prevent injection
+    safe_url = shlex.quote(url)
+    safe_method = shlex.quote(method)
+    
+    curl_cmd = f"curl -v --http2-prior-knowledge -X {safe_method} {safe_url} {header_str} {payload_arg} {extra_args}".strip()
     return curl_cmd, resolved_payload
 
 
 def build_ssh_k8s_curl_command(
-    namespace,
-    container,
-    url,
-    method="GET",
-    headers=None,
-    payload=None,
-    payloads_folder="payloads",
-    pod_pattern="-[a-z0-9]+-[a-z0-9]+$",
-    extra_curl_args=None
-):
+    namespace: str,
+    container: str,
+    url: str,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    payload: Optional[Union[str, Dict, List]] = None,
+    payloads_folder: str = "payloads",
+    pod_pattern: str = "-[a-z0-9]+-[a-z0-9]+$",
+    extra_curl_args: Optional[List[str]] = None
+) -> Tuple[str, Optional[str]]:
     """
     Returns a kubectl exec command that runs curl inside a pod via SSH.
     """
@@ -72,10 +106,19 @@ def build_ssh_k8s_curl_command(
         payloads_folder=payloads_folder,
         extra_curl_args=extra_curl_args,
     )
-    # Find pod and exec curl inside
-    pod_pattern = container + "-[a-z0-9]+-[a-z0-9]+$"
-    pod_find = f"kubectl get po -n {namespace} | awk '{{print $1}}' | grep -E '{pod_pattern}'"
+    # Find pod and exec curl inside - escape all user inputs
+    safe_container = shlex.quote(container)
+    safe_namespace = shlex.quote(namespace)
+    
+    # Build pod pattern safely
+    pod_pattern = f"{container}-[a-z0-9]+-[a-z0-9]+$"
+    safe_pod_pattern = shlex.quote(pod_pattern)
+    
+    # Build kubectl commands with proper escaping
+    pod_find = f"kubectl get po -n {safe_namespace} | awk '{{print $1}}' | grep -E {safe_pod_pattern}"
+    
+    # Note: curl_cmd is already escaped from build_curl_command
     exec_cmd = (
-        f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {namespace} -c {container} -- {curl_cmd}"
+        f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
     )
     return exec_cmd, resolved_payload

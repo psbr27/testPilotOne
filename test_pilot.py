@@ -1,16 +1,27 @@
+#!/usr/bin/env python3
+# TestPilot - Test automation framework
+# Requires Python 3.8+
+
+import sys
+
+# Check Python version compatibility
+if sys.version_info < (3, 8):
+    print(f"Error: TestPilot requires Python 3.8 or higher. You are using Python {sys.version}")
+    sys.exit(1)
+
 from ssh_connector import SSHConnector
 from logger import get_logger
 import json
 from excel_parser import ExcelParser
 import argparse
 import re
-import json
 import datetime
 import time
 import pandas as pd
 import os
 
 from tabulate import tabulate
+from console_table_fmt import LiveProgressTable
 
 from dry_run import dry_run_commands
 from excel_parser import parse_excel_to_flows
@@ -58,6 +69,16 @@ def parse_args():
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set log level (default: INFO)",
+    )
+    parser.add_argument(
+        "--no-file-logging",
+        action="store_true",
+        help="Disable file logging (console only)",
+    )
+    parser.add_argument(
+        "--log-dir",
+        default="logs",
+        help="Directory for log files (default: logs)",
     )
     return parser.parse_args()
 
@@ -370,9 +391,20 @@ def safe_str(val):
 
 def main():
     args = parse_args()
+    
+    # Configure logging based on command line arguments
+    global logger
+    logger = get_logger(
+        name="TestPilot",
+        log_to_file=not args.no_file_logging,
+        log_dir=args.log_dir
+    )
     logger.setLevel(args.log_level.upper())
+    
     logger.info(f"TestPilot started with args: {args}")
     logger.info(f"Module specified: {args.module}")
+    if not args.no_file_logging:
+        logger.info(f"Logs will be written to directory: {args.log_dir}")
     config_file = "config/hosts.json"
     _, target_hosts = load_config_and_targets(config_file)
     connector = SSHConnector(config_file)
