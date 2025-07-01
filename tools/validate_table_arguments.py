@@ -4,16 +4,16 @@ Table Arguments Validation Script
 Validates that all required fields are properly populated before being passed to LiveProgressTable
 """
 
-import sys
 import logging
-from typing import Any, Dict, List
+import sys
 from dataclasses import fields
+from typing import Any, Dict, List
 
 # Add current directory to path to import modules
 sys.path.insert(0, '.')
 
-from test_result import TestResult, TestStep, TestFlow
 from console_table_fmt import LiveProgressTable
+from test_result import TestFlow, TestResult, TestStep
 
 
 def validate_test_result_fields(test_result: Any) -> Dict[str, Any]:

@@ -174,3 +174,26 @@ MIT License. See `LICENSE` file for details.
 - Built with Python 3.8+
 - Uses pandas, tabulate, jsondiff, and standard libraries.
 - Inspired by real-world needs for robust, flexible, and workflow-aware cloud test automation.
+
+## Type Checking and mypy Usage
+
+To run mypy and avoid duplicate module errors:
+
+1. Always run mypy from the project root (the parent directory of `testPilotOne/`).
+   ```sh
+   mypy testPilotOne/
+   ```
+2. If you encounter errors like `Source file found twice under different module names`, ensure you are not running mypy from inside the `testPilotOne/` directory.
+3. If the error persists, try using the `--explicit-package-bases` flag:
+   ```sh
+   mypy --explicit-package-bases testPilotOne/
+   ```
+4. Make sure your imports are consistent (prefer absolute imports within the package).
+
+## Type Stubs for Third-Party Libraries
+
+For better type checking with mypy, install stubs for third-party libraries:
+
+```sh
+python3 -m pip install types-tabulate pandas-stubs
+```

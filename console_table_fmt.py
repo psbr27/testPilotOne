@@ -1,13 +1,34 @@
 # =============================================================================
-# APPROACH 1: Simple - Headers Once, Then Just Rows
+# Console Table Formatting Module
+# Provides multiple approaches for displaying live test results in terminal
 # =============================================================================
 
 import os
 import sys
+import threading
 import time
+
 from tabulate import tabulate
 
+# =============================================================================
+# Constants for table formatting
+# =============================================================================
+DEFAULT_COLUMN_WIDTHS = {
+    "host": 15,
+    "sheet": 20,
+    "test_name": 30,
+    "method": 8,
+    "result": 12,
+    "duration": 12,
+}
 
+TABLE_WIDTH = 120
+SEPARATOR_WIDTH = 120
+
+
+# =============================================================================
+# APPROACH 1: Simple - Headers Once, Then Just Rows
+# =============================================================================
 class SimpleProgressTable:
     def __init__(self):
         self.headers = [
@@ -199,10 +220,9 @@ class LiveUpdateTable:
 
 try:
     from rich.console import Console
-    from rich.table import Table
     from rich.live import Live
+    from rich.table import Table
     from rich.text import Text
-    import threading
 
     class RichLiveTable:
         def __init__(self):
@@ -289,7 +309,7 @@ except ImportError:
 class LiveProgressTable:
     """Live updating table that prints headers once and adds rows incrementally"""
 
-    def __init__(self, approach="simple"):
+    def __init__(self, approach="simple", column_widths=None):
         self.headers = [
             "Host",
             "Sheet",
@@ -301,71 +321,133 @@ class LiveProgressTable:
         self.headers_printed = False
         self.results_count = 0
         self.approach = approach
+        self.supports_ansi = self._check_ansi_support()
+
+        # Use custom column widths if provided, otherwise use defaults
+        self.column_widths = column_widths or DEFAULT_COLUMN_WIDTHS.copy()
+
+    def _check_ansi_support(self):
+        """Check if terminal supports ANSI color codes"""
+        try:
+            # Check if output is a TTY
+            if not sys.stdout.isatty():
+                return False
+
+            # Check common environment variables
+            if os.environ.get("NO_COLOR"):
+                return False
+
+            # Check TERM variable
+            term = os.environ.get("TERM", "").lower()
+            if term in ["dumb", "unknown"]:
+                return False
+
+            # Windows specific check
+            if os.name == "nt":
+                # Check if Windows Terminal or modern console
+                import platform
+
+                if platform.version() >= "10.0.10586":  # Windows 10 TH2 and later
+                    return True
+                return False
+
+            # Unix-like systems usually support ANSI
+            return True
+        except:
+            # If any error, default to no ANSI support
+            return False
 
     def print_headers_once(self):
         """Print table headers once at the beginning"""
         if not self.headers_printed:
-            print("\n" + "=" * 120)
+            print("\n" + "=" * SEPARATOR_WIDTH)
             print("TEST EXECUTION PROGRESS")
-            print("=" * 120)
+            print("=" * SEPARATOR_WIDTH)
 
             # Print header row with proper formatting
             header_row = (
-                "| {:<15} | {:<12} | {:<20} | {:<8} | {:<12} | {:<12} |".format(
+                f"| {{:<{self.column_widths['host']}}} | "
+                f"{{:<{self.column_widths['sheet']}}} | "
+                f"{{:<{self.column_widths['test_name']}}} | "
+                f"{{:<{self.column_widths['method']}}} | "
+                f"{{:<{self.column_widths['result']}}} | "
+                f"{{:<{self.column_widths['duration']}}} |".format(
                     "Host", "Sheet", "Test Name", "Method", "Result", "Duration (s)"
                 )
             )
             print(header_row)
-            print(
-                "|" + "-" * 15 + "|" + "-" * 20 + "|" + "-" * 30 + "|" + "-" * 8 + "|" + "-" * 12 + "|" + "-" * 12 + "|"
+
+            # Print separator line
+            separator = (
+                "|"
+                + "-" * self.column_widths["host"]
+                + "|"
+                + "-" * self.column_widths["sheet"]
+                + "|"
+                + "-" * self.column_widths["test_name"]
+                + "|"
+                + "-" * self.column_widths["method"]
+                + "|"
+                + "-" * self.column_widths["result"]
+                + "|"
+                + "-" * self.column_widths["duration"]
+                + "|"
             )
+            print(separator)
             self.headers_printed = True
 
     def add_result(self, test_result):
         """Add a single test result row"""
         self.print_headers_once()
 
-        # Extract data
-        host = getattr(test_result, "host", "")[:14]  # Truncate if too long
-        sheet = getattr(test_result, "sheet", "")[:20]
-        test_name = getattr(test_result, "test_name", "")[:30]
+        # Extract data with dynamic truncation based on column widths
+        host = getattr(test_result, "host", "")[: self.column_widths["host"] - 1]
+        sheet = getattr(test_result, "sheet", "")[: self.column_widths["sheet"] - 1]
+        test_name = getattr(test_result, "test_name", "")[
+            : self.column_widths["test_name"] - 1
+        ]
         method = (
-            getattr(test_result, "method", "") if hasattr(test_result, "method") else ""
+            getattr(test_result, "method", "")[: self.column_widths["method"] - 1]
+            if hasattr(test_result, "method")
+            else ""
         )
         duration = f"{getattr(test_result, 'duration', 0.0):.2f}"
 
         # Format result with colors
-        ANSI_GREEN = "\033[92m"
-        ANSI_RED = "\033[91m"
-        ANSI_RESET = "\033[0m"
+        if self.supports_ansi:
+            ANSI_GREEN = "\033[92m"
+            ANSI_RED = "\033[91m"
+            ANSI_YELLOW = "\033[93m"
+            ANSI_RESET = "\033[0m"
+        else:
+            ANSI_GREEN = ANSI_RED = ANSI_YELLOW = ANSI_RESET = ""
+
         if (
             hasattr(test_result, "result")
             and getattr(test_result, "result", "") == "DRY-RUN"
         ):
-            result = "DRY-RUN"
+            result = (
+                f"{ANSI_YELLOW}DRY-RUN{ANSI_RESET}" if self.supports_ansi else "DRY-RUN"
+            )
         elif getattr(test_result, "passed", False):
-            result = f"{ANSI_GREEN}PASS{ANSI_RESET}"
+            result = f"{ANSI_GREEN}PASS{ANSI_RESET}" if self.supports_ansi else "PASS"
         else:
-            result = f"{ANSI_RED}FAIL{ANSI_RESET}"
+            result = f"{ANSI_RED}FAIL{ANSI_RESET}" if self.supports_ansi else "FAIL"
 
-        # Print formatted row
-        row = "| {:<15} | {:<20} | {:<30} | {:<8} | {:<12} | {:<12} |".format(
-            host, sheet, test_name, method, result, duration
+        # Print formatted row with configurable widths
+        row = (
+            f"| {{:<{self.column_widths['host']}}} | "
+            f"{{:<{self.column_widths['sheet']}}} | "
+            f"{{:<{self.column_widths['test_name']}}} | "
+            f"{{:<{self.column_widths['method']}}} | "
+            f"{{:<{self.column_widths['result']}}} | "
+            f"{{:<{self.column_widths['duration']}}} |".format(
+                host, sheet, test_name, method, result, duration
+            )
         )
         print(row)
-        import time
-        time.sleep(0.5)
 
         self.results_count += 1
-
-        # Print running summary every 5 tests
-        if self.results_count % 5 == 0:
-            self._print_mini_summary()
-
-    def _print_mini_summary(self):
-        """Print a brief summary line"""
-        #print(f"    {self.results_count} tests completed...")
-        pass
 
     def print_final_summary(self, all_results):
         """Print final summary at the end"""
@@ -375,8 +457,8 @@ class LiveProgressTable:
         passed = sum(1 for r in all_results if getattr(r, "passed", False))
         failed = len(all_results) - passed
 
-        print("\n" + "=" * 120)
+        print("\n" + "=" * SEPARATOR_WIDTH)
         print(
             f"FINAL SUMMARY: {passed} PASSED | {failed} FAILED | {len(all_results)} TOTAL"
         )
-        print("=" * 120)
+        print("=" * SEPARATOR_WIDTH)

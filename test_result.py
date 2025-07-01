@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 
 @dataclass
 class TestResult:
@@ -20,8 +21,19 @@ class TestResult:
     duration: float = 0.0
     method: str = "GET"
 
+
 class TestStep:
-    def __init__(self, row_idx: int, method: str, url: str, payload: Any, headers: Dict, expected_status: Any, pattern_match: Any, other_fields: Dict = None):
+    def __init__(
+        self,
+        row_idx: int,
+        method: str,
+        url: str,
+        payload: Any,
+        headers: Dict,
+        expected_status: Any,
+        pattern_match: Any,
+        other_fields: Dict = None,
+    ):
         self.row_idx = row_idx
         self.method = method
         self.url = url
@@ -31,6 +43,7 @@ class TestStep:
         self.pattern_match = pattern_match
         self.other_fields = other_fields or {}
         self.result: Optional[TestResult] = None  # Will hold TestResult after execution
+
 
 class TestFlow:
     def __init__(self, sheet: str, test_name: str):

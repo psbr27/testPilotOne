@@ -1,18 +1,28 @@
-import json
-import paramiko
-import os
 import hashlib
+import json
+import os
 import time
-from typing import Optional, Dict, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional, Tuple
+
+import paramiko
+
 from logger import get_logger
 
 logger = get_logger("SSHConnector")
 
+
 class SSHHostConfig:
-    def __init__(self, name: str, hostname: str, username: str, 
-                 key_file: Optional[str] = None, password: Optional[str] = None, 
-                 port: int = 22, namespace: Optional[str] = None):
+    def __init__(
+        self,
+        name: str,
+        hostname: str,
+        username: str,
+        key_file: Optional[str] = None,
+        password: Optional[str] = None,
+        port: int = 22,
+        namespace: Optional[str] = None,
+    ):
         self.name = name
         self.hostname = hostname
         self.username = username
@@ -35,7 +45,7 @@ class SSHConnector:
         self._load_config()
 
     def _load_config(self):
-        with open(self.config_file, 'r') as f:
+        with open(self.config_file, "r") as f:
             data = json.load(f)
 
         self.use_ssh = data.get("use_ssh", False)
@@ -46,12 +56,16 @@ class SSHConnector:
         # Load SSH security settings
         ssh_settings = data.get("ssh_settings", {})
         self.auto_add_hosts = ssh_settings.get("auto_add_hosts", False)
-        self.known_hosts_file = ssh_settings.get("known_hosts_file", self.known_hosts_file)
+        self.known_hosts_file = ssh_settings.get(
+            "known_hosts_file", self.known_hosts_file
+        )
         self.max_retries = ssh_settings.get("max_retries", self.max_retries)
         self.retry_delay = ssh_settings.get("retry_delay", self.retry_delay)
-        
+
         if self.auto_add_hosts:
-            logger.warning("WARNING: auto_add_hosts is enabled. This is insecure and should only be used in development!")
+            logger.warning(
+                "WARNING: auto_add_hosts is enabled. This is insecure and should only be used in development!"
+            )
 
         for host in data.get("hosts", []):
             host_cfg = SSHHostConfig(
@@ -61,7 +75,7 @@ class SSHConnector:
                 key_file=host.get("key_file"),
                 password=host.get("password"),
                 port=host.get("port", 22),
-                namespace=host.get("namespace")
+                namespace=host.get("namespace"),
             )
             self.host_configs.append(host_cfg)
 
@@ -78,7 +92,7 @@ class SSHConnector:
                     logger.warning(f"Unknown host: {hostname}")
                     logger.warning(f"Key type: {key_type}")
                     logger.warning(f"Key fingerprint: {fingerprint}")
-                    
+
                     # In production, this should either:
                     # 1. Reject the connection (raise paramiko.SSHException)
                     # 2. Check against a pre-configured list of known host keys
@@ -88,15 +102,18 @@ class SSHConnector:
                         f"Add the host key to known_hosts or enable auto_add_hosts in config "
                         f"(not recommended for production)."
                     )
+
             return PromptPolicy()
 
-    def _connect_host(self, host_config: SSHHostConfig) -> Tuple[str, Optional[paramiko.SSHClient]]:
+    def _connect_host(
+        self, host_config: SSHHostConfig
+    ) -> Tuple[str, Optional[paramiko.SSHClient]]:
         """Connect to a host with retry mechanism."""
         last_exception = None
-        
+
         for attempt in range(self.max_retries):
             ssh = paramiko.SSHClient()
-            
+
             try:
                 # Load known hosts file if it exists
                 if os.path.exists(self.known_hosts_file):
@@ -105,7 +122,7 @@ class SSHConnector:
                         logger.debug(f"Loaded known hosts from {self.known_hosts_file}")
                     except Exception as e:
                         logger.warning(f"Failed to load known hosts file: {e}")
-                
+
                 # Set the host key policy
                 ssh.set_missing_host_key_policy(self._get_host_key_policy())
 
@@ -116,27 +133,35 @@ class SSHConnector:
                     username=host_config.username,
                     key_filename=host_config.key_file if host_config.key_file else None,
                     password=host_config.password if not host_config.key_file else None,
-                    timeout=10
+                    timeout=10,
                 )
-                logger.debug(f"Connected to {host_config.name} ({host_config.hostname}) on attempt {attempt + 1}")
+                logger.debug(
+                    f"Connected to {host_config.name} ({host_config.hostname}) on attempt {attempt + 1}"
+                )
                 return host_config.name, ssh
-                
+
             except paramiko.SSHException as e:
                 last_exception = e
-                logger.warning(f"SSH error connecting to {host_config.name} (attempt {attempt + 1}/{self.max_retries}): {e}")
+                logger.warning(
+                    f"SSH error connecting to {host_config.name} (attempt {attempt + 1}/{self.max_retries}): {e}"
+                )
                 ssh.close()
             except Exception as e:
                 last_exception = e
-                logger.warning(f"Failed to connect to {host_config.name} (attempt {attempt + 1}/{self.max_retries}): {e}")
+                logger.warning(
+                    f"Failed to connect to {host_config.name} (attempt {attempt + 1}/{self.max_retries}): {e}"
+                )
                 ssh.close()
-            
+
             # Wait before retry (except on last attempt)
             if attempt < self.max_retries - 1:
                 logger.debug(f"Waiting {self.retry_delay} seconds before retry...")
                 time.sleep(self.retry_delay)
-        
+
         # All attempts failed
-        logger.error(f"Failed to connect to {host_config.name} after {self.max_retries} attempts. Last error: {last_exception}")
+        logger.error(
+            f"Failed to connect to {host_config.name} after {self.max_retries} attempts. Last error: {last_exception}"
+        )
         return host_config.name, None
 
     def connect_all(self, target_hosts: Optional[List[str]] = None) -> None:
@@ -147,7 +172,9 @@ class SSHConnector:
 
         host_configs_to_connect = self.host_configs
         if target_hosts is not None:
-            host_configs_to_connect = [hc for hc in self.host_configs if hc.name in target_hosts]
+            host_configs_to_connect = [
+                hc for hc in self.host_configs if hc.name in target_hosts
+            ]
 
         if not host_configs_to_connect:
             logger.warning("No host configurations found to connect to")
@@ -193,7 +220,9 @@ class SSHConnector:
 
             for future in as_completed(futures):
                 try:
-                    name, out, err = future.result(timeout=timeout + 5)  # Give extra time for cleanup
+                    name, out, err = future.result(
+                        timeout=timeout + 5
+                    )  # Give extra time for cleanup
                     results[name] = {"output": out, "error": err}
                 except Exception as e:
                     name = futures[future]

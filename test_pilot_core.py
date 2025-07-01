@@ -3,27 +3,31 @@
 # =============================================================================
 
 import json
-import pandas as pd
-import subprocess
 import re
-import time
+import subprocess
 import sys
-from typing import Dict, List, Any, Optional, Tuple, Union
-from response_parser import parse_curl_output
-from validation_engine import ValidationDispatcher, ValidationContext
-from test_result import TestResult, TestFlow, TestStep
+import time
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import pandas as pd
+
 from curl_builder import build_ssh_k8s_curl_command
-from logger import get_logger, get_failure_logger
+from logger import get_failure_logger, get_logger
+from response_parser import parse_curl_output
+from test_result import TestFlow, TestResult, TestStep
+from validation_engine import ValidationContext, ValidationDispatcher
 
 # Python 3.8+ compatibility for Pattern type
 if sys.version_info >= (3, 9):
     PatternType = re.Pattern[str]
 else:
     from typing import Pattern
+
     PatternType = Pattern[str]
 
 logger = get_logger("TestPilot.Core")
 failure_logger = get_failure_logger("TestPilot.Failures")
+
 
 def safe_str(val: Any) -> str:
 
@@ -31,13 +35,19 @@ def safe_str(val: Any) -> str:
         return ""
     return str(val)
 
-def substitute_placeholders(command: str, svc_map: Dict[str, str], placeholder_pattern: PatternType) -> str:
+
+def substitute_placeholders(
+    command: str, svc_map: Dict[str, str], placeholder_pattern: PatternType
+) -> str:
     """Substitute placeholders in command with values from service map."""
+
     def repl(match):
         key = match.group(1)
         # Always return a string, never None
         return str(svc_map.get(key, match.group(0)))
+
     return placeholder_pattern.sub(repl, command)
+
 
 def extract_step_data(step: TestStep) -> Dict[str, Any]:
     """Extract and prepare all data from a TestStep object."""
@@ -49,7 +59,9 @@ def extract_step_data(step: TestStep) -> Dict[str, Any]:
     else:
         expected_status = None
     pattern_match = step.pattern_match
-    if pattern_match is None or (isinstance(pattern_match, float) and pd.isna(pattern_match)):
+    if pattern_match is None or (
+        isinstance(pattern_match, float) and pd.isna(pattern_match)
+    ):
         pattern_match = ""
     pod_exec = step.other_fields.get("podExec")
     request_payload = step.payload
@@ -75,6 +87,7 @@ def extract_step_data(step: TestStep) -> Dict[str, Any]:
         "compare_with_key": compare_with_key,
     }
 
+
 def manage_workflow_context(flow: TestFlow, step_data: Dict[str, Any]) -> None:
     """Manage workflow context for storing payloads between steps."""
     method = step_data["method"]
@@ -84,6 +97,7 @@ def manage_workflow_context(flow: TestFlow, step_data: Dict[str, Any]) -> None:
         save_key = step_data.get("save_key") or "put_payload"
         if request_payload:
             flow.context[save_key] = request_payload
+
 
 def resolve_namespace(connector, host: str) -> Optional[str]:
     """Resolve namespace for a given host."""
@@ -99,8 +113,8 @@ def resolve_namespace(connector, host: str) -> Optional[str]:
             if isinstance(hosts, list) and connect_to:
                 for host_cfg in hosts:
                     if isinstance(host_cfg, dict) and (
-                        host_cfg.get("name") == connect_to or 
-                        host_cfg.get("hostname") == connect_to
+                        host_cfg.get("name") == connect_to
+                        or host_cfg.get("hostname") == connect_to
                     ):
                         return host_cfg.get("namespace")
             elif isinstance(hosts, dict) and connect_to:
@@ -111,13 +125,14 @@ def resolve_namespace(connector, host: str) -> Optional[str]:
             logger.warning(f"Could not fetch namespace from config: {e}")
         return None
 
+
 def build_url_based_command(
-    step_data: Dict[str, Any], 
-    svc_map: Dict[str, str], 
-    placeholder_pattern: PatternType, 
-    namespace: Optional[str], 
-    host_cli_map: Optional[Dict[str, str]], 
-    host: str
+    step_data: Dict[str, Any],
+    svc_map: Dict[str, str],
+    placeholder_pattern: PatternType,
+    namespace: Optional[str],
+    host_cli_map: Optional[Dict[str, str]],
+    host: str,
 ) -> Optional[str]:
     """Build curl command for URL-based API calls."""
     url = step_data["url"]
@@ -125,9 +140,11 @@ def build_url_based_command(
     headers = step_data["headers"]
     request_payload = step_data["request_payload"]
     pod_exec = step_data["pod_exec"]
-    
+
     try:
-        substituted_url = substitute_placeholders(safe_str(url), svc_map, placeholder_pattern)
+        substituted_url = substitute_placeholders(
+            safe_str(url), svc_map, placeholder_pattern
+        )
         ssh_cmd, _ = build_ssh_k8s_curl_command(
             namespace=namespace or "default",
             container=pod_exec,
@@ -145,6 +162,7 @@ def build_url_based_command(
         logger.error(f"Failed to build SSH curl command: {e}")
         return None
 
+
 def build_kubectl_logs_command(command, namespace, connector, host):
     """Build kubectl logs command with dynamic pod name resolution."""
     match = re.search(r"\{([^}]+)\}", command)
@@ -158,7 +176,9 @@ def build_kubectl_logs_command(command, namespace, connector, host):
             f"awk 'NR==1 {{print $1}}'"
         )
     else:
-        find_pod = f"kubectl get pods | grep '{to_search_pod_name}' | awk 'NR==1 {{print $1}}'"
+        find_pod = (
+            f"kubectl get pods | grep '{to_search_pod_name}' | awk 'NR==1 {{print $1}}'"
+        )
     if connector.use_ssh:
         result = connector.run_command(find_pod, [host])
         res = result.get(host, {"output": "", "error": ""})
@@ -171,17 +191,23 @@ def build_kubectl_logs_command(command, namespace, connector, host):
         return None
     return command.replace(f"{{{to_search_pod_name}}}", pod_name)
 
-def build_command_for_step(step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host, connector):
+
+def build_command_for_step(
+    step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host, connector
+):
     """Build the appropriate command for a test step."""
     url = step_data["url"]
     command = step_data["command"]
     if url:
-        return build_url_based_command(step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host)
+        return build_url_based_command(
+            step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host
+        )
     elif command and (command.startswith("kubectl") or command.startswith("oc")):
         return build_kubectl_logs_command(command, namespace, connector, host)
     else:
         logger.warning(f"URL is required for command execution: {command}")
         return None
+
 
 def execute_command(command, host, connector):
     """Execute a command and return output, error, and duration."""
@@ -208,7 +234,10 @@ def execute_command(command, host, connector):
         logger.info(f"Error: {error}")
     return output, error, duration
 
-def validate_and_create_result(step, flow, step_data, parsed_output, output, error, duration, host, command):
+
+def validate_and_create_result(
+    step, flow, step_data, parsed_output, output, error, duration, host, command
+):
     """Validate test results and create TestResult object using modular validation engine."""
     expected_status = step_data["expected_status"]
     pattern_match = step_data["pattern_match"]
@@ -218,7 +247,9 @@ def validate_and_create_result(step, flow, step_data, parsed_output, output, err
     request_payload = step_data.get("request_payload")
 
     # Determine kubectl scenario
-    is_kubectl = bool(step_data.get("is_kubectl", False)) or parsed_output.get("is_kubectl_logs", False)
+    is_kubectl = bool(step_data.get("is_kubectl", False)) or parsed_output.get(
+        "is_kubectl_logs", False
+    )
 
     # Determine saved_payload for GET/PUT workflow
     saved_payload = None
@@ -226,7 +257,11 @@ def validate_and_create_result(step, flow, step_data, parsed_output, output, err
         saved_payload = flow.context.get(compare_with_key)
 
     # Use response_payload from Excel or parsed_output
-    response_payload = from_excel_response_payload if from_excel_response_payload is not None else parsed_output.get("response_payload")
+    response_payload = (
+        from_excel_response_payload
+        if from_excel_response_payload is not None
+        else parsed_output.get("response_payload")
+    )
     if isinstance(response_payload, float) and pd.isna(response_payload):
         response_payload = None
 
@@ -262,9 +297,7 @@ def validate_and_create_result(step, flow, step_data, parsed_output, output, err
         error=error,
         expected_status=expected_status,
         actual_status=actual_status,
-        pattern_match=(
-            str(pattern_match) if pattern_match is not None else None
-        ),
+        pattern_match=(str(pattern_match) if pattern_match is not None else None),
         pattern_found=result.details.get("pattern_found") if result.details else None,
         passed=result.passed,
         fail_reason=result.fail_reason,
@@ -274,15 +307,18 @@ def validate_and_create_result(step, flow, step_data, parsed_output, output, err
     )
     return test_result
 
+
 def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> None:
     """Log test result with appropriate level and structured failure logging."""
     if not test_result.passed:
         # Standard console/file logging
-        logger.error(f"[FAIL][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
+        logger.error(
+            f"[FAIL][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}"
+        )
         logger.error(f"Reason: {test_result.fail_reason}")
         # logger.error(f"Output: {test_result.output}")
         # logger.error(f"Error: {test_result.error}")
-        
+
         # Structured failure logging for automated analysis
         structured_failure = (
             f"SHEET={flow.sheet}|"
@@ -300,21 +336,41 @@ def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> 
         )
         failure_logger.error(structured_failure)
     else:
-        logger.debug(f"[PASS][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
+        logger.debug(
+            f"[PASS][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}"
+        )
 
-def process_single_step(step, flow, target_hosts, svc_maps, placeholder_pattern, connector, host_cli_map, test_results, show_table, print_results_table_func):
+
+def process_single_step(
+    step,
+    flow,
+    target_hosts,
+    svc_maps,
+    placeholder_pattern,
+    connector,
+    host_cli_map,
+    test_results,
+    show_table,
+    print_results_table_func,
+):
     step_data = extract_step_data(step)
     if step_data["command"] is None or pd.isna(step_data["command"]):
         return
-    
+
     step_data["save_key"] = step.other_fields.get("Save_As")
     manage_workflow_context(flow, step_data)
-    
+
     for host in target_hosts:
         svc_map = svc_maps.get(host, {})
         namespace = resolve_namespace(connector, host)
         command = build_command_for_step(
-            step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host, connector
+            step_data,
+            svc_map,
+            placeholder_pattern,
+            namespace,
+            host_cli_map,
+            host,
+            connector,
         )
         if not command:
             continue

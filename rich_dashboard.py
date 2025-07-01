@@ -5,17 +5,29 @@
 try:
     import threading
     import time
+
     from rich.console import Console
-    from rich.table import Table
-    from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn
     from rich.live import Live
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        TextColumn,
+        TimeElapsedColumn,
+        TimeRemainingColumn,
+    )
+    from rich.table import Table
     from rich.text import Text
 
     class RichDashboard:
         def __init__(self, total_steps):
             self.console = Console()
             self.headers = [
-                "Host", "Sheet", "Test Name", "Method", "Result", "Duration (s)"
+                "Host",
+                "Sheet",
+                "Test Name",
+                "Method",
+                "Result",
+                "Duration (s)",
             ]
             self.all_results = []
             self.total_steps = total_steps
@@ -54,7 +66,9 @@ try:
             return table
 
         def start(self):
-            self.live = Live(self._render_dashboard(), refresh_per_second=10, console=self.console)
+            self.live = Live(
+                self._render_dashboard(), refresh_per_second=10, console=self.console
+            )
             self.live.__enter__()
 
         def _render_dashboard(self):
@@ -76,32 +90,9 @@ try:
         def print_final_summary(self):
             passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
             failed = len(self.all_results) - passed
-            self.console.print(f"\n[bold]FINAL SUMMARY:[/bold] [green]{passed} PASSED[/green] | [red]{failed} FAILED[/red] | {len(self.all_results)} TOTAL")
-
-        def start(self):
-            self.live = Live(self._render_dashboard(), refresh_per_second=10, console=self.console)
-            self.live.__enter__()
-
-        def _render_dashboard(self):
-            table = self._create_table()
-            return self.progress.get_renderable(), table
-
-        def add_result(self, test_result):
-            with self.lock:
-                self.all_results.append(test_result)
-                self.completed_steps += 1
-                self.progress.update(self.progress_task, completed=self.completed_steps)
-                self.live.update(self._render_dashboard())
-
-        def stop(self):
-            if self.live:
-                self.live.__exit__(None, None, None)
-            self.progress.stop()
-
-        def print_final_summary(self):
-            passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
-            failed = len(self.all_results) - passed
-            self.console.print(f"\n[bold]FINAL SUMMARY:[/bold] [green]{passed} PASSED[/green] | [red]{failed} FAILED[/red] | {len(self.all_results)} TOTAL")
+            self.console.print(
+                f"\n[bold]FINAL SUMMARY:[/bold] [green]{passed} PASSED[/green] | [red]{failed} FAILED[/red] | {len(self.all_results)} TOTAL"
+            )
 
 except ImportError:
     RichDashboard = None

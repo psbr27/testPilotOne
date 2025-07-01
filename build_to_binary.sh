@@ -4,6 +4,11 @@
 
 set -e
 
+# Ensure script is run from the project root
+if [ ! -f "__init__.py" ]; then
+  echo "[WARNING] __init__.py not found in project root. Please run this script from the root of your project (the parent directory of test_pilot.py)."
+fi
+
 # Clean previous builds
 echo "[INFO] Cleaning previous build artifacts..."
 rm -rf dist build *.spec
@@ -25,6 +30,7 @@ pyinstaller --onedir --name testPilot --clean \
     --hidden-import=tabulate \
     --hidden-import=paramiko \
     --hidden-import=openpyxl \
+    --hidden-import=xlrd \
     --hidden-import=json \
     --hidden-import=re \
     --hidden-import=logger \
@@ -35,7 +41,8 @@ pyinstaller --onedir --name testPilot --clean \
     --hidden-import=ssh_connector \
     --hidden-import=dry_run \
     --hidden-import=console_table_fmt \
-    --hidden-import=log_analyzer \
+    --hidden-import=tools.log_analyzer \
+    --hidden-import=tools.validate_table_arguments \
     --hidden-import=table_demo \
     --hidden-import=test_result \
     --hidden-import=parse_instant_utils \

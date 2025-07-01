@@ -6,30 +6,27 @@ import sys
 
 # Check Python version compatibility
 if sys.version_info < (3, 8):
-    print(f"Error: TestPilot requires Python 3.8 or higher. You are using Python {sys.version}")
+    print(
+        f"Error: TestPilot requires Python 3.8 or higher. You are using Python {sys.version}"
+    )
     sys.exit(1)
 
-from ssh_connector import SSHConnector
-from logger import get_logger
-import json
-from excel_parser import ExcelParser
 import argparse
-import re
 import datetime
-import time
-import pandas as pd
+import json
 import os
+import re
+import time
 
+import pandas as pd
 from tabulate import tabulate
+
 from console_table_fmt import LiveProgressTable
-
 from dry_run import dry_run_commands
-from excel_parser import parse_excel_to_flows
-
-
-from test_pilot_core import (
-    process_single_step,
-)
+from excel_parser import ExcelParser, parse_excel_to_flows
+from logger import get_logger
+from ssh_connector import SSHConnector
+from test_pilot_core import process_single_step
 
 logger = get_logger("TestPilot")
 
@@ -165,7 +162,8 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
 def resolve_service_map_local(
     placeholders, namespace=None, config_file="config/hosts.json"
 ):
-    import subprocess, json as _json
+    import json as _json
+    import subprocess
 
     svc_maps = {}
     # If namespace is not provided, try to fetch from config using connect_to host
@@ -272,6 +270,7 @@ def execute_flows(
     if show_table:
         try:
             from rich_dashboard import RichDashboard
+
             if RichDashboard is not None:
                 dashboard = RichDashboard(total_steps)
                 dashboard.start()
@@ -280,6 +279,7 @@ def execute_flows(
             dashboard = None
     if not use_rich_dashboard and show_table:
         from console_table_fmt import LiveProgressTable
+
         dashboard = LiveProgressTable()
 
     for flow in flows:
@@ -313,15 +313,40 @@ def execute_flows(
 def export_workflow_results(test_results, flows):
     """
     Print workflow-level summary and export results/summary to Excel.
+    Also supports exporting to CSV and JSON formats.
     """
-    import pandas as pd
-    from dataclasses import asdict
     from collections import Counter
+    from dataclasses import asdict
 
+    import pandas as pd
+
+    from test_results_exporter import TestResultsExporter
+
+    # Original Excel export
     df_results = pd.DataFrame([asdict(r) for r in test_results])
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = f"test_results_{timestamp}.xlsx"
     df_results.to_excel(output_file, index=False)
+
+    # Additional format exports
+    exporter = TestResultsExporter()
+
+    # Export to JSON
+    json_file = exporter.export_to_json(test_results)
+
+    # Export to CSV
+    csv_file = exporter.export_to_csv(test_results)
+
+    # Export summary report
+    summary_file = exporter.export_summary_report(test_results)
+
+    # Log export information
+    logger.info(f"\nTest results exported to:")
+    logger.info(f"  - Excel: {output_file}")
+    logger.info(f"  - JSON: {json_file}")
+    logger.info(f"  - CSV: {csv_file}")
+    logger.info(f"  - Summary: {summary_file}")
+
     # Workflow-level summary
     logger.debug("\n===== WORKFLOW SUMMARY =====")
     logger.debug(
@@ -405,7 +430,7 @@ def detect_remote_cli(connector, host):
 
 
 def safe_str(val):
-    """ This is used in local functions like resolve_service_map_ssh"""
+    """This is used in local functions like resolve_service_map_ssh"""
     if val is None or (isinstance(val, float) and pd.isna(val)):
         return ""
     return str(val)
@@ -413,16 +438,14 @@ def safe_str(val):
 
 def main():
     args = parse_args()
-    
+
     # Configure logging based on command line arguments
     global logger
     logger = get_logger(
-        name="TestPilot",
-        log_to_file=not args.no_file_logging,
-        log_dir=args.log_dir
+        name="TestPilot", log_to_file=not args.no_file_logging, log_dir=args.log_dir
     )
     logger.setLevel(args.log_level.upper())
-    
+
     logger.debug(f"TestPilot started with args: {args}")
     logger.info(f"Module specified: {args.module}")
     if not args.no_file_logging:

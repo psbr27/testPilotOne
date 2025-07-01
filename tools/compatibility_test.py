@@ -4,8 +4,9 @@ Compatibility test for TestPilot
 Tests Python 3.8+ compatibility by importing all modules
 """
 
-import sys
 import importlib
+import sys
+
 
 def test_python_version():
     """Test minimum Python version requirement."""

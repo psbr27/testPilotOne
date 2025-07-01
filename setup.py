@@ -4,8 +4,9 @@ Setup script for TestPilot
 Test automation framework compatible with Python 3.8+
 """
 
-from setuptools import setup, find_packages
 import sys
+
+from setuptools import find_packages, setup
 
 # Check Python version
 if sys.version_info < (3, 8):
@@ -15,7 +16,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 with open("requirements.txt", "r", encoding="utf-8") as fh:
-    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+    requirements = [
+        line.strip() for line in fh if line.strip() and not line.startswith("#")
+    ]
 
 setup(
     name="testpilot",

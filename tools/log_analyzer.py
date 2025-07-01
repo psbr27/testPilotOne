@@ -4,13 +4,15 @@ Log Analyzer for TestPilot
 Analyzes structured failure logs and provides insights
 """
 
+import argparse
 import os
 import re
-import argparse
+from collections import Counter, defaultdict
 from datetime import datetime
-from collections import defaultdict, Counter
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 import pandas as pd
+
 
 class TestPilotLogAnalyzer:
     def __init__(self, log_dir: str = "logs"):

@@ -1,10 +1,11 @@
-import os
 import json
 import logging
+import os
 import shlex
 from typing import Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("CurlBuilder")
+
 
 def build_curl_command(
     url: str,
@@ -66,20 +67,22 @@ def build_curl_command(
         # Escape both key and value for safety
         safe_header = f"{k}: {v}"
         header_args.append(f"-H {shlex.quote(safe_header)}")
-    
+
     header_str = " ".join(header_args)
     if not header_str:
-        header_str = "-H 'Content-Type: application/json'"  # Default header if none provided
-    
+        header_str = (
+            "-H 'Content-Type: application/json'"  # Default header if none provided
+        )
+
     # Escape extra arguments if provided
     extra_args = ""
     if extra_curl_args:
         extra_args = " ".join(shlex.quote(arg) for arg in extra_curl_args)
-    
+
     # Escape URL and method to prevent injection
     safe_url = shlex.quote(url)
     safe_method = shlex.quote(method)
-    
+
     curl_cmd = f"curl -v --http2-prior-knowledge -X {safe_method} {safe_url} {header_str} {payload_arg} {extra_args}".strip()
     return curl_cmd, resolved_payload
 
@@ -93,7 +96,7 @@ def build_ssh_k8s_curl_command(
     payload: Optional[Union[str, Dict, List]] = None,
     payloads_folder: str = "payloads",
     pod_pattern: str = "-[a-z0-9]+-[a-z0-9]+$",
-    extra_curl_args: Optional[List[str]] = None
+    extra_curl_args: Optional[List[str]] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Returns a kubectl exec command that runs curl inside a pod via SSH.
@@ -109,16 +112,14 @@ def build_ssh_k8s_curl_command(
     # Find pod and exec curl inside - escape all user inputs
     safe_container = shlex.quote(container)
     safe_namespace = shlex.quote(namespace)
-    
+
     # Build pod pattern safely
     pod_pattern = f"{container}-[a-z0-9]+-[a-z0-9]+$"
     safe_pod_pattern = shlex.quote(pod_pattern)
-    
+
     # Build kubectl commands with proper escaping
     pod_find = f"kubectl get po -n {safe_namespace} | awk '{{print $1}}' | grep -E {safe_pod_pattern}"
-    
+
     # Note: curl_cmd is already escaped from build_curl_command
-    exec_cmd = (
-        f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
-    )
+    exec_cmd = f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
     return exec_cmd, resolved_payload
