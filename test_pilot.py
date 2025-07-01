@@ -34,6 +34,18 @@ logger = get_logger("TestPilot")
 def parse_args():
     parser = argparse.ArgumentParser(description="TestPilot")
     parser.add_argument(
+        "--display-mode",
+        choices=["standard", "progress_only", "batched", "static_live"],
+        default="standard",
+        help="Display mode for test results (default: standard)"
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5,
+        help="Batch size for batched display mode (default: 5)"
+    )
+    parser.add_argument(
         "-i",
         "--input",
         type=str,
@@ -262,6 +274,8 @@ def execute_flows(
     placeholder_pattern,
     host_cli_map=None,
     show_table=True,
+    display_mode="standard",
+    batch_size=5,
 ):
     test_results = []
     dashboard = None
@@ -278,9 +292,15 @@ def execute_flows(
         except ImportError:
             dashboard = None
     if not use_rich_dashboard and show_table:
-        from console_table_fmt import LiveProgressTable
-
-        dashboard = LiveProgressTable()
+        if display_mode == "standard":
+            from console_table_fmt import LiveProgressTable
+            dashboard = LiveProgressTable()
+        else:
+            from flicker_free_table import create_display
+            dashboard = create_display(
+                display_type=display_mode,
+                batch_size=batch_size
+            )
 
     for flow in flows:
         for step in flow.steps:
@@ -517,6 +537,8 @@ def main():
         placeholder_pattern,
         host_cli_map=host_cli_map,
         show_table=show_table,
+        display_mode=args.display_mode,
+        batch_size=args.batch_size,
     )
 
 
