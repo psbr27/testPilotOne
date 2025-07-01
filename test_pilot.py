@@ -60,6 +60,12 @@ def parse_args():
         "-s", "--sheet", type=str, help="Only run tests for the specified sheet name"
     )
     parser.add_argument(
+        "-t",
+        "--test-name",
+        type=str,
+        help="Only run the test with this test name in the selected sheet (case sensitive)",
+    )
+    parser.add_argument(
         "--no-table",
         action="store_true",
         help="Disable table output (default: enabled)",
@@ -99,7 +105,7 @@ def load_config_and_targets(config_file):
 def load_excel_and_sheets(input_path):
     excel_parser = ExcelParser(input_path)
     valid_sheets = excel_parser.list_valid_sheets()
-    logger.info(f"Valid sheets loaded: {valid_sheets}")
+    logger.debug(f"Valid sheets loaded: {valid_sheets}")
     return excel_parser, valid_sheets
 
 
@@ -301,8 +307,8 @@ def export_workflow_results(test_results, flows):
     output_file = f"test_results_{timestamp}.xlsx"
     df_results.to_excel(output_file, index=False)
     # Workflow-level summary
-    logger.info("\n===== WORKFLOW SUMMARY =====")
-    logger.info(
+    logger.debug("\n===== WORKFLOW SUMMARY =====")
+    logger.debug(
         f"Total test flows: {len([f for f in flows if pd.notna(f.test_name) and str(f.test_name).strip() != '' and str(f.test_name).lower() != 'nan'])}"
     )
     total_steps = sum(
@@ -312,12 +318,12 @@ def export_workflow_results(test_results, flows):
         and str(flow.test_name).strip() != ""
         and str(flow.test_name).lower() != "nan"
     )
-    logger.info(f"Total steps: {total_steps}")
+    logger.debug(f"Total steps: {total_steps}")
     n_pass = sum(1 for r in test_results if getattr(r, "passed", False))
     n_fail = sum(1 for r in test_results if not getattr(r, "passed", False))
-    logger.info(f"Total passed: {n_pass}")
-    logger.info(f"Total failed: {n_fail}")
-    logger.info("---------------------------")
+    logger.debug(f"Total passed: {n_pass}")
+    logger.debug(f"Total failed: {n_fail}")
+    logger.debug("---------------------------")
     for flow in flows:
         if not (
             pd.notna(flow.test_name)
@@ -358,7 +364,7 @@ def export_workflow_results(test_results, flows):
             output_file, mode="a", engine="openpyxl", if_sheet_exists="replace"
         ) as writer:
             df_summary.to_excel(writer, sheet_name="Summary", index=False)
-        logger.info(f"Workflow summary exported to {output_file} (sheet: Summary)")
+        logger.debug(f"Workflow summary exported to {output_file} (sheet: Summary)")
     except Exception as e:
         logger.error(f"Could not export summary sheet: {e}")
 
@@ -401,10 +407,10 @@ def main():
     )
     logger.setLevel(args.log_level.upper())
     
-    logger.info(f"TestPilot started with args: {args}")
+    logger.debug(f"TestPilot started with args: {args}")
     logger.info(f"Module specified: {args.module}")
     if not args.no_file_logging:
-        logger.info(f"Logs will be written to directory: {args.log_dir}")
+        logger.debug(f"Logs will be written to directory: {args.log_dir}")
     config_file = "config/hosts.json"
     _, target_hosts = load_config_and_targets(config_file)
     connector = SSHConnector(config_file)
@@ -455,6 +461,15 @@ def main():
     show_table = not args.no_table
 
     flows = parse_excel_to_flows(excel_parser, valid_sheets)
+
+    # Filter for a specific test name if provided
+    if getattr(args, "test_name", None):
+        filtered_flows = []
+        for flow in flows:
+            if hasattr(flow, "test_name") and flow.test_name == args.test_name:
+                filtered_flows.append(flow)
+        flows = filtered_flows
+
     execute_flows(
         flows,
         connector,

@@ -17,6 +17,7 @@ def get_logger(name: str = "TestPilot", log_to_file: bool = True, log_dir: str =
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
+    logger.propagate = False  # Prevent double logging by disabling propagation
 
     if not logger.handlers:
         formatter = logging.Formatter(
@@ -51,7 +52,7 @@ def get_logger(name: str = "TestPilot", log_to_file: bool = True, log_dir: str =
                 error_handler.setFormatter(formatter)
                 logger.addHandler(error_handler)
                 
-                logger.info(f"Logging to files: {log_file} and {error_log_file}")
+                logger.debug(f"Logging to files: {log_file} and {error_log_file}")
                 
             except (OSError, PermissionError) as e:
                 logger.warning(f"Could not setup file logging: {e}. Continuing with console-only logging.")
@@ -67,6 +68,7 @@ def get_failure_logger(name: str = "TestPilot.Failures") -> logging.Logger:
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.ERROR)
+    logger.propagate = False  # Prevent double logging by disabling propagation
     
     if not logger.handlers:
         # Create logs directory

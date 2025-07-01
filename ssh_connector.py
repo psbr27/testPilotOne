@@ -118,7 +118,7 @@ class SSHConnector:
                     password=host_config.password if not host_config.key_file else None,
                     timeout=10
                 )
-                logger.info(f"Connected to {host_config.name} ({host_config.hostname}) on attempt {attempt + 1}")
+                logger.debug(f"Connected to {host_config.name} ({host_config.hostname}) on attempt {attempt + 1}")
                 return host_config.name, ssh
                 
             except paramiko.SSHException as e:
@@ -217,4 +217,4 @@ class SSHConnector:
     def close_all(self):
         for name, conn in self.connections.items():
             conn.close()
-            logger.info(f"Closed connection to {name}")
+            logger.debug(f"Closed connection to {name}")

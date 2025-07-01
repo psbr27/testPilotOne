@@ -317,19 +317,7 @@ class LiveProgressTable:
             )
             print(header_row)
             print(
-                "|"
-                + "-" * 17
-                + "|"
-                + "-" * 14
-                + "|"
-                + "-" * 22
-                + "|"
-                + "-" * 10
-                + "|"
-                + "-" * 14
-                + "|"
-                + "-" * 14
-                + "|"
+                "|" + "-" * 15 + "|" + "-" * 20 + "|" + "-" * 30 + "|" + "-" * 8 + "|" + "-" * 12 + "|" + "-" * 12 + "|"
             )
             self.headers_printed = True
 
@@ -339,26 +327,29 @@ class LiveProgressTable:
 
         # Extract data
         host = getattr(test_result, "host", "")[:14]  # Truncate if too long
-        sheet = getattr(test_result, "sheet", "")[:11]
-        test_name = getattr(test_result, "test_name", "")[:19]
+        sheet = getattr(test_result, "sheet", "")[:20]
+        test_name = getattr(test_result, "test_name", "")[:30]
         method = (
             getattr(test_result, "method", "") if hasattr(test_result, "method") else ""
         )
         duration = f"{getattr(test_result, 'duration', 0.0):.2f}"
 
-        # Format result with colors/emojis
+        # Format result with colors
+        ANSI_GREEN = "\033[92m"
+        ANSI_RED = "\033[91m"
+        ANSI_RESET = "\033[0m"
         if (
             hasattr(test_result, "result")
             and getattr(test_result, "result", "") == "DRY-RUN"
         ):
             result = "DRY-RUN"
         elif getattr(test_result, "passed", False):
-            result = "PASS"
+            result = f"{ANSI_GREEN}PASS{ANSI_RESET}"
         else:
-            result = "FAIL"
+            result = f"{ANSI_RED}FAIL{ANSI_RESET}"
 
         # Print formatted row
-        row = "| {:<15} | {:<12} | {:<20} | {:<8} | {:<12} | {:<12} |".format(
+        row = "| {:<15} | {:<20} | {:<30} | {:<8} | {:<12} | {:<12} |".format(
             host, sheet, test_name, method, result, duration
         )
         print(row)
@@ -371,7 +362,8 @@ class LiveProgressTable:
 
     def _print_mini_summary(self):
         """Print a brief summary line"""
-        print(f"    {self.results_count} tests completed...")
+        #print(f"    {self.results_count} tests completed...")
+        pass
 
     def print_final_summary(self, all_results):
         """Print final summary at the end"""

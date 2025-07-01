@@ -62,14 +62,14 @@ def check_flexible_log_pattern_v3(output, pattern_match):
     pattern_info = extract_log_info_regex(pattern_match)
     
     if not pattern_info['level'] or not pattern_info['loggerName']:
-        logger.info("Could not extract level or logger from pattern")
+        logger.debug("Could not extract level or logger from pattern")
         return pattern_match in output  # Fallback to string matching
     
     level = pattern_info['level']
     logger_name = pattern_info['loggerName'] 
     message = pattern_info['message']
     
-    logger.info(f"Searching for: level={level}, logger={logger_name}")
+    logger.debug(f"Searching for: level={level}, logger={logger_name}")
     
     # Look for key message components
     key_phrases = []
@@ -82,7 +82,7 @@ def check_flexible_log_pattern_v3(output, pattern_match):
     if 'User agent validation failure' in message:
         key_phrases.append('User agent validation failure')
     
-    logger.info(f"Key phrases to match: {key_phrases}")
+    logger.debug(f"Key phrases to match: {key_phrases}")
     
     # Search in output
     matches_found = 0
@@ -98,13 +98,13 @@ def check_flexible_log_pattern_v3(output, pattern_match):
                 log_entry.get('loggerName') == logger_name):
                 
                 matches_found += 1
-                logger.info(f"Found matching level and logger in line {matches_found}")
+                logger.debug(f"Found matching level and logger in line {matches_found}")
                 
                 # Check for key phrases in message
                 log_message = log_entry.get('message', '')
                 if key_phrases:
                     if any(phrase in log_message for phrase in key_phrases):
-                        logger.info(f"Found matching key phrase!")
+                        logger.debug(f"Found matching key phrase!")
                         return True
                 else:
                     # If no key phrases, just check if logger and level match
@@ -113,5 +113,5 @@ def check_flexible_log_pattern_v3(output, pattern_match):
         except json.JSONDecodeError:
             continue
     
-    logger.info(f"Found {matches_found} entries with matching level/logger but no matching key phrases")
+    logger.debug(f"Found {matches_found} entries with matching level/logger but no matching key phrases")
     return False

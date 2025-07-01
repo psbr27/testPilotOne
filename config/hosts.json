@@ -1,7 +1,7 @@
 {
-  "use_ssh": false,
+  "use_ssh": true,
   "ssh_settings": {
-    "auto_add_hosts": false,
+    "auto_add_hosts": true,
     "known_hosts_file": "~/.ssh/known_hosts",
     "max_retries": 3,
     "retry_delay": 2

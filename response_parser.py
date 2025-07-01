@@ -37,14 +37,24 @@ def parse_curl_output(output: str, error: str) -> dict:
         logger.debug("No HTTP status found in either output or error.") 
     # Extract headers
     headers = {}
-    for line in response.splitlines():
-        if line.startswith('< '):
-            header_line = line[2:].strip()
-            if ':' in header_line:
-                k, v = header_line.split(':', 1)
-                headers[k.strip().lower()] = v.strip()
-                logger.debug(f"Header found: {k.strip().lower()} = {v.strip()}")
-    result['headers'] = headers
+    # assuming headers are always present in error
+    if error:
+        for line in error.splitlines():
+            if line.startswith('< '):
+                header_line = line[2:].strip()
+                if ':' in header_line:
+                    k, v = header_line.split(':', 1)
+                    headers[k.strip().lower()] = v.strip()
+                    logger.debug(f"Header found: {k.strip().lower()} = {v.strip()}")
+        result['headers'] = headers
+    
+    # print headers information if headers are present
+    if headers:
+        logger.info(f"Extracted {len(headers)} headers from response.")
+        for k, v in headers.items():
+            logger.info(f"Header: {k} = {v}")
+    else:
+        logger.info("No headers found in response.")
     # Extract JSON response payload if present (after headers)
     # Find the last header line and try to parse what's after
     payload = None
@@ -70,7 +80,7 @@ def parse_curl_output(output: str, error: str) -> dict:
     if reason_match:
         result['reason'] = reason_match.group(1).strip()
         logger.debug(f"Found Reason in response: {result['reason']}")
-    logger.info(
+    logger.debug(
         f"parse_curl_output result summary: status={result.get('http_status')}, headers={len(headers)}, payload={'present' if payload else 'none'}"
     )
     
@@ -106,17 +116,17 @@ def check_pod_logs(output, pattern_match):
         # Example pattern: '"request":"{"profile-data":{"accountID":["12345678912345678912345678"],"imsi":["302720603942144"],"msisdn":["19195225555"]},"slfGroupName":"IMSGrp1"}"}'
         pattern_json = extract_request_json_manual(pattern_match)
         if pattern_json is None:
-            logger.info(f"Failed to extract JSON from pattern_match, trying flexibe log patern: {pattern_match}")
+            logger.debug(f"Failed to extract JSON from pattern_match, trying flexibe log patern: {pattern_match}")
             # trying with flexible log pattern
             # Test the regex extraction
             info = piu.extract_log_info_regex(pattern_match)
-            logger.info(f"Level: {info['level']}")
-            logger.info(f"Logger: {info['loggerName']}")
-            logger.info(f"Message (first 100 chars): {info['message'][:100]}...")
+            logger.debug(f"Level: {info['level']}")
+            logger.debug(f"Logger: {info['loggerName']}")
+            logger.debug(f"Message (first 100 chars): {info['message'][:100]}...")
 
             result = piu.check_flexible_log_pattern_v3(output, pattern_match)
             if result:
-                logger.info(f"Pattern match found in pod logs for pattern: {pattern_match}")
+                logger.debug(f"Pattern match found in pod logs for pattern: {pattern_match}")
                 return True
             logger.error(f"Failed to extract JSON from pattern_match: {pattern_match}")
             return False
@@ -162,7 +172,7 @@ def _validate_get_method_comparison(
             fail_reason = f"GET response does not match {compare_with_key or 'reference payload'}. Diff: {diff_result}"
             return False, fail_reason
         else:
-            logger.info(f"GET response matches {compare_with_key or 'reference payload'}.")
+            logger.debug(f"GET response matches {compare_with_key or 'reference payload'}.")
             return True, None
     except Exception as e:
         logger.error(f"Workflow compare failed: {e}")
@@ -183,7 +193,7 @@ def _validate_status_code(
         actual_status_int = int(actual_status or 0)
         
         # For PUT, accept both 200 and 201 as pass if expected is either
-        logger.info(f"{method} Comparing actual status {actual_status_int} with expected status {expected_status_int}")
+        logger.debug(f"{method} Comparing actual status {actual_status_int} with expected status {expected_status_int}")
         
         if method and method.upper() == "PUT":
             if (expected_status_int in (200, 201)) and (actual_status_int in (200, 201)):

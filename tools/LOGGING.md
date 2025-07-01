@@ -27,13 +27,13 @@ logs/
 
 ### 1. General Log File (`testpilot_*.log`)
 Contains all logging information:
-- INFO: Test progress, configuration, summaries
+- DEBUG: Test progress, configuration, summaries
 - ERROR: Test failures, system errors
 - DEBUG: Detailed execution information
 
 **Example:**
 ```
-[2024-01-15 10:30:15] [INFO] [TestPilot] [test_pilot.py:25] - TestPilot started with args: ...
+[2024-01-15 10:30:15] [DEBUG] [TestPilot] [test_pilot.py:25] - TestPilot started with args: ...
 [2024-01-15 10:30:16] [ERROR] [TestPilot.Core] [test_pilot_core.py:248] - [FAIL][Sheet1][row 5][host1] Command: curl -X GET https://api.example.com/users
 [2024-01-15 10:30:16] [ERROR] [TestPilot.Core] [test_pilot_core.py:249] - Reason: Status mismatch: 404 vs 200
 ```
@@ -71,7 +71,7 @@ python test_pilot.py --input test.xlsx --module config --log-level DEBUG
 ### Available Options:
 - `--no-file-logging`: Disable file logging (console only)
 - `--log-dir DIR`: Specify custom log directory (default: `logs`)
-- `--log-level LEVEL`: Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `--log-level LEVEL`: Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Default is DEBUG.
 
 ## 📈 Log Analysis
 

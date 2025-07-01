@@ -52,6 +52,43 @@ pip install -r requirements.txt
 python compatibility_test.py
 ```
 
+---
+
+## CLI Usage
+
+```bash
+python test_pilot.py -i <input.xlsx> -m <module> [options]
+```
+
+**Options:**
+- `-i, --input <file>`: Path to Excel file (required)
+- `-m, --module <otp|config|audit>`: Module to use (required)
+- `-s, --sheet <sheetname>`: Only run tests for the specified sheet
+- `--test-name <testname>`: Only run the test with this name in the selected sheet (case sensitive)
+- `--dry-run`: Only display commands, do not execute
+- `--no-table`: Disable table output
+- `--log-level <level>`: Set log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) (default: `INFO`)
+- `--no-file-logging`: Disable file logging (console only)
+- `--log-dir <dir>`: Directory for log files (default: `logs`)
+
+### Example: Run a Specific Test
+
+Run only the test named `MyTestName` in the sheet `Sheet1`:
+```bash
+python test_pilot.py -i Oracle_VzW_OCSLF_25.1.x_Auto_OTP_v1.2.xlsx -m otp -s Sheet1 --test-name "MyTestName"
+```
+
+Suppress all logs (show only critical errors):
+```bash
+python test_pilot.py -i input.xlsx -m otp --log-level CRITICAL
+```
+
+Show debug-level logs:
+```bash
+python test_pilot.py -i input.xlsx -m otp --log-level DEBUG
+```
+
+
 **Option 2: Package Installation**
 ```bash
 # Install as package

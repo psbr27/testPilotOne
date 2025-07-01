@@ -110,7 +110,7 @@ def dry_run_commands(
     from console_table_fmt import LiveProgressTable
     
     logger = logging.getLogger("TestPilot")
-    logger.info("--- DRY RUN MODE ENABLED ---")
+    logger.debug("--- DRY RUN MODE ENABLED ---")
     dry_run_results = []
     
     # Initialize progress table if needed
@@ -158,5 +158,5 @@ def dry_run_commands(
     if progress_table:
         progress_table.print_final_summary([_convert_to_result_object(r) for r in dry_run_results])
     
-    logger.info("--- END DRY RUN ---")
+    logger.debug("--- END DRY RUN ---")
     connector.close_all()

@@ -9,7 +9,8 @@ import re
 import time
 import sys
 from typing import Dict, List, Any, Optional, Tuple, Union
-from response_parser import parse_curl_output, validate_test_result
+from response_parser import parse_curl_output
+from validation_engine import ValidationDispatcher, ValidationContext
 from test_result import TestResult, TestFlow, TestStep
 from curl_builder import build_ssh_k8s_curl_command
 from logger import get_logger, get_failure_logger
@@ -34,7 +35,8 @@ def substitute_placeholders(command: str, svc_map: Dict[str, str], placeholder_p
     """Substitute placeholders in command with values from service map."""
     def repl(match):
         key = match.group(1)
-        return svc_map.get(key, match.group(0))
+        # Always return a string, never None
+        return str(svc_map.get(key, match.group(0)))
     return placeholder_pattern.sub(repl, command)
 
 def extract_step_data(step: TestStep) -> Dict[str, Any]:
@@ -150,9 +152,13 @@ def build_kubectl_logs_command(command, namespace, connector, host):
         return command
     to_search_pod_name = match.group(1)
     if namespace:
-        find_pod = f"kubectl get pods -n {namespace} | grep '{to_search_pod_name}' | awk '{{print $1}}'"
+        find_pod = (
+            f"kubectl get pods -n {namespace} | "
+            f"grep '{to_search_pod_name}' | "
+            f"awk 'NR==1 {{print $1}}'"
+        )
     else:
-        find_pod = f"kubectl get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
+        find_pod = f"kubectl get pods | grep '{to_search_pod_name}' | awk 'NR==1 {{print $1}}'"
     if connector.use_ssh:
         result = connector.run_command(find_pod, [host])
         res = result.get(host, {"output": "", "error": ""})
@@ -181,9 +187,12 @@ def execute_command(command, host, connector):
     """Execute a command and return output, error, and duration."""
     if not command:
         return "", "Command build failed", 0.0
-    logger.info(f"Running command on [{host}]: {command}")
+    logger.debug(f"Running command on [{host}]: {command}")
     start_time = time.time()
     if connector.use_ssh:
+        # print *f"Executing command via SSH on {command} for host {host}")
+        print("*" * 80)
+        logger.info(f"Executing command via SSH on {command}")
         result = connector.run_command(command, [host])
         res = result.get(host, {"output": "", "error": ""})
         output = res["output"]
@@ -193,29 +202,57 @@ def execute_command(command, host, connector):
         output = result.stdout.strip()
         error = result.stderr.strip()
     duration = time.time() - start_time
+    logger.info(f"Command executed in {duration:.2f} seconds on [{host}]")
+    logger.info(f"Output: {output}")
+    if error:
+        logger.info(f"Error: {error}")
     return output, error, duration
 
 def validate_and_create_result(step, flow, step_data, parsed_output, output, error, duration, host, command):
-    """Validate test results and create TestResult object."""
+    """Validate test results and create TestResult object using modular validation engine."""
     expected_status = step_data["expected_status"]
     pattern_match = step_data["pattern_match"]
     compare_with_key = step_data["compare_with_key"]
     from_excel_response_payload = step_data["from_excel_response_payload"]
     method = step_data["method"]
-    
-    passed, fail_reason, pattern_found = validate_test_result(
-        parsed_output,
-        expected_status=expected_status,
-        pattern_match=pattern_match,
-        output=output,
-        compare_with_payload=(
-            flow.context.get(compare_with_key) if compare_with_key 
-            else from_excel_response_payload
-        ),
-        compare_with_key=compare_with_key,
+    request_payload = step_data.get("request_payload")
+
+    # Determine kubectl scenario
+    is_kubectl = bool(step_data.get("is_kubectl", False)) or parsed_output.get("is_kubectl_logs", False)
+
+    # Determine saved_payload for GET/PUT workflow
+    saved_payload = None
+    if compare_with_key:
+        saved_payload = flow.context.get(compare_with_key)
+
+    # Use response_payload from Excel or parsed_output
+    response_payload = from_excel_response_payload if from_excel_response_payload is not None else parsed_output.get("response_payload")
+    if isinstance(response_payload, float) and pd.isna(response_payload):
+        response_payload = None
+
+    # Use actual_status and response_body from parsed_output
+    actual_status = parsed_output.get("http_status") or parsed_output.get("status_code")
+    response_body = parsed_output.get("raw_output")
+    response_headers = parsed_output.get("headers")
+
+    # Build ValidationContext
+    context = ValidationContext(
         method=method,
+        request_payload=request_payload,
+        expected_status=expected_status,
+        response_payload=response_payload,
+        pattern_match=pattern_match,
+        actual_status=actual_status,
+        response_body=response_body,
+        response_headers=response_headers,
+        is_kubectl=is_kubectl,
+        saved_payload=saved_payload,
     )
-    
+
+    # Dispatch validation
+    dispatcher = ValidationDispatcher()
+    result = dispatcher.dispatch(context)
+
     test_result = TestResult(
         sheet=flow.sheet,
         row_idx=step.row_idx,
@@ -224,18 +261,13 @@ def validate_and_create_result(step, flow, step_data, parsed_output, output, err
         output=output,
         error=error,
         expected_status=expected_status,
-        actual_status=(
-            parsed_output.get("status_code") if isinstance(parsed_output, dict) and "status_code" in parsed_output
-            else None
-        ),
+        actual_status=actual_status,
         pattern_match=(
-            str(pattern_match) if pd.notna(pattern_match) and pattern_match is not None
-            else None
+            str(pattern_match) if pattern_match is not None else None
         ),
-        pattern_found=pattern_found,
-        passed=passed,
-        fail_reason=fail_reason,
-        # Now included in dataclass definition
+        pattern_found=result.details.get("pattern_found") if result.details else None,
+        passed=result.passed,
+        fail_reason=result.fail_reason,
         test_name=flow.test_name,
         duration=duration,
         method=method,
@@ -248,8 +280,8 @@ def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> 
         # Standard console/file logging
         logger.error(f"[FAIL][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
         logger.error(f"Reason: {test_result.fail_reason}")
-        logger.error(f"Output: {test_result.output}")
-        logger.error(f"Error: {test_result.error}")
+        # logger.error(f"Output: {test_result.output}")
+        # logger.error(f"Error: {test_result.error}")
         
         # Structured failure logging for automated analysis
         structured_failure = (
@@ -268,7 +300,7 @@ def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> 
         )
         failure_logger.error(structured_failure)
     else:
-        logger.info(f"[PASS][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
+        logger.debug(f"[PASS][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}")
 
 def process_single_step(step, flow, target_hosts, svc_maps, placeholder_pattern, connector, host_cli_map, test_results, show_table, print_results_table_func):
     step_data = extract_step_data(step)
