@@ -72,8 +72,19 @@ try:
             self.live.__enter__()
 
         def _render_dashboard(self):
+            from rich.layout import Layout
+            from rich.panel import Panel
+            
             table = self._create_table()
-            return self.progress.get_renderable(), table
+            progress_display = self.progress.get_renderable()
+            
+            # Create a layout to combine progress and table
+            layout = Layout()
+            layout.split_column(
+                Layout(Panel(progress_display, title="Progress", height=3)),
+                Layout(Panel(table, title="Test Results"))
+            )
+            return layout
 
         def add_result(self, test_result):
             with self.lock:

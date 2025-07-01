@@ -351,7 +351,7 @@ def process_single_step(
     host_cli_map,
     test_results,
     show_table,
-    print_results_table_func,
+    dashboard,
 ):
     step_data = extract_step_data(step)
     if step_data["command"] is None or pd.isna(step_data["command"]):
@@ -381,8 +381,6 @@ def process_single_step(
         )
         test_results.append(test_result)
         step.result = test_result
-        if show_table and print_results_table_func is not None:
-            print_results_table_func.add_result(test_result)
         if show_table and dashboard is not None:
             dashboard.add_result(test_result)
         log_test_result(test_result, flow, step)
