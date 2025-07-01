@@ -121,18 +121,35 @@ def dry_run_commands(
     svc_maps,
     placeholder_pattern,
     show_table=True,
+    display_mode="blessed",
 ):
     import logging
-
-    from console_table_fmt import LiveProgressTable
     from test_pilot import print_results_table, substitute_placeholders
 
     logger = logging.getLogger("TestPilot")
     logger.debug("--- DRY RUN MODE ENABLED ---")
     dry_run_results = []
 
-    # Initialize progress table if needed
-    progress_table = LiveProgressTable() if show_table else None
+    # Initialize dashboard if needed
+    dashboard = None
+    if show_table:
+        try:
+            from blessed_dashboard import create_blessed_dashboard
+            
+            if display_mode == "blessed":
+                dashboard = create_blessed_dashboard(mode="full", max_visible_rows=20)
+            elif display_mode == "progress":
+                dashboard = create_blessed_dashboard(mode="progress")
+            else:  # simple
+                dashboard = create_blessed_dashboard(mode="simple")
+            
+            dashboard.start()
+            
+        except ImportError as e:
+            logger.warning(f"Blessed dashboard not available: {e}")
+            # Fallback to simple print-based display
+            from console_table_fmt import LiveProgressTable
+            dashboard = LiveProgressTable()
     for sheet in valid_sheets:
         df = excel_parser.get_sheet(sheet)
         logger.debug(f"Sheet '{sheet}' columns: {list(df.columns)}")
@@ -186,14 +203,13 @@ def dry_run_commands(
                     )
                     dry_run_results.append(result)
 
-                    # Update progress table if enabled
-                    if progress_table:
-                        progress_table.add_result(_convert_to_result_object(result))
-    # Print final summary if table is enabled
-    if progress_table:
-        progress_table.print_final_summary(
-            [_convert_to_result_object(r) for r in dry_run_results]
-        )
+                    # Update dashboard if enabled
+                    if dashboard:
+                        dashboard.add_result(_convert_to_result_object(result))
+    
+    # Print final summary if dashboard is enabled
+    if dashboard:
+        dashboard.print_final_summary()
 
     logger.debug("--- END DRY RUN ---")
     connector.close_all()

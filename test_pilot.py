@@ -35,15 +35,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="TestPilot")
     parser.add_argument(
         "--display-mode",
-        choices=["standard", "progress_only", "batched", "static_live"],
-        default="standard",
-        help="Display mode for test results (default: standard)"
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=5,
-        help="Batch size for batched display mode (default: 5)"
+        choices=["blessed", "progress", "simple"],
+        default="blessed",
+        help="Display mode: blessed (full dashboard), progress (progress only), simple (basic) (default: blessed)"
     )
     parser.add_argument(
         "-i",
@@ -274,33 +268,29 @@ def execute_flows(
     placeholder_pattern,
     host_cli_map=None,
     show_table=True,
-    display_mode="standard",
-    batch_size=5,
+    display_mode="blessed",
 ):
     test_results = []
     dashboard = None
-    use_rich_dashboard = False
-    total_steps = sum(len(flow.steps) for flow in flows)
+    
     if show_table:
         try:
-            from rich_dashboard import RichDashboard
-
-            if RichDashboard is not None:
-                dashboard = RichDashboard(total_steps)
-                dashboard.start()
-                use_rich_dashboard = True
-        except ImportError:
-            dashboard = None
-    if not use_rich_dashboard and show_table:
-        if display_mode == "standard":
+            from blessed_dashboard import create_blessed_dashboard
+            
+            if display_mode == "blessed":
+                dashboard = create_blessed_dashboard(mode="full", max_visible_rows=20)
+            elif display_mode == "progress":
+                dashboard = create_blessed_dashboard(mode="progress")
+            else:  # simple
+                dashboard = create_blessed_dashboard(mode="simple")
+            
+            dashboard.start()
+            
+        except ImportError as e:
+            logger.warning(f"Blessed dashboard not available: {e}")
+            # Fallback to simple print-based display
             from console_table_fmt import LiveProgressTable
             dashboard = LiveProgressTable()
-        else:
-            from flicker_free_table import create_display
-            dashboard = create_display(
-                display_type=display_mode,
-                batch_size=batch_size
-            )
 
     for flow in flows:
         for step in flow.steps:
@@ -318,11 +308,7 @@ def execute_flows(
             )
     # Print final summary
     if dashboard:
-        if use_rich_dashboard:
-            dashboard.stop()
-            dashboard.print_final_summary()
-        else:
-            dashboard.print_final_summary(test_results)
+        dashboard.print_final_summary()
 
     # Cleanup and export results
     connector.close_all()
@@ -514,6 +500,7 @@ def main():
             svc_maps,
             placeholder_pattern,
             show_table=show_table,
+            display_mode=args.display_mode,
         )
         return
 
@@ -538,7 +525,6 @@ def main():
         host_cli_map=host_cli_map,
         show_table=show_table,
         display_mode=args.display_mode,
-        batch_size=args.batch_size,
     )
 
 
