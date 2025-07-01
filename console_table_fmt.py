@@ -353,6 +353,8 @@ class LiveProgressTable:
             host, sheet, test_name, method, result, duration
         )
         print(row)
+        import time
+        time.sleep(0.5)
 
         self.results_count += 1
 

@@ -1,5 +1,5 @@
 {
-  "use_ssh": true,
+  "use_ssh": false,
   "ssh_settings": {
     "auto_add_hosts": true,
     "known_hosts_file": "~/.ssh/known_hosts",

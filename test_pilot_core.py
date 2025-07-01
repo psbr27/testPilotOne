@@ -325,6 +325,8 @@ def process_single_step(step, flow, target_hosts, svc_maps, placeholder_pattern,
         )
         test_results.append(test_result)
         step.result = test_result
-        if show_table:
+        if show_table and print_results_table_func is not None:
             print_results_table_func.add_result(test_result)
+        if show_table and dashboard is not None:
+            dashboard.add_result(test_result)
         log_test_result(test_result, flow, step)

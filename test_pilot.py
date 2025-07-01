@@ -266,9 +266,21 @@ def execute_flows(
     show_table=True,
 ):
     test_results = []
-
-    # Initialize live progress table
-    progress_table = LiveProgressTable() if show_table else None
+    dashboard = None
+    use_rich_dashboard = False
+    total_steps = sum(len(flow.steps) for flow in flows)
+    if show_table:
+        try:
+            from rich_dashboard import RichDashboard
+            if RichDashboard is not None:
+                dashboard = RichDashboard(total_steps)
+                dashboard.start()
+                use_rich_dashboard = True
+        except ImportError:
+            dashboard = None
+    if not use_rich_dashboard and show_table:
+        from console_table_fmt import LiveProgressTable
+        dashboard = LiveProgressTable()
 
     for flow in flows:
         for step in flow.steps:
@@ -282,11 +294,15 @@ def execute_flows(
                 host_cli_map,
                 test_results,
                 show_table,
-                progress_table,  # Pass the function
+                dashboard,
             )
     # Print final summary
-    if progress_table:
-        progress_table.print_final_summary(test_results)
+    if dashboard:
+        if use_rich_dashboard:
+            dashboard.stop()
+            dashboard.print_final_summary()
+        else:
+            dashboard.print_final_summary(test_results)
 
     # Cleanup and export results
     connector.close_all()
