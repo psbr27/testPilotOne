@@ -217,8 +217,7 @@ def execute_command(command, host, connector):
     start_time = time.time()
     if connector.use_ssh:
         # print *f"Executing command via SSH on {command} for host {host}")
-        print("*" * 80)
-        logger.info(f"Executing command via SSH on {command}")
+        logger.debug(f"Executing command via SSH on {command}")
         result = connector.run_command(command, [host])
         res = result.get(host, {"output": "", "error": ""})
         output = res["output"]
@@ -228,10 +227,10 @@ def execute_command(command, host, connector):
         output = result.stdout.strip()
         error = result.stderr.strip()
     duration = time.time() - start_time
-    logger.info(f"Command executed in {duration:.2f} seconds on [{host}]")
-    logger.info(f"Output: {output}")
+    logger.debug(f"Command executed in {duration:.2f} seconds on [{host}]")
+    logger.debug(f"Output: {output}")
     if error:
-        logger.info(f"Error: {error}")
+        logger.debug(f"Error: {error}")
     return output, error, duration
 
 
@@ -312,10 +311,10 @@ def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> 
     """Log test result with appropriate level and structured failure logging."""
     if not test_result.passed:
         # Standard console/file logging
-        logger.error(
+        logger.debug(
             f"[FAIL][{flow.sheet}][row {step.row_idx}][{test_result.host}] Command: {test_result.command}"
         )
-        logger.error(f"Reason: {test_result.fail_reason}")
+        logger.debug(f"Reason: {test_result.fail_reason}")
         # logger.error(f"Output: {test_result.output}")
         # logger.error(f"Error: {test_result.error}")
 

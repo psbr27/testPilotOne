@@ -122,7 +122,7 @@ def extract_placeholders(excel_parser, valid_sheets):
             if pd.notna(command):
                 matches = placeholder_pattern.findall(str(command))
                 placeholders.update(matches)
-    logger.info(f"Unique placeholders found in commands: {sorted(placeholders)}")
+    logger.debug(f"Unique placeholders found in commands: {sorted(placeholders)}")
     return placeholders, placeholder_pattern
 
 
@@ -278,7 +278,7 @@ def execute_flows(
             from blessed_dashboard import create_blessed_dashboard
             
             if display_mode == "blessed":
-                dashboard = create_blessed_dashboard(mode="full", max_visible_rows=20)
+                dashboard = create_blessed_dashboard(mode="full")
             elif display_mode == "progress":
                 dashboard = create_blessed_dashboard(mode="progress")
             else:  # simple
@@ -347,11 +347,11 @@ def export_workflow_results(test_results, flows):
     summary_file = exporter.export_summary_report(test_results)
 
     # Log export information
-    logger.info(f"\nTest results exported to:")
-    logger.info(f"  - Excel: {output_file}")
-    logger.info(f"  - JSON: {json_file}")
-    logger.info(f"  - CSV: {csv_file}")
-    logger.info(f"  - Summary: {summary_file}")
+    logger.debug(f"\nTest results exported to:")
+    logger.debug(f"  - Excel: {output_file}")
+    logger.debug(f"  - JSON: {json_file}")
+    logger.debug(f"  - CSV: {csv_file}")
+    logger.debug(f"  - Summary: {summary_file}")
 
     # Workflow-level summary
     logger.debug("\n===== WORKFLOW SUMMARY =====")
@@ -380,7 +380,7 @@ def export_workflow_results(test_results, flows):
             continue
         step_results = [step.result for step in flow.steps if hasattr(step, "result")]
         c = Counter(getattr(r, "passed", False) for r in step_results)
-        print(
+        logger.debug(
             f"Flow: {flow.test_name} | Sheet: {flow.sheet} | Steps: {len(flow.steps)} | Passed: {c[True]} | Failed: {c[False]}"
         )
     # Optionally, export summary sheet
@@ -453,7 +453,7 @@ def main():
     logger.setLevel(args.log_level.upper())
 
     logger.debug(f"TestPilot started with args: {args}")
-    logger.info(f"Module specified: {args.module}")
+    logger.debug(f"Module specified: {args.module}")
     if not args.no_file_logging:
         logger.debug(f"Logs will be written to directory: {args.log_dir}")
     config_file = "config/hosts.json"
@@ -469,7 +469,7 @@ def main():
             )
             return
         valid_sheets = [args.sheet]
-        logger.info(f"Running tests for sheet: {args.sheet}")
+        logger.debug(f"Running tests for sheet: {args.sheet}")
     placeholders, placeholder_pattern = extract_placeholders(excel_parser, valid_sheets)
     host_cli_map = {}
     if connector.use_ssh:
@@ -482,14 +482,14 @@ def main():
         for host in target_hosts:
             cli = detect_remote_cli(connector, host)
             host_cli_map[host] = cli
-            logger.info(f"Host {host} uses CLI: {cli}")
+            logger.debug(f"Host {host} uses CLI: {cli}")
         svc_maps = resolve_service_map_ssh(connector, target_hosts, placeholders)
     else:
         if len(target_hosts) > 1:
             logger.error("Non-SSH mode supports only one target host. Aborting.")
             return
         svc_maps = resolve_service_map_local(placeholders)
-    logger.info(f"Service maps resolved: {svc_maps}")
+    logger.debug(f"Service maps resolved: {svc_maps}")
     if args.dry_run:
         show_table = not args.no_table
         dry_run_commands(

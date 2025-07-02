@@ -74,9 +74,9 @@ class GetCompareWithPutValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetCompareWithPutValidator")
         if context.response_body == context.saved_payload:
-            logger.info("GET response matches saved PUT payload")
+            logger.debug("GET response matches saved PUT payload")
             return ValidationResult(True)
-        logger.info("GET response does not match saved PUT payload")
+        logger.debug("GET response does not match saved PUT payload")
         return ValidationResult(False, "GET response does not match saved PUT payload")
 
 
@@ -86,7 +86,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
         if context.method and context.method.upper() == "PUT":
             try:
                 if context.expected_status is None or context.actual_status is None:
-                    logger.info("Expected status or actual status is None")
+                    logger.debug("Expected status or actual status is None")
                     return ValidationResult(
                         False, "Expected status or actual status is None"
                     )
@@ -95,10 +95,10 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                 if (expected_status_int in (200, 201)) and (
                     actual_status_int in (200, 201)
                 ):
-                    logger.info("PUT: Accepting both 200 and 201 as valid status")
+                    logger.debug("PUT: Accepting both 200 and 201 as valid status")
                     pass  # continue to payload check
                 elif actual_status_int != expected_status_int:
-                    logger.info(
+                    logger.debug(
                         f"Status mismatch: {actual_status_int} != {expected_status_int}"
                     )
                     return ValidationResult(
@@ -106,7 +106,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                         f"Status mismatch: {actual_status_int} != {expected_status_int}",
                     )
             except Exception:
-                logger.info(
+                logger.debug(
                     f"Unable to compare status: {context.actual_status} vs {context.expected_status}"
                 )
                 return ValidationResult(
@@ -114,7 +114,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                     f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
                 )
         elif context.actual_status != context.expected_status:
-            logger.info(
+            logger.debug(
                 f"Status mismatch: {context.actual_status} != {context.expected_status}"
             )
             return ValidationResult(
@@ -122,19 +122,19 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                 f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         if context.response_body != context.response_payload:
-            logger.info(
+            logger.debug(
                 "Response body does not match response payload, running check_diff"
             )
             diff_result = check_diff(context)
             if diff_result is not None:
-                logger.info(f"Diff result: {diff_result.fail_reason}")
+                logger.debug(f"Diff result: {diff_result.fail_reason}")
                 return diff_result
             else:
-                logger.info("Unknown error during payload comparison")
+                logger.debug("Unknown error during payload comparison")
                 return ValidationResult(
                     False, "Unknown error during payload comparison"
                 )
-        logger.info("PUT status and payload validation passed")
+        logger.debug("PUT status and payload validation passed")
         return ValidationResult(True)
 
 
@@ -144,7 +144,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
         if context.method and context.method.upper() == "PUT":
             try:
                 if context.expected_status is None or context.actual_status is None:
-                    logger.info("Expected status or actual status is None")
+                    logger.debug("Expected status or actual status is None")
                     return ValidationResult(
                         False, "Expected status or actual status is None"
                     )
@@ -153,10 +153,10 @@ class PutStatusAndPatternValidator(ValidationStrategy):
                 if (expected_status_int in (200, 201)) and (
                     actual_status_int in (200, 201)
                 ):
-                    logger.info("PUT: Accepting both 200 and 201 as valid status")
+                    logger.debug("PUT: Accepting both 200 and 201 as valid status")
                     pass  # continue to pattern check
                 elif actual_status_int != expected_status_int:
-                    logger.info(
+                    logger.debug(
                         f"Status mismatch: {actual_status_int} != {expected_status_int}"
                     )
                     return ValidationResult(
@@ -164,7 +164,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
                         f"Status mismatch: {actual_status_int} != {expected_status_int}",
                     )
             except Exception:
-                logger.info(
+                logger.debug(
                     f"Unable to compare status: {context.actual_status} vs {context.expected_status}"
                 )
                 return ValidationResult(
@@ -172,7 +172,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
                     f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
                 )
         elif context.actual_status != context.expected_status:
-            logger.info(
+            logger.debug(
                 f"Status mismatch: {context.actual_status} != {context.expected_status}"
             )
             return ValidationResult(
@@ -183,24 +183,24 @@ class PutStatusAndPatternValidator(ValidationStrategy):
         if context.pattern_match and context.pattern_match in str(
             context.response_body
         ):
-            logger.info(f"Pattern '{context.pattern_match}' found in response body")
+            logger.debug(f"Pattern '{context.pattern_match}' found in response body")
             found = True
         elif (
             context.pattern_match
             and context.response_headers
             and context.pattern_match in str(context.response_headers)
         ):
-            logger.info(f"Pattern '{context.pattern_match}' found in response headers")
+            logger.debug(f"Pattern '{context.pattern_match}' found in response headers")
             found = True
         if not found:
-            logger.info(
+            logger.debug(
                 f"Pattern '{context.pattern_match}' not found in response body or headers"
             )
             return ValidationResult(
                 False,
                 f"Pattern '{context.pattern_match}' not found in response body or headers",
             )
-        logger.info("PUT status and pattern validation passed")
+        logger.debug("PUT status and pattern validation passed")
         return ValidationResult(True)
 
 
@@ -208,7 +208,7 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.PutStatusPayloadPatternValidator")
         if context.actual_status != context.expected_status:
-            logger.info(
+            logger.debug(
                 f"Status mismatch: {context.actual_status} != {context.expected_status}"
             )
             return ValidationResult(
@@ -216,15 +216,15 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
                 f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         if context.response_body != context.response_payload:
-            logger.info(
+            logger.debug(
                 "Response body does not match response payload, running check_diff"
             )
             diff_result = check_diff(context)
             if diff_result is not None:
-                logger.info(f"Diff result: {diff_result.fail_reason}")
+                logger.debug(f"Diff result: {diff_result.fail_reason}")
                 return diff_result
             else:
-                logger.info("Unknown error during payload comparison")
+                logger.debug("Unknown error during payload comparison")
                 return ValidationResult(
                     False, "Unknown error during payload comparison"
                 )
@@ -236,7 +236,7 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             logger,
         )
         if result.passed is False:
-            logger.info(f"Pattern matching failed: {result.fail_reason}")
+            logger.debug(f"Pattern matching failed: {result.fail_reason}")
             return result
         return ValidationResult(True)
 
@@ -246,7 +246,7 @@ class ValidationDispatcher:
         self.logger = get_logger("ValidationEngine.Dispatcher")
 
     def dispatch(self, context: ValidationContext) -> ValidationResult:
-        self.logger.info(
+        self.logger.debug(
             f"Dispatching validation for method={context.method}, is_kubectl={context.is_kubectl}, "
             f"expected_status={context.expected_status}, pattern_match={context.pattern_match}, "
             f"response_payload={'present' if context.response_payload else 'none'}, "
@@ -259,9 +259,9 @@ class ValidationDispatcher:
                 and not context.response_payload
                 and not context.pattern_match
             ):
-                self.logger.info("Selected strategy: put_status_only")
+                self.logger.debug("Selected strategy: put_status_only")
                 result = VALIDATION_STRATEGIES["put_status_only"].validate(context)
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -270,11 +270,11 @@ class ValidationDispatcher:
                 and context.response_payload
                 and not context.pattern_match
             ):
-                self.logger.info("Selected strategy: put_status_and_payload")
+                self.logger.debug("Selected strategy: put_status_and_payload")
                 result = VALIDATION_STRATEGIES["put_status_and_payload"].validate(
                     context
                 )
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -283,11 +283,11 @@ class ValidationDispatcher:
                 and context.pattern_match
                 and not context.response_payload
             ):
-                self.logger.info("Selected strategy: put_status_and_pattern")
+                self.logger.debug("Selected strategy: put_status_and_pattern")
                 result = VALIDATION_STRATEGIES["put_status_and_pattern"].validate(
                     context
                 )
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -296,22 +296,22 @@ class ValidationDispatcher:
                 and context.response_payload
                 and context.pattern_match
             ):
-                self.logger.info("Selected strategy: put_status_payload_pattern")
+                self.logger.debug("Selected strategy: put_status_payload_pattern")
                 result = VALIDATION_STRATEGIES["put_status_payload_pattern"].validate(
                     context
                 )
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
         # GET rules
         if context.method.upper() == "GET":
             if context.saved_payload is not None:
-                self.logger.info(
+                self.logger.debug(
                     "Selected strategy: get_compare_with_put (workflow-aware GET)"
                 )
                 result = VALIDATION_STRATEGIES["get_compare_with_put"].validate(context)
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -320,9 +320,9 @@ class ValidationDispatcher:
                 and context.response_payload
                 and context.pattern_match
             ):
-                self.logger.info("Selected strategy: get_full")
+                self.logger.debug("Selected strategy: get_full")
                 result = VALIDATION_STRATEGIES["get_full"].validate(context)
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -331,9 +331,9 @@ class ValidationDispatcher:
                 and not context.response_payload
                 and not context.pattern_match
             ):
-                self.logger.info("Selected strategy: get_status_only")
+                self.logger.debug("Selected strategy: get_status_only")
                 result = VALIDATION_STRATEGIES["get_status_only"].validate(context)
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -342,11 +342,11 @@ class ValidationDispatcher:
                 and context.response_payload
                 and not context.pattern_match
             ):
-                self.logger.info("Selected strategy: get_status_and_payload")
+                self.logger.debug("Selected strategy: get_status_and_payload")
                 result = VALIDATION_STRATEGIES["get_status_and_payload"].validate(
                     context
                 )
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -355,11 +355,11 @@ class ValidationDispatcher:
                 and context.pattern_match
                 and not context.response_payload
             ):
-                self.logger.info("Selected strategy: get_status_and_pattern")
+                self.logger.debug("Selected strategy: get_status_and_pattern")
                 result = VALIDATION_STRATEGIES["get_status_and_pattern"].validate(
                     context
                 )
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
@@ -370,19 +370,19 @@ class ValidationDispatcher:
                 and not context.response_payload
                 and not context.pattern_match
             ):
-                self.logger.info("Selected strategy: delete_status_only")
+                self.logger.debug("Selected strategy: delete_status_only")
                 result = VALIDATION_STRATEGIES["delete_status_only"].validate(context)
-                self.logger.info(
+                self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
                 )
                 return result
         # kubectl log validation
         if context.is_kubectl and context.pattern_match:
-            self.logger.info(
+            self.logger.debug(
                 "Selected strategy: kubectl_pattern (kubectl log validation)"
             )
             result = VALIDATION_STRATEGIES["kubectl_pattern"].validate(context)
-            self.logger.info(
+            self.logger.debug(
                 f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
             )
             return result
@@ -399,7 +399,7 @@ class PutStatusOnlyValidator(ValidationStrategy):
         if context.method and context.method.upper() == "PUT":
             try:
                 if context.expected_status is None or context.actual_status is None:
-                    logger.info("Expected status or actual status is None")
+                    logger.debug("Expected status or actual status is None")
                     return ValidationResult(
                         False, "Expected status or actual status is None"
                     )
@@ -408,10 +408,10 @@ class PutStatusOnlyValidator(ValidationStrategy):
                 if (expected_status_int in (200, 201)) and (
                     actual_status_int in (200, 201)
                 ):
-                    logger.info("PUT: Accepting both 200 and 201 as valid status")
+                    logger.debug("PUT: Accepting both 200 and 201 as valid status")
                     return ValidationResult(True)
                 elif actual_status_int != expected_status_int:
-                    logger.info(
+                    logger.debug(
                         f"Status mismatch: {actual_status_int} != {expected_status_int}"
                     )
                     return ValidationResult(
@@ -419,7 +419,7 @@ class PutStatusOnlyValidator(ValidationStrategy):
                         f"Status mismatch: {actual_status_int} != {expected_status_int}",
                     )
             except Exception:
-                logger.info(
+                logger.debug(
                     f"Unable to compare status: {context.actual_status} vs {context.expected_status}"
                 )
                 return ValidationResult(
@@ -427,9 +427,9 @@ class PutStatusOnlyValidator(ValidationStrategy):
                     f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
                 )
         if context.actual_status == context.expected_status:
-            logger.info("PUT status only validation passed")
+            logger.debug("PUT status only validation passed")
             return ValidationResult(True)
-        logger.info(
+        logger.debug(
             f"Status mismatch: {context.actual_status} != {context.expected_status}"
         )
         return ValidationResult(
@@ -451,7 +451,7 @@ class KubectlPatternValidator(ValidationStrategy):
         pattern_str = context.pattern_match.strip() if context.pattern_match else ""
 
         if not pattern_str:
-            logger.info("No pattern provided to validate")
+            logger.debug("No pattern provided to validate")
             return ValidationResult(True)
 
         # Support comma-separated or newline-separated patterns
@@ -463,12 +463,12 @@ class KubectlPatternValidator(ValidationStrategy):
                 missing.append(pattern)
 
         if missing:
-            logger.info(f"Patterns not found: {missing}")
+            logger.debug(f"Patterns not found: {missing}")
             return ValidationResult(
                 False, f"Patterns not found in kubectl output: {missing}"
             )
 
-        logger.info(f"All patterns matched in kubectl output: {subpatterns}")
+        logger.debug(f"All patterns matched in kubectl output: {subpatterns}")
         return ValidationResult(True)
 
 
@@ -476,7 +476,7 @@ class GetFullValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetFullValidator")
         if context.actual_status != context.expected_status:
-            logger.info(
+            logger.debug(
                 f"Status mismatch: {context.actual_status} != {context.expected_status}"
             )
             return ValidationResult(
@@ -491,7 +491,7 @@ class GetFullValidator(ValidationStrategy):
             logger,
         )
         if result.passed is False:
-            logger.info(f"Pattern matching failed: {result.fail_reason}")
+            logger.debug(f"Pattern matching failed: {result.fail_reason}")
             return result
         return ValidationResult(True)
 
@@ -500,9 +500,9 @@ class GetStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetStatusOnlyValidator")
         if context.actual_status == context.expected_status:
-            logger.info("GET status only validation passed")
+            logger.debug("GET status only validation passed")
             return ValidationResult(True)
-        logger.info(
+        logger.debug(
             f"Status mismatch: {context.actual_status} != {context.expected_status}"
         )
         return ValidationResult(
@@ -515,7 +515,7 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetStatusAndPayloadValidator")
         if context.actual_status != context.expected_status:
-            logger.info(
+            logger.debug(
                 f"Status mismatch: {context.actual_status} != {context.expected_status}"
             )
             return ValidationResult(
@@ -523,19 +523,19 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
                 f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         if context.response_body != context.response_payload:
-            logger.info(
+            logger.debug(
                 "Response body does not match response payload, running check_diff"
             )
             diff_result = check_diff(context)
             if diff_result is not None:
-                logger.info(f"Diff result: {diff_result.fail_reason}")
+                logger.debug(f"Diff result: {diff_result.fail_reason}")
                 return diff_result
             else:
-                logger.info("Unknown error during payload comparison")
+                logger.debug("Unknown error during payload comparison")
                 return ValidationResult(
                     False, "Unknown error during payload comparison"
                 )
-        logger.info("GET status and payload validation passed")
+        logger.debug("GET status and payload validation passed")
         return ValidationResult(True)
 
 
@@ -545,7 +545,7 @@ class GetStatusAndPatternValidator(ValidationStrategy):
 
         # Step 1: Check HTTP status
         if context.actual_status != context.expected_status:
-            logger.info(
+            logger.debug(
                 f"Status mismatch: {context.actual_status} != {context.expected_status}"
             )
             return ValidationResult(
@@ -562,7 +562,7 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             logger,
         )
         if result.passed is False:
-            logger.info(f"Pattern matching failed: {result.fail_reason}")
+            logger.debug(f"Pattern matching failed: {result.fail_reason}")
             return result
 
         return ValidationResult(True)
@@ -616,16 +616,16 @@ def match_patterns_in_headers_and_body(
         if key:  # key:value style
             header_val = headers_dict.get(key)
             if header_val and val in header_val:
-                logger.info(
+                logger.debug(
                     f"Pattern key='{key}' with value='{val}' matched in headers"
                 )
                 matched = True
         if not matched and val in body_str:
-            logger.info(f"Pattern value '{val}' matched in response body")
+            logger.debug(f"Pattern value '{val}' matched in response body")
             matched = True
 
         if not matched:
-            logger.warning(
+            logger.debug(
                 f"Pattern key='{key}' or value='{val}' NOT matched in headers or body"
             )
             return ValidationResult(
@@ -640,9 +640,9 @@ class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.DeleteStatusOnlyValidator")
         if context.actual_status == context.expected_status:
-            logger.info("DELETE status only validation passed")
+            logger.debug("DELETE status only validation passed")
             return ValidationResult(True)
-        logger.info(
+        logger.debug(
             f"Status mismatch: {context.actual_status} != {context.expected_status}"
         )
         return ValidationResult(

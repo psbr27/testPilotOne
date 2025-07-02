@@ -54,11 +54,11 @@ def parse_curl_output(output: str, error: str) -> dict:
 
     # print headers information if headers are present
     if headers:
-        logger.info(f"Extracted {len(headers)} headers from response.")
+        logger.debug(f"Extracted {len(headers)} headers from response.")
         for k, v in headers.items():
-            logger.info(f"Header: {k} = {v}")
+            logger.debug(f"Header: {k} = {v}")
     else:
-        logger.info("No headers found in response.")
+        logger.debug("No headers found in response.")
     # Extract JSON response payload if present (after headers)
     # Find the last header line and try to parse what's after
     payload = None
@@ -93,7 +93,7 @@ def parse_curl_output(output: str, error: str) -> dict:
     # if status is None, Payload is None and headers are emtpy consider it
     # is kubectl logs output
     if result["http_status"] is None and not payload and not headers:
-        logger.warning(
+        logger.debug(
             "No HTTP status, payload, or headers found. This may be kubectl logs output."
         )
         result["is_kubectl_logs"] = True
