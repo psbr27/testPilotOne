@@ -123,6 +123,8 @@ def dry_run_commands(
     show_table=True,
     display_mode="blessed",
 ):
+    # Robustly handle connector=None for dry-run
+    use_ssh = connector is not None and getattr(connector, "use_ssh", False)
     import logging
     from test_pilot import print_results_table, substitute_placeholders
 
@@ -167,17 +169,18 @@ def dry_run_commands(
                 # Determine hosts to process
                 hosts_to_process = (
                     target_hosts
-                    if connector.use_ssh
+                    if use_ssh
                     else [target_hosts[0] if target_hosts else "local"]
                 )
 
                 for host in hosts_to_process:
-                    svc_map = svc_maps.get(host, {})
+                    host_key = host['name'] if isinstance(host, dict) and 'name' in host else host
+                    svc_map = svc_maps.get(host_key, {})
 
                     # Get namespace for SSH connections
                     namespace = None
-                    if connector.use_ssh:
-                        host_cfg = connector.get_host_config(host)
+                    if use_ssh:
+                        host_cfg = connector.get_host_config(host) if connector is not None else None
                         namespace = (
                             getattr(host_cfg, "namespace", None) if host_cfg else None
                         )
@@ -189,7 +192,7 @@ def dry_run_commands(
                         svc_map,
                         placeholder_pattern,
                         namespace,
-                        connector.use_ssh,
+                        use_ssh,
                         substitute_placeholders,
                     )
 
@@ -212,4 +215,5 @@ def dry_run_commands(
         dashboard.print_final_summary()
 
     logger.debug("--- END DRY RUN ---")
-    connector.close_all()
+    if connector is not None:
+        connector.close_all()

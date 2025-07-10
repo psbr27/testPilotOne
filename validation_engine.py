@@ -6,11 +6,12 @@ import json
 import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
-
+import ast
 from deepdiff import DeepDiff
 
 from logger import get_logger
-
+from utils.myutils import compare_dicts_ignore_timestamp
+import utils.parse_pattern_match as parse_pattern_match
 
 def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
     try:
@@ -77,7 +78,7 @@ class GetCompareWithPutValidator(ValidationStrategy):
             logger.debug("GET response matches saved PUT payload")
             return ValidationResult(True)
         logger.debug("GET response does not match saved PUT payload")
-        return ValidationResult(False, "GET response does not match saved PUT payload")
+        return ValidationResult(False, fail_reason="GET response does not match saved PUT payload")
 
 
 class PutStatusAndPayloadValidator(ValidationStrategy):
@@ -88,7 +89,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                 if context.expected_status is None or context.actual_status is None:
                     logger.debug("Expected status or actual status is None")
                     return ValidationResult(
-                        False, "Expected status or actual status is None"
+                        False, fail_reason="Expected status or actual status is None"
                     )
                 expected_status_int = int(context.expected_status)
                 actual_status_int = int(context.actual_status)
@@ -103,7 +104,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                     )
                     return ValidationResult(
                         False,
-                        f"Status mismatch: {actual_status_int} != {expected_status_int}",
+                        fail_reason=f"Status mismatch: {actual_status_int} != {expected_status_int}",
                     )
             except Exception:
                 logger.debug(
@@ -111,7 +112,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
                 )
                 return ValidationResult(
                     False,
-                    f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
+                    fail_reason=f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
                 )
         elif context.actual_status != context.expected_status:
             logger.debug(
@@ -119,7 +120,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Status mismatch: {context.actual_status} != {context.expected_status}",
+                fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         if context.response_body != context.response_payload:
             logger.debug(
@@ -132,7 +133,7 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
             else:
                 logger.debug("Unknown error during payload comparison")
                 return ValidationResult(
-                    False, "Unknown error during payload comparison"
+                    False, fail_reason="Unknown error during payload comparison"
                 )
         logger.debug("PUT status and payload validation passed")
         return ValidationResult(True)
@@ -146,7 +147,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
                 if context.expected_status is None or context.actual_status is None:
                     logger.debug("Expected status or actual status is None")
                     return ValidationResult(
-                        False, "Expected status or actual status is None"
+                        False, fail_reason="Expected status or actual status is None"
                     )
                 expected_status_int = int(context.expected_status)
                 actual_status_int = int(context.actual_status)
@@ -161,7 +162,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
                     )
                     return ValidationResult(
                         False,
-                        f"Status mismatch: {actual_status_int} != {expected_status_int}",
+                        fail_reason=f"Status mismatch: {actual_status_int} != {expected_status_int}",
                     )
             except Exception:
                 logger.debug(
@@ -169,7 +170,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
                 )
                 return ValidationResult(
                     False,
-                    f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
+                    fail_reason=f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
                 )
         elif context.actual_status != context.expected_status:
             logger.debug(
@@ -177,7 +178,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Status mismatch: {context.actual_status} != {context.expected_status}",
+                fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         found = False
         if context.pattern_match and context.pattern_match in str(
@@ -198,7 +199,7 @@ class PutStatusAndPatternValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Pattern '{context.pattern_match}' not found in response body or headers",
+                fail_reason=f"Pattern '{context.pattern_match}' not found in response body or headers",
             )
         logger.debug("PUT status and pattern validation passed")
         return ValidationResult(True)
@@ -213,7 +214,7 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Status mismatch: {context.actual_status} != {context.expected_status}",
+                fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         if context.response_body != context.response_payload:
             logger.debug(
@@ -226,7 +227,7 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             else:
                 logger.debug("Unknown error during payload comparison")
                 return ValidationResult(
-                    False, "Unknown error during payload comparison"
+                    False, fail_reason="Unknown error during payload comparison"
                 )
 
         result = match_patterns_in_headers_and_body(
@@ -401,7 +402,7 @@ class PutStatusOnlyValidator(ValidationStrategy):
                 if context.expected_status is None or context.actual_status is None:
                     logger.debug("Expected status or actual status is None")
                     return ValidationResult(
-                        False, "Expected status or actual status is None"
+                        False, fail_reason="Expected status or actual status is None"
                     )
                 expected_status_int = int(context.expected_status)
                 actual_status_int = int(context.actual_status)
@@ -416,7 +417,7 @@ class PutStatusOnlyValidator(ValidationStrategy):
                     )
                     return ValidationResult(
                         False,
-                        f"Status mismatch: {actual_status_int} != {expected_status_int}",
+                        fail_reason=f"Status mismatch: {actual_status_int} != {expected_status_int}",
                     )
             except Exception:
                 logger.debug(
@@ -424,7 +425,7 @@ class PutStatusOnlyValidator(ValidationStrategy):
                 )
                 return ValidationResult(
                     False,
-                    f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
+                    fail_reason=f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
                 )
         if context.actual_status == context.expected_status:
             logger.debug("PUT status only validation passed")
@@ -434,7 +435,7 @@ class PutStatusOnlyValidator(ValidationStrategy):
         )
         return ValidationResult(
             False,
-            f"Status mismatch: {context.actual_status} != {context.expected_status}",
+            fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
         )
 
 
@@ -465,7 +466,7 @@ class KubectlPatternValidator(ValidationStrategy):
         if missing:
             logger.debug(f"Patterns not found: {missing}")
             return ValidationResult(
-                False, f"Patterns not found in kubectl output: {missing}"
+                False, fail_reason=f"Patterns not found in kubectl output: {missing}"
             )
 
         logger.debug(f"All patterns matched in kubectl output: {subpatterns}")
@@ -481,7 +482,7 @@ class GetFullValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Status mismatch: {context.actual_status} != {context.expected_status}",
+                fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         # No need to check the response_payload here, as we are validating against the expected payload
         result = match_patterns_in_headers_and_body(
@@ -507,7 +508,7 @@ class GetStatusOnlyValidator(ValidationStrategy):
         )
         return ValidationResult(
             False,
-            f"Status mismatch: {context.actual_status} != {context.expected_status}",
+            fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
         )
 
 
@@ -520,7 +521,7 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Status mismatch: {context.actual_status} != {context.expected_status}",
+                fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         if context.response_body != context.response_payload:
             logger.debug(
@@ -533,7 +534,7 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
             else:
                 logger.debug("Unknown error during payload comparison")
                 return ValidationResult(
-                    False, "Unknown error during payload comparison"
+                    False, fail_reason="Unknown error during payload comparison"
                 )
         logger.debug("GET status and payload validation passed")
         return ValidationResult(True)
@@ -550,7 +551,7 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             )
             return ValidationResult(
                 False,
-                f"Status mismatch: {context.actual_status} != {context.expected_status}",
+                fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
 
         # Step 2: Normalize inputs
@@ -591,50 +592,86 @@ def match_patterns_in_headers_and_body(
         else {}
     )
 
-    # Extract key-value pairs from the pattern string
-    def extract_patterns(pstr: str):
-        # Try to match JSON-style key-value pairs
-        matches = re.findall(r'"([^"]+?)"\s*:\s*"([^"]+?)"', pstr)
-        if matches:
-            return [(k.strip().lower(), v.strip()) for k, v in matches]
+    def string_to_dict_regex(s):
+        # Pattern to match key: value pairs
+        pattern = r'([^:;]+):\s*"?([^";]+)"?'
+        matches = re.findall(pattern, s)
+        return {key.strip(): value.strip() for key, value in matches}
 
-        # Fallback: try colon-split inside one quoted string
-        pstr = pstr.strip().strip('"')
-        if ":" in pstr:
-            k, v = pstr.split(":", 1)
-            return [(k.strip().lower(), v.strip())]
+    patterns = parse_pattern_match.parse_pattern_match_string(pattern_str)
+    # Normalize patterns to lowercase keys
+    patterns = {k.lower(): str(v) for k, v in patterns.items()} if isinstance(patterns, dict) else {}
 
-        # Absolute fallback: plain string value
-        return [(None, pstr)]
+    if not patterns:
+        logger.error("No patterns provided to validate")
+        return ValidationResult(True)
+    
+    # compare patterns and headers_dict or body_str
+    # if no headers and body_str is present then pass body_str as headers_dict
+    if not headers and body_str:
+        # convert body_str to a dict-like structure
+        headers_dict = parse_pattern_match.parse_pattern_match_string(body_str)
+ 
+    
+    # compare to find the differences between patterns and headers_dict
+    headers_val = {}
+    for key, val in patterns.items():
+        # if key is not found headers find in response from server
+        if headers_dict.get(key) is not None:
+            headers_val = string_to_dict_regex(headers_dict.get(key, "{}"))
+            # if headers value is {} then check actual header dict and assign 
+            if not headers_val and isinstance(headers_dict, dict):
+                headers_val = headers_dict
+        else:
+            headers_val = parse_pattern_match.parse_pattern_match_string(body_str)
+            if headers_val:
+                headers_val = (
+                        {k.lower(): str(v) for k, v in headers_val.items()}
+                        if isinstance(headers_val, dict)
+                        else {}
+                        )
 
-    patterns = extract_patterns(pattern_str)
+        # if the value itself is a dict in string format below logic 
+        # converts str to dict
+        if isinstance(val, str):
+            try:
+                val_dict = ast.literal_eval(val) if val.strip() else {}
+            except Exception:
+                val_dict = val
 
-    # Step 3: Check all patterns
-    for key, val in patterns:
-        matched = False
-
-        if key:  # key:value style
-            header_val = headers_dict.get(key)
-            if header_val and val in header_val:
-                logger.debug(
-                    f"Pattern key='{key}' with value='{val}' matched in headers"
+        # check the type of val_dict before calling compare_dicts_ignore_timestamp
+        # if its other than dict dont pass it to compare_dicts_ignore_timestamp
+        if not isinstance(val_dict, dict):
+            # checking the length of patterns
+            if len(patterns) == 1:
+                result = compare_dicts_ignore_timestamp(patterns, headers_val)
+            else:
+                raise ValueError(
+                    "Pattern value is not a dict, cannot compare with headers"
                 )
-                matched = True
-        if not matched and val in body_str:
-            logger.debug(f"Pattern value '{val}' matched in response body")
-            matched = True
-
-        if not matched:
-            logger.debug(
-                f"Pattern key='{key}' or value='{val}' NOT matched in headers or body"
-            )
-            return ValidationResult(
-                False,
-                f"Pattern key='{key}' or value='{val}' NOT matched in headers or body",
-            )
-
-    return ValidationResult(True)
-
+        else:
+            result = compare_dicts_ignore_timestamp(val_dict, headers_val)
+            
+        if result["equal"]:
+            logger.debug("All patterns matched in headers")
+            return ValidationResult(True)
+        else:
+            # keys only in dict1
+            missing_patterns = result["only_in_dict1"]
+            # keys only in dict2
+            extra_headers = result["only_in_dict2"]
+            # if there are keys present in dict1 and dict2 along with value differences
+            # consider the validation failed
+            if missing_patterns or extra_headers or result["value_differences"]:
+                logger.debug(
+                    f"Patterns not found in headers: {missing_patterns}, "
+                    f"Extra headers: {extra_headers}, "
+                    f"Common keys with value differences: {result['value_differences']}"
+                )
+                return ValidationResult(False, fail_reason=f"Patterns not found in headers: {missing_patterns}, Extra headers: {extra_headers}, Common keys with value differences: {result['value_differences']}")
+            # If no missing patterns, extra headers, or value differences, consider it passed
+            logger.info("All patterns matched in headers after comparison")
+            return ValidationResult(True)
 
 class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
@@ -647,7 +684,7 @@ class DeleteStatusOnlyValidator(ValidationStrategy):
         )
         return ValidationResult(
             False,
-            f"Status mismatch: {context.actual_status} != {context.expected_status}",
+            fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
         )
 
 

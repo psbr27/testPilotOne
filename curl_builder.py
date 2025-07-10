@@ -58,9 +58,35 @@ def build_curl_command(
                 resolved_payload = str(payload)
         else:
             resolved_payload = None
-        if resolved_payload:
+        if resolved_payload and resolved_payload != 'nan':
             payload_arg = f"-d {shlex.quote(resolved_payload)}"
 
+    # Fetch nf_name from config/hosts.json if available
+    try:
+        with open("config/hosts.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+            nf_name = config.get("nf_name", "SLF")
+    except (IOError, OSError, json.JSONDecodeError) as e:
+        logger.error(f"Failed to read or parse config/hosts.json: {e}")
+        nf_name = "SLF"
+        
+    # if resolved_payload is true, then try to search for nfInstanceId 
+    # in the payload, if that is found then append to safe_url
+    if nf_name.lower() != "slf" and resolved_payload:
+        parsed = json.loads(resolved_payload)
+        nfInstanceId = None
+        if isinstance(parsed, dict):
+            nfInstanceId = parsed.get("nfInstanceId", None)
+        elif isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, dict) and "nfInstanceId" in item:
+                    nfInstanceId = item["nfInstanceId"]
+                    break
+        # For other types, nfInstanceId remains None
+        if nfInstanceId:
+            url = f"{url}{nfInstanceId}"
+            logger.debug(f"Appending nfInstanceId to URL: {nfInstanceId}")
+    
     # Handle headers - escape each header value to prevent injection
     header_args = []
     for k, v in headers.items():
@@ -123,3 +149,28 @@ def build_ssh_k8s_curl_command(
     # Note: curl_cmd is already escaped from build_curl_command
     exec_cmd = f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
     return exec_cmd, resolved_payload
+
+
+def build_pod_mode(
+    url: str,
+    method: str = "GET",
+    headers: Optional[Dict[str, str]] = None,
+    payload: Optional[Union[str, Dict, List]] = None,
+    payloads_folder: str = "payloads",
+    extra_curl_args: Optional[List[str]] = None,
+) -> Tuple[str, Optional[str]]:
+    """
+    This function is used to build curl command for pod mode
+    so the final curl command will be curl command as it is from the excel file
+    with out kubectl exec appended to the original curl command
+    """
+    
+    curl_cmd, resolved_payload = build_curl_command(
+        url,
+        method=method,
+        headers=headers,
+        payload=payload,
+        payloads_folder=payloads_folder,
+        extra_curl_args=extra_curl_args,
+    )
+    return curl_cmd, resolved_payload

@@ -7,6 +7,10 @@ import re
 import subprocess
 import sys
 import time
+import os
+from utils.resource_map_utils import map_localhost_url
+from utils.myutils import prettify_curl_output, replace_placeholder_in_command
+from utils.kubectl_logs_search import search_in_custom_output
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -27,6 +31,15 @@ else:
 
 logger = get_logger("TestPilot.Core")
 failure_logger = get_failure_logger("TestPilot.Failures")
+
+
+def save_kubectl_logs(raw_output, host, row_idx, test_name, dir_path="kubectl_logs"):
+    os.makedirs(dir_path, exist_ok=True)
+    safe_test_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', str(test_name))
+    filename = f"kubectl_logs_{host}_{safe_test_name}_{row_idx}.json"
+    filepath = os.path.join(dir_path, filename)
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(raw_output, f, indent=2)
 
 
 def safe_str(val: Any) -> str:
@@ -142,8 +155,11 @@ def build_url_based_command(
     pod_exec = step_data["pod_exec"]
 
     try:
-        substituted_url = substitute_placeholders(
-            safe_str(url), svc_map, placeholder_pattern
+        # substituted_url = substitute_placeholders(
+        #     safe_str(url), svc_map, placeholder_pattern
+        # )
+        substituted_url = replace_placeholder_in_command(
+            safe_str(url), svc_map
         )
         ssh_cmd, _ = build_ssh_k8s_curl_command(
             namespace=namespace or "default",
@@ -195,14 +211,58 @@ def build_kubectl_logs_command(command, namespace, connector, host):
 def build_command_for_step(
     step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host, connector
 ):
-    """Build the appropriate command for a test step."""
+    """Build the appropriate command for a test step, with pod_mode support."""
+    import os
+    import json
+    from curl_builder import build_pod_mode
+
     url = step_data["url"]
     command = step_data["command"]
-    if url:
+    
+    # Check for pod_mode in config/hosts.json
+    pod_mode = False
+    config_path = os.path.join(os.path.dirname(__file__), 'config', 'hosts.json')
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            pod_mode = config.get('pod_mode', False)
+    except Exception as e:
+        logger.warning(f"Could not read pod_mode from config: {e}")
+
+    if pod_mode and url:
+        # Use build_pod_mode to construct the command
+        method = step_data.get("method", "KUBECTL")
+        headers = step_data.get("headers")
+        payload = step_data.get("request_payload")
+        payloads_folder = step_data.get("payloads_folder", "payloads")
+        extra_curl_args = step_data.get("extra_curl_args")
+        
+        # if localhost is in the url, replace it with the FQDN from resource_map.json
+        if "localhost" in url:
+            substituted_url = map_localhost_url(url, svc_map)
+        else:
+            # substituted_url = substitute_placeholders(
+            #     safe_str(url), svc_map, placeholder_pattern
+            # )
+            substituted_url = replace_placeholder_in_command(
+                safe_str(url), svc_map
+            )
+        curl_cmd, _ = build_pod_mode(
+            substituted_url,
+            method=method,
+            headers=headers,
+            payload=payload,
+            payloads_folder=payloads_folder,
+            extra_curl_args=extra_curl_args,
+        )
+        return curl_cmd
+    elif url:
         return build_url_based_command(
             step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host
         )
     elif command and (command.startswith("kubectl") or command.startswith("oc")):
+        # update method to KUBECTL in step_data method
+        step_data["method"] = "KUBCTL"
         return build_kubectl_logs_command(command, namespace, connector, host)
     else:
         logger.warning(f"URL is required for command execution: {command}")
@@ -362,6 +422,10 @@ def process_single_step(
     for host in target_hosts:
         svc_map = svc_maps.get(host, {})
         namespace = resolve_namespace(connector, host)
+        if not show_table:
+            logger.info(f"[CALLFLOW] Host: {host}")
+            logger.info(f"[CALLFLOW] Step: {getattr(step, 'step_name', 'N/A')} (Flow: {getattr(flow, 'test_name', 'N/A')})")
+            logger.info(f"[CALLFLOW] Substituting placeholders in command: {step_data['command']}")
         command = build_command_for_step(
             step_data,
             svc_map,
@@ -372,14 +436,42 @@ def process_single_step(
             connector,
         )
         if not command:
+            if not show_table:
+                logger.warning(f"[CALLFLOW] Command could not be built for host {host}, step {getattr(step, 'step_name', 'N/A')}. Skipping.")
             continue
+        if not show_table:
+            logger.info(f"[CALLFLOW] Built command: {command}")
+            logger.info(f"[CALLFLOW] Executing command on host {host}...")
         output, error, duration = execute_command(command, host, connector)
+        if not show_table:
+            logger.info(f"[CALLFLOW] Command executed in {duration:.2f}s")
+            if len(output) > 5000:
+                logger.info(f"[CALLFLOW] Output: {search_in_custom_output(output, step_data['pattern_match'])}")
+            else:
+                logger.info(f"[CALLFLOW] Server Reponse: {output[:300]}" + ("..." if output and len(output) > 300 else ""))
+            if error:
+                logger.info(f"[CALLFLOW] Header response:: ") 
+                prettify_curl_output(error)
         parsed_output = parse_curl_output(output, error)
+        if parsed_output.get("is_kubectl_logs"):
+            # save the response from server to a json file, including test name in filename
+            save_kubectl_logs(
+                parsed_output.get("raw_output"),
+                host,
+                step.row_idx,
+                getattr(flow, "test_name", "unknown")
+            )
+
         test_result = validate_and_create_result(
             step, flow, step_data, parsed_output, output, error, duration, host, command
         )
         test_results.append(test_result)
         step.result = test_result
+        if not show_table:
+            logger.info(f"[CALLFLOW] Result: {test_result.passed} | Expected: {step_data.get('expected_status', 'N/A')} | Actual: {getattr(test_result, 'actual_status', 'N/A')}")
         if show_table and dashboard is not None:
             dashboard.add_result(test_result)
+
         log_test_result(test_result, flow, step)
+        # introduced delay between each test
+        time.sleep(1)

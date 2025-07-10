@@ -165,7 +165,7 @@ class BlessedDashboard:
         
         # Table header
         output.append(self.term.move(4, 0) + self.term.bold)
-        header = f"{'Host':<12} {'Sheet':<10} {'Test Name':<25} {'Method':<6} {'Status':<8} {'Duration':<8}"
+        header = f"{'Index':<6} {'Host':<12} {'Sheet':<10} {'Test Name':<25} {'Method':<6} {'Status':<8} {'Duration':<8}"
         output.append(header + self.term.normal)
         output.append(self.term.move(5, 0) + "-" * len(header))
         
@@ -176,7 +176,7 @@ class BlessedDashboard:
         for i, row in enumerate(visible_results):
             line_num = self.header_height + i
             if line_num < self.term.height - 1:  # Leave space for status line
-                output.append(self.term.move(line_num, 0) + self._format_result_row(row))
+                output.append(self.term.move(line_num, 0) + self._format_result_row(row, index=i + 1 + scroll_pos))
         
         # Clear any remaining lines in the results area
         max_rows = self._calculate_layout()
@@ -226,9 +226,10 @@ class BlessedDashboard:
         if visible_results and self.auto_scroll:
             newest_result = visible_results[-1]
             line_num = self.header_height + len(visible_results) - 1
+            index = len(self.results) - len(visible_results) + len(visible_results)
             if line_num < self.term.height - 1:
                 # Highlight the newest result briefly
-                highlighted_row = self._format_result_row(newest_result, highlight=True)
+                highlighted_row = self._format_result_row(newest_result, highlight=True, index=index)
                 print(self.term.move(line_num, 0) + self.term.clear_eol + highlighted_row, end='')
         
         # Update status line with scroll info
@@ -240,7 +241,8 @@ class BlessedDashboard:
             def remove_highlight():
                 time.sleep(0.2)
                 if self.running:
-                    normal_row = self._format_result_row(visible_results[-1], highlight=False)
+                    index = len(self.results) - len(visible_results) + len(visible_results)
+                    normal_row = self._format_result_row(visible_results[-1], highlight=False, index=index)
                     line_num = self.header_height + len(visible_results) - 1
                     if line_num < self.term.height - 1:
                         print(self.term.move(line_num, 0) + self.term.clear_eol + normal_row, end='', flush=True)
@@ -266,7 +268,7 @@ class BlessedDashboard:
         
         return progress
     
-    def _format_result_row(self, row: TestDisplayRow, highlight=False):
+    def _format_result_row(self, row: TestDisplayRow, highlight=False, index=None):
         """Format a single result row with colors and optional highlight"""
         # Choose color based on status
         if row.status == "PASS":
@@ -283,7 +285,8 @@ class BlessedDashboard:
         reset_style = self.term.normal if highlight else ""
         
         return (
-            f"{row_style}{row.host:<12} "
+            f"{row_style}{str(index) if index is not None else '':<6} "
+            f"{row.host:<12} "
             f"{row.sheet:<10} "
             f"{row.test_name:<25} "
             f"{row.method:<6} "

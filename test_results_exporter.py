@@ -40,6 +40,7 @@ class TestResultsExporter:
                 "sheet": getattr(result, "sheet", ""),
                 "test_name": getattr(result, "test_name", ""),
                 "method": getattr(result, "method", ""),
+                "command": getattr(result, "command", ""),
                 "passed": getattr(result, "passed", False),
                 "duration": getattr(result, "duration", 0.0),
                 "timestamp": getattr(result, "timestamp", ""),
