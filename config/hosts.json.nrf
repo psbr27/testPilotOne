@@ -1,0 +1,33 @@
+{
+    "use_ssh": true,
+    "pod_mode": false,
+    "nf_name": "NRF",
+    "connect_to": "tailgate",
+    "ssh_settings": {
+       "auto_add_hosts": true,
+       "known_hosts_file": "~/.ssh/known_hosts",
+       "max_retries": 3,
+       "retry_delay": 2
+    },
+    "hosts": [
+      {
+        "name": "tailgate",
+        "hostname": "10.75.184.84",
+        "username": "alejandro.chavez",
+        "key_file": "",
+        "password": "Changeme_tailgate25",
+        "namespace": "ocdb",
+        "port": 22
+      },
+      {
+        "name": "Mudflap",
+        "hostname": "192.168.1.102",
+        "username": "ec2-user",
+        "key_file": null,
+        "password": "examplePassword123",
+        "namespace": "",
+        "port": 22
+      }
+    ]
+  }
+  
