@@ -136,7 +136,7 @@ def extract_placeholders(excel_parser, valid_sheets):
     return placeholders, placeholder_pattern
 
 
-def resolve_service_map_ssh(connector, target_hosts, placeholders):
+def resolve_service_map_ssh(connector, target_hosts, placeholders, host_cli_map):
     svc_maps = {}
     for host in target_hosts:
         conn = connector.connections.get(host)
@@ -150,9 +150,11 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
             host_cfg = connector.get_host_config(host)
             namespace = getattr(host_cfg, "namespace", None) if host_cfg else None
             if namespace:
-                kubectl_cmd = f"kubectl get virtualservices -n {namespace} -o json"
+                cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = f"{cli_type} get virtualservices -n {namespace} -o json"
             else:
-                kubectl_cmd = "kubectl get virtualservices -A -o json"
+                cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = f"{cli_type} get virtualservices -A -o json"
             stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
             out = stdout.read().decode()
             err = stderr.read().decode()
@@ -183,7 +185,8 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
     # fallback to get services command
     for host in target_hosts:
         if not len(svc_maps[host]):
-            kubectl_cmd = f"kubectl get svc -n {namespace} -o json"
+            cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+            kubectl_cmd = f"{cli_type} get svc -n {namespace} -o json"
             stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
             out = stdout.read().decode()
             err = stderr.read().decode()
@@ -201,7 +204,7 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
 
 
 def resolve_service_map_local(
-    placeholders, namespace=None, config_file="config/hosts.json"
+    placeholders, host_cli_map, namespace=None, config_file="config/hosts.json"
 ):
     svc_maps = {}
     # If namespace is not provided, try to fetch from config using connect_to host
@@ -233,9 +236,11 @@ def resolve_service_map_local(
         if not pod_mode:
             # Construct kubectl command based on namespace
             if namespace:
-                kubectl_cmd = ["kubectl", "get", "virtualservices", "-n", namespace, "-o", "json"]
+                cli_type = host_cli_map.get('localhost', "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = [cli_type, "get", "virtualservices", "-n", namespace, "-o", "json"]
             else:
-                kubectl_cmd = ["kubectl", "get", "svc", "-A", "-o", "json"]
+                cli_type = host_cli_map.get('localhost', "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = [cli_type, "get", "svc", "-A", "-o", "json"]
             logger.debug(f"Running local kubectl command: {' '.join(kubectl_cmd)}")
             result = subprocess.run(
                 kubectl_cmd,
@@ -338,6 +343,7 @@ def execute_flows(
     host_cli_map=None,
     show_table=True,
     display_mode="blessed",
+    userargs=None,
 ):
     test_results = []
     dashboard = None
@@ -375,6 +381,7 @@ def execute_flows(
                 test_results,
                 show_table,
                 dashboard,
+                args=userargs,
             )
     # Print final summary if dashboard is present
     if dashboard:
@@ -621,7 +628,7 @@ def main():
     connector.connect_all(target_hosts)
     host_cli_map = {}
     if pod_mode:
-        svc_maps = resolve_service_map_local(placeholders)
+        svc_maps = resolve_service_map_local(placeholders, host_cli_map, namespace=namespace)
     elif connector.use_ssh:
         if not connector.get_all_connections():
             logger.error(
@@ -633,7 +640,7 @@ def main():
             cli = detect_remote_cli(connector, host)
             host_cli_map[host] = cli
             logger.debug(f"Host {host} uses CLI: {cli}")
-        svc_maps = resolve_service_map_ssh(connector, target_hosts, placeholders)
+        svc_maps = resolve_service_map_ssh(connector, target_hosts, placeholders, host_cli_map)
     else:
         if len(target_hosts) > 1:
             logger.error("Non-SSH mode supports only one target host. Aborting.")
@@ -663,6 +670,7 @@ def main():
         host_cli_map=host_cli_map,
         show_table=show_table,
         display_mode=args.display_mode,
+        userargs=args,
     )
 
 

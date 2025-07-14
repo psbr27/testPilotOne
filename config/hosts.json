@@ -1,6 +1,6 @@
 {
-    "use_ssh": true,
-    "pod_mode": false,
+    "use_ssh": false,
+    "pod_mode": true,
     "nf_name": "SLF",
     "connect_to": "tailgate",
     "ssh_settings": {

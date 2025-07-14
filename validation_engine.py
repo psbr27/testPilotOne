@@ -8,10 +8,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 import ast
 from deepdiff import DeepDiff
-
+import pattern_match as ppm
 from logger import get_logger
 from utils.myutils import compare_dicts_ignore_timestamp
 import utils.parse_pattern_match as parse_pattern_match
+import utils.parse_key_strings as parse_key_strings
+
 
 def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
     try:
@@ -50,6 +52,7 @@ class ValidationContext:
     response_headers: Optional[Dict[str, Any]]
     is_kubectl: bool = False
     saved_payload: Optional[Any] = None
+    args: Optional[Any] = None  # <-- Add args to context
     # Add more as needed
 
 
@@ -78,7 +81,9 @@ class GetCompareWithPutValidator(ValidationStrategy):
             logger.debug("GET response matches saved PUT payload")
             return ValidationResult(True)
         logger.debug("GET response does not match saved PUT payload")
-        return ValidationResult(False, fail_reason="GET response does not match saved PUT payload")
+        return ValidationResult(
+            False, fail_reason="GET response does not match saved PUT payload"
+        )
 
 
 class PutStatusAndPayloadValidator(ValidationStrategy):
@@ -235,6 +240,7 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
+            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -383,10 +389,12 @@ class ValidationDispatcher:
                 "Selected strategy: kubectl_pattern (kubectl log validation)"
             )
             result = VALIDATION_STRATEGIES["kubectl_pattern"].validate(context)
-            self.logger.debug(
-                f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
-            )
-            return result
+            if result is not None:
+                self.logger.debug(
+                    f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
+                )
+                return result
+
         self.logger.warning("No matching validation rule implemented for this context")
         return ValidationResult(False, "No matching validation rule implemented yet")
 
@@ -455,22 +463,72 @@ class KubectlPatternValidator(ValidationStrategy):
             logger.debug("No pattern provided to validate")
             return ValidationResult(True)
 
-        # Support comma-separated or newline-separated patterns
-        subpatterns = [p.strip() for p in re.split(r"[\n,]+", pattern_str) if p.strip()]
-        missing = []
+        # convert pattern_str to a dict
+        pattern_dict = parse_pattern_match.parse_pattern_match_string(pattern_str)
 
-        for pattern in subpatterns:
-            if pattern not in body_str:
-                missing.append(pattern)
+        # if body_str is a string convert to json object
+        if isinstance(body_str, str):
+            try:
+                # split body_str "\n"
+                body_str = body_str.split("\n")
+                for item in body_str:
+                    if isinstance(item, str):
+                        item = item.strip()
+                        item_json = json.loads(item)
+                        # fetch the keys from pattern_dict
+                        keys_list = pattern_dict.keys()
+                        for key in keys_list:
+                            # use key to fetch the value from item_json
+                            if key in item_json:
+                                if item_json[key] == pattern_dict[key]:
+                                    logger.debug(
+                                        f"Pattern '{key}' matched in response body"
+                                    )
+                                    return ValidationResult(True)
+                        # now check if the message has the pattern from item_json
+                        # retrieve message from item_json
+                        kubectl_message = {}
+                        kubectl_message["message"] = item_json.get("message", "")
+                        if kubectl_message:
+                            message_dict = parse_key_strings.parse_log_string_to_dict(
+                                kubectl_message
+                            )
+                            if message_dict:
+                                # retrieve the headers from message_dict
+                                logger.info(
+                                    "Found User-Agent header in message_dict {message_dict}"
+                                )
+                                headers = message_dict.get("headers", {})
+                                if headers:
+                                    # retrieve user-agent from headers
+                                    user_agent = headers.get(", User-Agent", "")
+                                    for key in keys_list:
+                                        # retrieve the value from pattern_dict
+                                        pattern_user_agent = pattern_dict.get(key, "")
+                                        if user_agent == pattern_user_agent:
+                                            logger.debug(
+                                                f"Pattern '{key}' matched in User-Agent header"
+                                            )
+                                            return ValidationResult(True)
+                                        else:
+                                            logger.debug(
+                                                f"Pattern '{key}' did not match User-Agent header: {user_agent} != {pattern_user_agent}"
+                                            )
+                                            return ValidationResult(
+                                                False,
+                                                fail_reason=f"Pattern '{key}' did not match User-Agent header: {user_agent} != {pattern_user_agent}",
+                                            )
 
-        if missing:
-            logger.debug(f"Patterns not found: {missing}")
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON format in response body")
+                return ValidationResult(
+                    False, fail_reason="Invalid JSON format in response body"
+                )
+        else:
+            # fail it here
             return ValidationResult(
-                False, fail_reason=f"Patterns not found in kubectl output: {missing}"
+                False, fail_reason="Response body is not a valid JSON object"
             )
-
-        logger.debug(f"All patterns matched in kubectl output: {subpatterns}")
-        return ValidationResult(True)
 
 
 class GetFullValidator(ValidationStrategy):
@@ -490,6 +548,7 @@ class GetFullValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
+            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -561,6 +620,7 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
+            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -574,11 +634,53 @@ def match_patterns_in_headers_and_body(
     headers: Optional[Dict[str, Any]],
     body: Optional[Any],
     logger,
+    args=None,  # <-- add args parameter
 ) -> ValidationResult:
     """
     Checks if the pattern exists in the response body or headers.
     Returns ValidationResult(True) if found, otherwise ValidationResult(False, reason).
     """
+    # Example usage:
+    if args is not None and getattr(args, "module", None) == "audit":
+        logger.debug("Audit module detected in match_patterns_in_headers_and_body")
+        # for audit assume pattern_match is a dict and compare with response body
+        pattern = str(pattern or "")
+        if isinstance(pattern, str):
+            # if pattern is a string and not a dict then
+            # convert it to a JSON object for a comparison
+            try:
+                pattern_json = json.loads(pattern)
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON format in pattern")
+                return ValidationResult(
+                    False, fail_reason="Invalid JSON format in pattern"
+                )
+        # now fetch response from body and compare with pattern
+        body_str = str(body or "")
+        if isinstance(body_str, str):
+            try:
+                body_json = json.loads(body_str)
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON format in response body")
+                return ValidationResult(
+                    False, fail_reason="Invalid JSON format in response body"
+                )
+        pattern_match_for_response_payload, match_dict_payload = (
+            ppm.check_json_pattern_match(
+                pattern=pattern_json,
+                response=body_json,
+            )
+        )
+        logger.info(f"Pattern match result: {pattern_match_for_response_payload}")
+        match_percentage = int(match_dict_payload.get("overall_match_percent", 0))
+        if pattern_match_for_response_payload and match_percentage == 100:
+            logger.debug("Pattern matched in response payload")
+            return ValidationResult(True)
+        else:
+            return ValidationResult(
+                False,
+                fail_reason=f"Pattern did not match in response payload. Match percentage: {match_percentage}",
+            )
 
     # Step 2: Normalize inputs
     pattern_str = pattern.strip() if pattern else ""
@@ -600,38 +702,69 @@ def match_patterns_in_headers_and_body(
 
     patterns = parse_pattern_match.parse_pattern_match_string(pattern_str)
     # Normalize patterns to lowercase keys
-    patterns = {k.lower(): str(v) for k, v in patterns.items()} if isinstance(patterns, dict) else {}
+    patterns = (
+        {k.lower(): str(v) for k, v in patterns.items()}
+        if isinstance(patterns, dict)
+        else {}
+    )
 
     if not patterns:
         logger.error("No patterns provided to validate")
         return ValidationResult(True)
-    
+
     # compare patterns and headers_dict or body_str
     # if no headers and body_str is present then pass body_str as headers_dict
     if not headers and body_str:
         # convert body_str to a dict-like structure
         headers_dict = parse_pattern_match.parse_pattern_match_string(body_str)
- 
-    
+
     # compare to find the differences between patterns and headers_dict
     headers_val = {}
     for key, val in patterns.items():
         # if key is not found headers find in response from server
         if headers_dict.get(key) is not None:
             headers_val = string_to_dict_regex(headers_dict.get(key, "{}"))
-            # if headers value is {} then check actual header dict and assign 
+            # if headers value is {} then check actual header dict and assign
             if not headers_val and isinstance(headers_dict, dict):
                 headers_val = headers_dict
         else:
+            if isinstance(body_str, str):
+                # convert body_str to JSON object if it is a string
+                body_json = {}
+                try:
+                    body_json = json.loads(body_str)
+                except json.JSONDecodeError:
+                    # catch the exception and do nothing
+                    pass
+
+            # if body_json is not empty then check if it a type <class, list>
+            if isinstance(body_json, list):
+                for item in body_json:
+                    if isinstance(item, dict):
+                        # lower keys
+                        item = (
+                            {k.lower(): str(v) for k, v in item.items()}
+                            if isinstance(item, dict)
+                            else {}
+                        )
+                        # use key and compare the values
+                        if item[key] == val:
+                            return ValidationResult(True)
+                        else:
+                            return ValidationResult(
+                                False,
+                                fail_reason=f"Pattern '{key}' did not match in response body: {item[key]} != {val}",
+                            )
+
             headers_val = parse_pattern_match.parse_pattern_match_string(body_str)
             if headers_val:
                 headers_val = (
-                        {k.lower(): str(v) for k, v in headers_val.items()}
-                        if isinstance(headers_val, dict)
-                        else {}
-                        )
+                    {k.lower(): str(v) for k, v in headers_val.items()}
+                    if isinstance(headers_val, dict)
+                    else {}
+                )
 
-        # if the value itself is a dict in string format below logic 
+        # if the value itself is a dict in string format below logic
         # converts str to dict
         if isinstance(val, str):
             try:
@@ -650,8 +783,22 @@ def match_patterns_in_headers_and_body(
                     "Pattern value is not a dict, cannot compare with headers"
                 )
         else:
+            # check if 3gpp headers are present if so then no need to compare just return True
+            if "3gpp-sbi-lci" in key or "3gpp-sbi-oci" in key:
+                # looks like a 3gpp header verification is required in response body
+                # check if headers_val is a dict and has 3gpp key
+                if headers_dict:
+                    if headers_dict.get(key) is not None:
+                        logger.debug("3gpp header found in response headers")
+                        return ValidationResult(True)
+                    else:
+                        logger.debug("3gpp header not found in response headers")
+                        return ValidationResult(
+                            False,
+                            fail_reason="3gpp header not found in response headers",
+                        )
             result = compare_dicts_ignore_timestamp(val_dict, headers_val)
-            
+
         if result["equal"]:
             logger.debug("All patterns matched in headers")
             return ValidationResult(True)
@@ -668,10 +815,21 @@ def match_patterns_in_headers_and_body(
                     f"Extra headers: {extra_headers}, "
                     f"Common keys with value differences: {result['value_differences']}"
                 )
-                return ValidationResult(False, fail_reason=f"Patterns not found in headers: {missing_patterns}, Extra headers: {extra_headers}, Common keys with value differences: {result['value_differences']}")
+                return ValidationResult(
+                    False,
+                    fail_reason=f"Patterns not found in headers: {missing_patterns}, Extra headers: {extra_headers}, Common keys with value differences: {result['value_differences']}",
+                )
             # If no missing patterns, extra headers, or value differences, consider it passed
             logger.info("All patterns matched in headers after comparison")
             return ValidationResult(True)
+    # If the loop completes without returning, return a default ValidationResult
+    logger.error(
+        "Pattern matching did not return a result; returning failure by default"
+    )
+    return ValidationResult(
+        False, fail_reason="Pattern matching did not return a result"
+    )
+
 
 class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:

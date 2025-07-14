@@ -144,7 +144,7 @@ def build_ssh_k8s_curl_command(
     safe_pod_pattern = shlex.quote(pod_pattern)
 
     # Build kubectl commands with proper escaping
-    pod_find = f"kubectl get po -n {safe_namespace} | awk '{{print $1}}' | grep -E {safe_pod_pattern}"
+    pod_find = f"kubectl get po -n {safe_namespace} | awk '{{print $1}}' | grep -E {safe_pod_pattern} | head -n 1"
 
     # Note: curl_cmd is already escaped from build_curl_command
     exec_cmd = f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
