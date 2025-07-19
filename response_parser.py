@@ -52,6 +52,9 @@ def parse_curl_output(output: str, error: str) -> dict:
                     logger.debug(f"Header found: {k.strip().lower()} = {v.strip()}")
         result["headers"] = headers
 
+    if result.get("headers", None):
+        logger.debug(f"Extracted Headers ==> {result['headers']}")
+        
     # print headers information if headers are present
     if headers:
         logger.debug(f"Extracted {len(headers)} headers from response.")

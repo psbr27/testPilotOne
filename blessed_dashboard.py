@@ -23,6 +23,7 @@ class TestDisplayRow:
     method: str
     status: str  # PASS, FAIL, DRY-RUN
     duration: float
+    fail_reason: str = ""  # Add fail_reason
     
     @classmethod
     def from_result(cls, result):
@@ -34,14 +35,15 @@ class TestDisplayRow:
             status = "PASS"
         else:
             status = "FAIL"
-            
+        fail_reason = getattr(result, "fail_reason", "") or ""
         return cls(
             host=getattr(result, "host", "")[:12],  # Truncate for display
             sheet=getattr(result, "sheet", "")[:10],
             test_name=getattr(result, "test_name", "")[:25],
             method=getattr(result, "method", "GET")[:6],
             status=status,
-            duration=getattr(result, "duration", 0.0)
+            duration=getattr(result, "duration", 0.0),
+            fail_reason=fail_reason[:40]  # Truncate for display
         )
 
 
@@ -152,43 +154,35 @@ class BlessedDashboard:
     def _render_full_screen(self):
         """Render the complete dashboard"""
         output = []
-        
         # Header
         output.append(self.term.move(0, 0) + self.term.bold + self.term.blue)
         output.append("=" * self.term.width)
         output.append(self.term.move(1, 0) + "TestPilot - Live Test Results (Auto-Scroll)".center(self.term.width))
         output.append(self.term.move(2, 0) + "=" * self.term.width + self.term.normal)
-        
         # Progress line
         progress_line = self._format_progress_line()
         output.append(self.term.move(3, 0) + progress_line)
-        
-        # Table header
+        # Table header (single line, no duplicate)
         output.append(self.term.move(4, 0) + self.term.bold)
-        header = f"{'Index':<6} {'Host':<12} {'Sheet':<10} {'Test Name':<25} {'Method':<6} {'Status':<8} {'Duration':<8}"
+        header = f"{'Index':<6} {'Host':<12} {'Sheet':<10} {'Test Name':<25} {'Method':<6} {'Status':<8} {'Duration':<8} {'Fail Reason':<40}"
         output.append(header + self.term.normal)
         output.append(self.term.move(5, 0) + "-" * len(header))
-        
         # Get visible results
         visible_results, scroll_pos = self._get_visible_results()
-        
         # Test results (visible window)
         for i, row in enumerate(visible_results):
             line_num = self.header_height + i
             if line_num < self.term.height - 1:  # Leave space for status line
                 output.append(self.term.move(line_num, 0) + self._format_result_row(row, index=i + 1 + scroll_pos))
-        
         # Clear any remaining lines in the results area
         max_rows = self._calculate_layout()
         for i in range(len(visible_results), max_rows):
             line_num = self.header_height + i
             if line_num < self.term.height - 1:
                 output.append(self.term.move(line_num, 0) + self.term.clear_eol)
-        
         # Status line at bottom with scroll info
         status_line = self._format_status_line_with_scroll(scroll_pos)
         output.append(self.term.move(self.term.height - 1, 0) + self.term.bold + status_line + self.term.normal)
-        
         # Print all at once to reduce flicker
         print(''.join(output), end='', flush=True)
         self.force_full_redraw = False
@@ -279,11 +273,9 @@ class BlessedDashboard:
             status_colored = self.term.yellow + "◦ DRY  " + self.term.normal
         else:
             status_colored = f"{row.status:<8}"
-        
         # Apply highlight if requested (for newest result)
         row_style = self.term.reverse if highlight else ""
         reset_style = self.term.normal if highlight else ""
-        
         return (
             f"{row_style}{str(index) if index is not None else '':<6} "
             f"{row.host:<12} "
@@ -291,7 +283,8 @@ class BlessedDashboard:
             f"{row.test_name:<25} "
             f"{row.method:<6} "
             f"{status_colored:<8} "
-            f"{row.duration:>6.2f}s{reset_style}"
+            f"{row.duration:>6.2f}s "
+            f"{row.fail_reason:<40}{reset_style}"
         )
     
     def _format_status_line_with_scroll(self, scroll_pos=0):

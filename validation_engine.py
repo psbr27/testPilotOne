@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import ast
 import os
 from deepdiff import DeepDiff
-
+import pattern_match as ppm
 from logger import get_logger
 from utils.myutils import compare_dicts_ignore_timestamp
 import utils.parse_pattern_match as parse_pattern_match
@@ -32,6 +32,8 @@ def status_matches(expected, actual):
             return int(expected) == int(actual)
     except Exception:
         return False
+import utils.parse_key_strings as parse_key_strings
+
 
 def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
     try:
@@ -73,6 +75,7 @@ class ValidationContext:
     args: Optional[Any] = None
     sheet_name: Optional[str] = None  # Sheet name for enhanced pattern matching
     row_idx: Optional[int] = None  # Row index for enhanced pattern matching
+    args: Optional[Any] = None  # <-- Add args to context
     # Add more as needed
 
 
@@ -101,7 +104,9 @@ class GetCompareWithPutValidator(ValidationStrategy):
             logger.debug("GET response matches saved PUT payload")
             return ValidationResult(True)
         logger.debug("GET response does not match saved PUT payload")
-        return ValidationResult(False, fail_reason="GET response does not match saved PUT payload")
+        return ValidationResult(
+            False, fail_reason="GET response does not match saved PUT payload"
+        )
 
 
 class PutStatusAndPayloadValidator(ValidationStrategy):
@@ -216,6 +221,7 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -365,10 +371,12 @@ class ValidationDispatcher:
             )
             result = VALIDATION_STRATEGIES["kubectl_pattern"].validate(context)
             if result is not None:
+                if result is not None:
                 self.logger.debug(
-                    f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
-                )
-                return result
+                        f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
+                    )
+                    return result
+
 
 
         #self.logger.warning("No matching validation rule implemented for this context")
@@ -462,9 +470,6 @@ class KubectlPatternValidator(ValidationStrategy):
         logger.debug("No enhanced pattern match found or pattern matching failed")
         return ValidationResult(False, fail_reason="Pattern not found in kubectl logs")
 
-        logger.debug(f"All patterns matched in kubectl output: {subpatterns}")
-        return ValidationResult(True)
-
 
 class GetFullValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
@@ -491,6 +496,7 @@ class GetFullValidator(ValidationStrategy):
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -570,6 +576,7 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -616,6 +623,7 @@ def match_patterns_in_headers_and_body(
     args=None,  # <-- add args parameter
     sheet_name: Optional[str] = None,  # Sheet name for enhanced pattern matching
     row_idx: Optional[int] = None,  # Row index for enhanced pattern matching
+    args=None,  # <-- add args parameter
 ) -> ValidationResult:
     """
     Checks if the pattern exists in the response body or headers.

@@ -1,0 +1,54 @@
+{
+    "use_ssh": false,
+    "pod_mode": false,
+    "nf_name": "YOUR_NF_NAME",
+    "connect_to": "HOST_NAME_OR_ALL",
+    "ssh_settings": {
+        "auto_add_hosts": true,
+        "known_hosts_file": "~/.ssh/known_hosts",
+        "max_retries": 3,
+        "retry_delay": 2
+    },
+    "hosts": [
+        {
+            "name": "example-host-1",
+            "hostname": "${HOST1_HOSTNAME}",
+            "username": "${HOST1_USERNAME}",
+            "key_file": "${HOST1_SSH_KEY_PATH}",
+            "password": "${HOST1_PASSWORD}",
+            "namespace": "${HOST1_NAMESPACE}",
+            "port": 22,
+            "_comment": "Use either key_file OR password, not both. Set unused to null"
+        },
+        {
+            "name": "example-host-2",
+            "hostname": "${HOST2_HOSTNAME}",
+            "username": "${HOST2_USERNAME}",
+            "key_file": "${HOST2_SSH_KEY_PATH}",
+            "password": "${HOST2_PASSWORD}",
+            "namespace": "${HOST2_NAMESPACE}",
+            "port": 22,
+            "_comment": "Environment variables will be automatically loaded if present"
+        }
+    ],
+    "_configuration_notes": {
+        "use_ssh": "Set to true for SSH connections, false for local execution",
+        "pod_mode": "Set to true when running inside a Kubernetes pod",
+        "connect_to": "Specify host name from hosts array or 'all' for all hosts",
+        "environment_variables": [
+            "Export environment variables before running:",
+            "export HOST1_HOSTNAME='your.host.com'",
+            "export HOST1_USERNAME='your_username'",
+            "export HOST1_PASSWORD='your_password'",
+            "export HOST1_SSH_KEY_PATH='/path/to/key'",
+            "export HOST1_NAMESPACE='your_namespace'"
+        ],
+        "security_best_practices": [
+            "Never commit this file with actual credentials",
+            "Use environment variables for sensitive data",
+            "Store SSH keys outside the project directory",
+            "Use key-based authentication instead of passwords when possible",
+            "Set proper file permissions (600) on SSH private keys"
+        ]
+    }
+}

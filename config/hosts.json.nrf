@@ -1,7 +1,7 @@
 {
-    "use_ssh": false,
-    "pod_mode": true,
-    "nf_name": "SLF",
+    "use_ssh": true,
+    "pod_mode": false,
+    "nf_name": "NRF",
     "connect_to": "tailgate",
     "ssh_settings": {
        "auto_add_hosts": true,
@@ -13,10 +13,10 @@
       {
         "name": "tailgate",
         "hostname": "10.75.184.84",
-        "username": "aziz.tejani",
-        "key_file": "/home/cloud-user/aziz/sshkeys/aziz_ssh_key",
-        "password": null,
-        "namespace": "ocnrfslf",
+        "username": "alejandro.chavez",
+        "key_file": "",
+        "password": "Changeme_tailgate25",
+        "namespace": "ocdb",
         "port": 22
       },
       {

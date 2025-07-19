@@ -15,15 +15,16 @@ import argparse
 import datetime
 import json
 import os
+import platform
 import re
-import time
-import sys
 import subprocess
+import sys
+import time
+
 import pandas as pd
 from tabulate import tabulate
+
 from build_info import BUILD_EPOCH, BUILD_DATE, APP_VERSION
-import platform, sys, json, os
-import pandas, tabulate
 from console_table_fmt import LiveProgressTable
 from dry_run import dry_run_commands
 from excel_parser import ExcelParser, parse_excel_to_flows
@@ -35,6 +36,7 @@ from utils.myutils import set_pdb_trace
 # Import pattern processing modules
 from patterns.pattern_match_parser import PatternMatchParser
 from patterns.pattern_to_dict_converter import PatternToDictConverter, integrate_with_excel_parser
+from utils.config_resolver import load_config_with_env, mask_sensitive_data
 
 logger = get_logger("TestPilot")
 
@@ -113,8 +115,23 @@ def parse_args():
 
 
 def load_config_and_targets(config_file):
-    with open(config_file, "r") as f:
-        data = json.load(f)
+    try:
+        # Use the secure config loader
+        data = load_config_with_env(config_file)
+        
+        # Check for sensitive data in config
+        check_config_security(data)
+        
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found: {config_file}")
+        logger.info("Please create a config file from the template:")
+        logger.info(f"  cp {config_file}.template {config_file}")
+        logger.info("  Then update it with your settings")
+        sys.exit(1)
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    
     connect_to = data.get("connect_to")
     if isinstance(connect_to, str):
         target_hosts = [connect_to]
@@ -123,6 +140,29 @@ def load_config_and_targets(config_file):
     else:
         target_hosts = []
     return data, target_hosts
+
+
+def check_config_security(config):
+    """Check configuration for potential security issues."""
+    warnings = []
+    
+    # Check for hardcoded passwords
+    for host in config.get("hosts", []):
+        if host.get("password") and not host["password"].startswith("${"):
+            warnings.append(f"Host '{host.get('name', 'unknown')}' has a hardcoded password")
+        
+        # Check for hardcoded private key paths that might be committed
+        key_file = host.get("key_file", "")
+        if key_file and not key_file.startswith("${") and not key_file.startswith("~"):
+            if any(pattern in key_file for pattern in ["config/", "keys/", ".ssh/"]):
+                warnings.append(f"Host '{host.get('name', 'unknown')}' has a key file in project directory")
+    
+    if warnings:
+        logger.warning("🔒 Security warnings detected in configuration:")
+        for warning in warnings:
+            logger.warning(f"  - {warning}")
+        logger.warning("Consider using environment variables for sensitive data.")
+        logger.warning("See docs/SECURE_CONFIGURATION.md for guidance.")
 
 
 def load_excel_and_sheets(input_path):
@@ -146,7 +186,7 @@ def extract_placeholders(excel_parser, valid_sheets):
     return placeholders, placeholder_pattern
 
 
-def resolve_service_map_ssh(connector, target_hosts, placeholders):
+def resolve_service_map_ssh(connector, target_hosts, placeholders, host_cli_map):
     svc_maps = {}
     for host in target_hosts:
         conn = connector.connections.get(host)
@@ -160,9 +200,11 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
             host_cfg = connector.get_host_config(host)
             namespace = getattr(host_cfg, "namespace", None) if host_cfg else None
             if namespace:
-                kubectl_cmd = f"kubectl get virtualservices -n {namespace} -o json"
+                cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = f"{cli_type} get virtualservices -n {namespace} -o json"
             else:
-                kubectl_cmd = "kubectl get virtualservices -A -o json"
+                cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = f"{cli_type} get virtualservices -A -o json"
             stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
             out = stdout.read().decode()
             err = stderr.read().decode()
@@ -193,7 +235,8 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
     # fallback to get services command if there are no virtual services
     for host in target_hosts:
         if not len(svc_maps[host]):
-            kubectl_cmd = f"kubectl get svc -n {namespace} -o json"
+            cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+            kubectl_cmd = f"{cli_type} get svc -n {namespace} -o json"
             stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
             out = stdout.read().decode()
             err = stderr.read().decode()
@@ -211,7 +254,7 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
 
 
 def resolve_service_map_local(
-    placeholders, target_hosts=None, namespace=None, config_file="config/hosts.json"
+    placeholders, target_hosts=None, host_cli_map, namespace=None, config_file="config/hosts.json"
 ):
     svc_maps = {}
     # If namespace is not provided, try to fetch from config using connect_to host
@@ -243,9 +286,11 @@ def resolve_service_map_local(
         if not pod_mode:
             # Construct kubectl command based on namespace
             if namespace:
-                kubectl_cmd = ["kubectl", "get", "virtualservices", "-n", namespace, "-o", "json"]
+                cli_type = host_cli_map.get('localhost', "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = [cli_type, "get", "virtualservices", "-n", namespace, "-o", "json"]
             else:
-                kubectl_cmd = ["kubectl", "get", "svc", "-A", "-o", "json"]
+                cli_type = host_cli_map.get('localhost', "kubectl") if host_cli_map else "kubectl"
+                kubectl_cmd = [cli_type, "get", "svc", "-A", "-o", "json"]
             logger.debug(f"Running local kubectl command: {' '.join(kubectl_cmd)}")
             result = subprocess.run(
                 kubectl_cmd,
@@ -353,6 +398,7 @@ def execute_flows(
     display_mode="blessed",
     userargs=None,
     step_delay=1,
+    userargs=None,
 ):
     test_results = []
     dashboard = None
@@ -392,6 +438,7 @@ def execute_flows(
                 dashboard,
                 args=userargs,
                 step_delay=step_delay,
+                args=userargs,
             )
     # Print final summary if dashboard is present
     if dashboard:
@@ -712,6 +759,8 @@ def main():
         # Use dummy mapping for dry-run: map each placeholder to a dummy value for each host
         dummy_map = {p: f"dummy-{p}" for p in placeholders}
         svc_maps = {host['name'] if isinstance(host, dict) else host: dummy_map for host in target_hosts}
+        # Create a dummy host_cli_map for dry run
+        dummy_host_cli_map = {host['name'] if isinstance(host, dict) else host: "kubectl" for host in target_hosts}
         dry_run_commands(
             excel_parser,
             valid_sheets,
@@ -719,6 +768,7 @@ def main():
             target_hosts,
             svc_maps,
             placeholder_pattern,
+            host_cli_map=dummy_host_cli_map,
             show_table=show_table,
             display_mode=args.display_mode,
         )
@@ -745,7 +795,7 @@ def main():
     connector.connect_all(target_hosts)
     host_cli_map = {}
     if pod_mode:
-        svc_maps = resolve_service_map_local(placeholders)
+        svc_maps = resolve_service_map_local(placeholders, host_cli_map)
     elif connector.use_ssh:
         if not connector.get_all_connections():
             logger.error(
@@ -757,7 +807,7 @@ def main():
             cli = detect_remote_cli(connector, host)
             host_cli_map[host] = cli
             logger.debug(f"Host {host} uses CLI: {cli}")
-        svc_maps = resolve_service_map_ssh(connector, target_hosts, placeholders)
+        svc_maps = resolve_service_map_ssh(connector, target_hosts, placeholders, host_cli_map)
     else:
         if len(target_hosts) > 1:
             logger.error("Non-SSH mode supports only one target host. Aborting.")
@@ -789,6 +839,7 @@ def main():
         display_mode=args.display_mode,
         userargs=args,
         step_delay=args.step_delay,
+        userargs=args,
     )
 
 

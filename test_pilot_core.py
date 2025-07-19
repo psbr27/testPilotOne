@@ -8,6 +8,7 @@ import subprocess
 import sys
 import time
 import os
+from pprint import pprint
 from utils.resource_map_utils import map_localhost_url
 from utils.myutils import prettify_curl_output, replace_placeholder_in_command
 from utils.kubectl_logs_search import search_in_custom_output
@@ -167,10 +168,8 @@ def build_url_based_command(
             headers={k: safe_str(v) for k, v in headers.items()},
             payload=safe_str(request_payload),
             payloads_folder="payloads",
+            cli_type=cli_type,
         )
-        cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
-        if cli_type == "oc":
-            ssh_cmd = ssh_cmd.replace("kubectl", "oc")
         return ssh_cmd
     except Exception as e:
         logger.error(f"Failed to build SSH curl command: {e}")
@@ -217,7 +216,7 @@ def build_kubectl_logs_command(command, namespace, connector, host):
 
 def build_command_for_step(
     step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host, connector
-):
+):  # host_cli_map now required
     """Build the appropriate command for a test step, with pod_mode support."""
     import os
     import json
@@ -264,11 +263,11 @@ def build_command_for_step(
     elif url:
         return build_url_based_command(
             step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host
-        )
+        )  # host_cli_map passed
     elif command and (command.startswith("kubectl") or command.startswith("oc")):
         # update method to KUBECTL in step_data method
         step_data["method"] = "KUBCTL"
-        return build_kubectl_logs_command(command, namespace, connector, host)
+        return build_kubectl_logs_command(command, namespace, connector, host, host_cli_map), host_cli_map
     else:
         logger.warning(f"URL is required for command execution: {command}")
         return None
@@ -300,7 +299,7 @@ def execute_command(command, host, connector):
 
 
 def validate_and_create_result(
-    step, flow, step_data, parsed_output, output, error, duration, host, command
+    step, flow, step_data, parsed_output, output, error, duration, host, command, args=None
 ):
     """Validate test results and create TestResult object using modular validation engine."""
     expected_status = step_data["expected_status"]

@@ -14,6 +14,7 @@ def _build_command_for_host(
     namespace: Optional[str],
     use_ssh: bool,
     substitute_placeholders_func,
+    host_cli_map: Optional[Dict[str, str]] = None,
 ) -> str:
     """Build command for a specific host, handling both SSH and non-SSH cases."""
     import logging
@@ -53,6 +54,7 @@ def _build_command_for_host(
             # Build command based on SSH or non-SSH mode
             if use_ssh:
                 container = "appinfo"  # TODO: Make this configurable
+                cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
                 ssh_cmd, _ = build_ssh_k8s_curl_command(
                     namespace=namespace or "default",
                     container=container,
@@ -61,6 +63,7 @@ def _build_command_for_host(
                     headers=substituted_headers,
                     payload=substituted_payload,
                     payloads_folder="payloads",
+                    cli_type=cli_type,
                 )
                 return ssh_cmd
             else:
@@ -120,6 +123,7 @@ def dry_run_commands(
     target_hosts,
     svc_maps,
     placeholder_pattern,
+    host_cli_map=None,
     show_table=True,
     display_mode="blessed",
 ):
@@ -194,6 +198,7 @@ def dry_run_commands(
                         namespace,
                         use_ssh,
                         substitute_placeholders,
+                        host_cli_map,
                     )
 
                     logger.debug(
