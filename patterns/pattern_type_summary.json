@@ -1,95 +1,83 @@
 {
   "json_extracted": {
-    "count": 35,
+    "count": 16,
     "examples": [
       {
-        "original": "\"autoCreate\":true",
+        "original": "\"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",_x000D_\n  \"nfType\": \"SMF\",_x000D_\n  \"nfStatus\": \"REGISTERED\",_x000D_\n\"vsmfSupportInd\": true",
         "converted": {
-          "autoCreate": true
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "vsmfSupportInd": true
         }
       },
       {
-        "original": "\"level\": \"DEBUG\"",
+        "original": "\"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",_x000D_\n  \"nfType\": \"SMF\",_x000D_\n  \"nfStatus\": \"REGISTERED\",_x000D_\n\"fqdn\": \"SMF.d5g.oracle.com\"_x000D_\n\"vsmfSupportInd\": true",
         "converted": {
-          "level": "DEBUG"
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "fqdn": "SMF.d5g.oracle.com",
+          "vsmfSupportInd": true
         }
       },
       {
-        "original": "\"level\": \"DEBUG\"",
+        "original": "\"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",_x000D_\n  \"nfType\": \"SMF\",_x000D_\n  \"nfStatus\": \"REGISTERED\",_x000D_\n\"fqdn\": \"SMF.d5g.oracle.com\"_x000D_\n\"vsmfSupportInd\": false",
         "converted": {
-          "level": "DEBUG"
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "fqdn": "SMF.d5g.oracle.com",
+          "vsmfSupportInd": false
         }
       }
     ],
     "sheets": [
-      "SLFRegistration-NRF",
-      "SubscriberActivity",
-      "ErrorCodes-igw",
-      "ErrorCodes-egw",
-      "UserAgentHeader-igw",
-      "podProtection-igw",
-      "AutoCreateSubs",
-      "ServiceLogLevel",
-      "UserAgentHeader-egw",
-      "ControlledShutdown",
-      "SBICorrelationHeader",
-      "SBIOverload-igw",
-      "ProvisioningLogs",
-      "ServerHeader",
-      "SLFRegistrationProfile",
-      "NFScoring"
+      "NRFDiscovery",
+      "NRFFunctionalUseCases",
+      "NRFRegistration"
     ]
   },
   "json_object": {
-    "count": 7,
+    "count": 2,
     "examples": [
       {
-        "original": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
-        "converted": "3gpp-sbi-correlation-info: imsi-302720603940001"
+        "original": "{\"title\":\"Bad Request\", \"status\":400, \"detail\":\"NRF-d5g.oracle.com: Nnrf_NFManagement: nfServiceInstanceIds in the nfProfile are not unique: ONRF-REG-REGN-E0007\", \"cause\":\"MANDATORY_IE_INCORRECT\" }",
+        "converted": {
+          "title": "Bad Request",
+          "status": 400,
+          "detail": "NRF-d5g.oracle.com: Nnrf_NFManagement: nfServiceInstanceIds in the nfProfile are not unique: ONRF-REG-REGN-E0007",
+          "cause": "MANDATORY_IE_INCORRECT"
+        }
       },
       {
-        "original": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
-        "converted": "3gpp-sbi-correlation-info: imsi-302720603940001"
-      },
-      {
-        "original": "\"3gpp-sbi-correlation-info: msisdn-19195220001\"",
-        "converted": "3gpp-sbi-correlation-info: msisdn-19195220001"
+        "original": "{}",
+        "converted": {}
       }
     ],
     "sheets": [
-      "ErrorLogsEnhancement",
-      "SBICorrelationHeader"
+      "NRFDiscovery",
+      "NRFRegistration"
     ]
   },
-  "http_header": {
-    "count": 10,
+  "raw": {
+    "count": 2,
     "examples": [
       {
-        "original": "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+        "original": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\"",
         "converted": {
-          "header_type": "server",
-          "server_value": "UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03"
+          "raw_value": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\""
         }
       },
       {
-        "original": "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+        "original": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\"",
         "converted": {
-          "header_type": "server",
-          "server_value": "UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03"
-        }
-      },
-      {
-        "original": "3gpp-Sbi-Lci",
-        "converted": {
-          "header_type": "3gpp_sbi",
-          "header_name": "3gpp-Sbi-Lci",
-          "header_value": null
+          "raw_value": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\""
         }
       }
     ],
     "sheets": [
-      "ServerHeader",
-      "LciOciHeader-igw"
+      "NRFDiscovery"
     ]
   }
 }

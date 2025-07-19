@@ -22,6 +22,25 @@ from utils.myutils import prettify_curl_output, replace_placeholder_in_command
 from utils.resource_map_utils import map_localhost_url
 from validation_engine import ValidationContext, ValidationDispatcher
 
+# Mock integration imports (lazy loaded to avoid issues if not available)
+_mock_executor = None
+
+
+def get_mock_executor(mock_server_url: str):
+    """Lazy load mock executor to avoid import issues."""
+    global _mock_executor
+    if _mock_executor is None:
+        try:
+            from mock_integration import MockExecutor
+
+            _mock_executor = MockExecutor(mock_server_url)
+            logger.debug(f"Initialized mock executor for {mock_server_url}")
+        except ImportError as e:
+            logger.error(f"Failed to import mock integration: {e}")
+            _mock_executor = None
+    return _mock_executor
+
+
 # Python 3.8+ compatibility for Pattern type
 if sys.version_info >= (3, 9):
     PatternType = re.Pattern[str]
@@ -307,6 +326,16 @@ def execute_command(command, host, connector):
     """Execute a command and return output, error, and duration."""
     if not command:
         return "", "Command build failed", 0.0
+
+    # Check for mock execution mode
+    if (
+        hasattr(connector, "execution_mode")
+        and connector.execution_mode == "mock"
+    ):
+        logger.debug(f"Executing in MOCK mode on [{host}]: {command}")
+        return execute_mock_command(command, host, connector)
+
+    # Original production execution
     logger.debug(f"Running command on [{host}]: {command}")
     start_time = time.time()
     if connector.use_ssh:
@@ -328,6 +357,34 @@ def execute_command(command, host, connector):
     if error:
         logger.debug(f"Error: {error}")
     return output, error, duration
+
+
+def execute_mock_command(command, host, connector):
+    """Execute command in mock mode using mock server."""
+    mock_server_url = getattr(
+        connector, "mock_server_url", "http://localhost:8081"
+    )
+
+    # Get mock executor
+    mock_executor = get_mock_executor(mock_server_url)
+    if mock_executor is None:
+        logger.error(
+            "Mock executor not available, falling back to error response"
+        )
+        return "", "Mock execution failed: MockExecutor not available", 0.0
+
+    # Check if mock server is running
+    if not mock_executor.health_check():
+        logger.warning(
+            f"Mock server at {mock_server_url} not responding, attempting execution anyway"
+        )
+
+    # Execute mock command
+    try:
+        return mock_executor.execute_mock_command(command, host)
+    except Exception as e:
+        logger.error(f"Mock execution failed: {e}")
+        return "", f"Mock execution failed: {e}", 0.0
 
 
 def validate_and_create_result(

@@ -117,6 +117,22 @@ def parse_args():
         default="logs",
         help="Directory for log files (default: logs)",
     )
+    parser.add_argument(
+        "--execution-mode",
+        choices=["production", "mock"],
+        default="production",
+        help="Test execution mode: production (SSH/kubectl) or mock (local mock server) (default: production)",
+    )
+    parser.add_argument(
+        "--mock-server-url",
+        default="http://localhost:8081",
+        help="Mock server URL for mock execution mode (default: http://localhost:8081)",
+    )
+    parser.add_argument(
+        "--mock-data-file",
+        default="mock_data/test_results_20250719_122220.json",
+        help="Real response data file for mock server (default: mock_data/test_results_20250719_122220.json)",
+    )
     return parser.parse_args()
 
 
@@ -460,7 +476,6 @@ def execute_flows(
     display_mode="blessed",
     userargs=None,
     step_delay=1,
-    userargs=None,
 ):
     test_results = []
     dashboard = None
@@ -500,7 +515,6 @@ def execute_flows(
                 dashboard,
                 args=userargs,
                 step_delay=step_delay,
-                args=userargs,
             )
     # Print final summary if dashboard is present
     if dashboard:
@@ -875,7 +889,21 @@ def main():
     _, target_hosts = load_config_and_targets(config_file)
     logger.debug(f"Target hosts: {target_hosts}")
     connector = SSHConnector(config_file)
-    connector.connect_all(target_hosts)
+
+    # Add execution mode support to connector
+    connector.execution_mode = args.execution_mode
+    connector.mock_server_url = args.mock_server_url
+    connector.mock_data_file = args.mock_data_file
+
+    if args.execution_mode == "mock":
+        logger.info(f"🎭 Mock execution mode enabled")
+        logger.info(f"🔗 Mock server URL: {args.mock_server_url}")
+        logger.info(f"📁 Mock data file: {args.mock_data_file}")
+        # Skip SSH connections in mock mode
+        logger.debug("Skipping SSH connections in mock mode")
+    else:
+        logger.debug("Production mode: establishing SSH connections")
+        connector.connect_all(target_hosts)
     host_cli_map = {}
     if pod_mode:
         svc_maps = resolve_service_map_local(placeholders, host_cli_map)
@@ -926,7 +954,6 @@ def main():
         display_mode=args.display_mode,
         userargs=args,
         step_delay=args.step_delay,
-        userargs=args,
     )
 
 

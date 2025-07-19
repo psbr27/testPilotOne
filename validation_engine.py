@@ -241,7 +241,6 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
-            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -551,7 +550,6 @@ class GetFullValidator(ValidationStrategy):
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
-            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -632,7 +630,6 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
-            args=context.args,  # Pass args
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -689,7 +686,6 @@ def match_patterns_in_headers_and_body(
         str
     ] = None,  # Sheet name for enhanced pattern matching
     row_idx: Optional[int] = None,  # Row index for enhanced pattern matching
-    args=None,  # <-- add args parameter
 ) -> ValidationResult:
     """
     Checks if the pattern exists in the response body or headers.

@@ -1,0 +1,34 @@
+{
+  "nfInstances": [
+    {
+      "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+      "nfType": "SMF",
+      "nfStatus": "REGISTERED",
+      "plmnList": [
+        {
+          "mcc": "310",
+          "mnc": "410"
+        }
+      ],
+      "fqdn": "SMF.d5g.oracle.com",
+      "ipv4Addresses": ["192.168.1.100"],
+      "nfServices": [
+        {
+          "serviceInstanceId": "nsmf-pdusession",
+          "serviceName": "nsmf-pdusession",
+          "versions": [
+            {
+              "apiVersionInUri": "v1",
+              "apiFullVersion": "1.0.0"
+            }
+          ],
+          "scheme": "http",
+          "nfServiceStatus": "REGISTERED"
+        }
+      ],
+      "registeredAt": "2024-01-15T10:30:00Z",
+      "lastUpdated": "2024-01-15T10:30:00Z"
+    }
+  ],
+  "totalCount": 1
+}
