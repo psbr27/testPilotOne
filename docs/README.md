@@ -7,6 +7,31 @@ A modular, workflow-aware test automation framework for orchestrating multi-step
 - **Python 3.8+** (tested on Python 3.8, 3.9, 3.10, 3.11, 3.12)
 - Dependencies listed in `requirements.txt`
 
+## 🎨 Code Formatting
+
+This project uses automated code formatting tools to maintain consistent code style:
+
+- **Black**: Python code formatter with 79-character line length
+- **isort**: Import sorting and organization
+- **pre-commit**: Git hooks for automatic formatting
+
+### Setup Pre-commit Hooks
+
+To set up the pre-commit hooks for development:
+
+```bash
+# Install dependencies (if not already installed)
+pip install -r requirements.txt
+
+# Install pre-commit hooks
+pre-commit install
+
+# Optionally, run on all files to format existing code
+pre-commit run --all-files
+```
+
+The pre-commit hooks will automatically run Black and isort on your code before each commit, ensuring consistent formatting across the project.
+
 ---
 
 ## Features
@@ -107,7 +132,7 @@ pip install -e .
 3. **Run TestPilot**
    ```bash
    python test_pilot.py --input path/to/testcases.xlsx --module your_module
-   
+
    # Or if installed as package
    testpilot --input path/to/testcases.xlsx --module your_module
    ```
