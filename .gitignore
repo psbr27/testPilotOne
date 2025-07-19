@@ -222,7 +222,6 @@ tmp/
 temp/
 *.tmp
 *.zip
-*.json
 patterns/Oracle*.json
 
 # Local environment overrides
