@@ -32,6 +32,30 @@ pre-commit run --all-files
 
 The pre-commit hooks will automatically run Black and isort on your code before each commit, ensuring consistent formatting across the project.
 
+### Development Commands
+
+You can also use the provided Makefile for common development tasks:
+
+```bash
+# See all available commands
+make help
+
+# Set up development environment
+make install-dev
+
+# Format code manually
+make format
+
+# Check formatting without changes
+make check
+
+# Run all pre-commit checks
+make lint
+
+# Clean up temporary files
+make clean
+```
+
 ---
 
 ## Features
