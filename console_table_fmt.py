@@ -47,7 +47,11 @@ class SimpleProgressTable:
             print("\n" + "=" * 100)
             print("TEST EXECUTION PROGRESS")
             print("=" * 100)
-            print(tabulate([self.headers], headers=self.headers, tablefmt="github"))
+            print(
+                tabulate(
+                    [self.headers], headers=self.headers, tablefmt="github"
+                )
+            )
             print("-" * 100)
             self.headers_printed = True
 
@@ -59,7 +63,9 @@ class SimpleProgressTable:
         sheet = getattr(test_result, "sheet", "")
         test_name = getattr(test_result, "test_name", "")
         method = (
-            getattr(test_result, "method", "") if hasattr(test_result, "method") else ""
+            getattr(test_result, "method", "")
+            if hasattr(test_result, "method")
+            else ""
         )
         duration = f"{getattr(test_result, 'duration', 0.0):.2f}"
 
@@ -70,7 +76,9 @@ class SimpleProgressTable:
         ):
             result = "DRY-RUN"
         else:
-            result = "PASS" if getattr(test_result, "passed", False) else "FAIL"
+            result = (
+                "PASS" if getattr(test_result, "passed", False) else "FAIL"
+            )
 
         row_data = [host, sheet, test_name, method, result, duration]
 
@@ -109,7 +117,9 @@ class ClearAndReprintTable:
         self.clear_screen()
 
         print("\n" + "=" * 100)
-        print(f"TEST EXECUTION PROGRESS - {len(self.all_results)} tests completed")
+        print(
+            f"TEST EXECUTION PROGRESS - {len(self.all_results)} tests completed"
+        )
         print("=" * 100)
 
         table_data = []
@@ -125,12 +135,16 @@ class ClearAndReprintTable:
             else:
                 result = "PASS" if getattr(r, "passed", False) else "FAIL"
 
-            table_data.append([host, sheet, test_name, method, result, duration])
+            table_data.append(
+                [host, sheet, test_name, method, result, duration]
+            )
 
         print(tabulate(table_data, headers=self.headers, tablefmt="github"))
 
         # Show summary
-        passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
+        passed = sum(
+            1 for r in self.all_results if getattr(r, "passed", False)
+        )
         failed = len(self.all_results) - passed
         print(f"\nSUMMARY: {passed} passed, {failed} failed")
 
@@ -160,7 +174,9 @@ class LiveUpdateTable:
         print("=" * 100)
 
         # Print headers
-        print(tabulate([self.headers], headers=self.headers, tablefmt="github"))
+        print(
+            tabulate([self.headers], headers=self.headers, tablefmt="github")
+        )
 
         # Remember where our data starts
         self.table_start_line = self._get_cursor_position()
@@ -192,7 +208,9 @@ class LiveUpdateTable:
         sheet = getattr(test_result, "sheet", "")
         test_name = getattr(test_result, "test_name", "")
         method = (
-            getattr(test_result, "method", "") if hasattr(test_result, "method") else ""
+            getattr(test_result, "method", "")
+            if hasattr(test_result, "method")
+            else ""
         )
         duration = f"{getattr(test_result, 'duration', 0.0):.2f}"
 
@@ -202,14 +220,18 @@ class LiveUpdateTable:
         ):
             result = "DRY-RUN"
         else:
-            result = "PASS" if getattr(test_result, "passed", False) else "FAIL"
+            result = (
+                "PASS" if getattr(test_result, "passed", False) else "FAIL"
+            )
 
         # Print the new row at the current position
         row_data = [host, sheet, test_name, method, result, duration]
         print(tabulate([row_data], tablefmt="github"))
 
         # Update summary at the bottom
-        passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
+        passed = sum(
+            1 for r in self.all_results if getattr(r, "passed", False)
+        )
         failed = len(self.all_results) - passed
         print(f"\nSUMMARY: {passed} passed, {failed} failed, Running...")
 
@@ -260,10 +282,15 @@ try:
                 host = getattr(r, "host", "")
                 sheet = getattr(r, "sheet", "")
                 test_name = getattr(r, "test_name", "")
-                method = getattr(r, "method", "") if hasattr(r, "method") else ""
+                method = (
+                    getattr(r, "method", "") if hasattr(r, "method") else ""
+                )
                 duration = f"{getattr(r, 'duration', 0.0):.2f}"
 
-                if hasattr(r, "result") and getattr(r, "result", "") == "DRY-RUN":
+                if (
+                    hasattr(r, "result")
+                    and getattr(r, "result", "") == "DRY-RUN"
+                ):
                     result = Text("DRY-RUN", style="yellow")
                 elif getattr(r, "passed", False):
                     result = Text("PASS", style="green")
@@ -274,7 +301,9 @@ try:
 
             # Add summary
             if self.all_results:
-                passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
+                passed = sum(
+                    1 for r in self.all_results if getattr(r, "passed", False)
+                )
                 failed = len(self.all_results) - passed
                 table.caption = f"Summary: {passed} passed, {failed} failed"
 
@@ -283,7 +312,9 @@ try:
         def start_live_display(self):
             """Start the live updating display"""
             self.live_display = Live(
-                self._create_table(), refresh_per_second=10, console=self.console
+                self._create_table(),
+                refresh_per_second=10,
+                console=self.console,
             )
             self.live_display.start()
 
@@ -347,7 +378,9 @@ class LiveProgressTable:
                 # Check if Windows Terminal or modern console
                 import platform
 
-                if platform.version() >= "10.0.10586":  # Windows 10 TH2 and later
+                if (
+                    platform.version() >= "10.0.10586"
+                ):  # Windows 10 TH2 and later
                     return True
                 return False
 
@@ -372,7 +405,12 @@ class LiveProgressTable:
                 f"{{:<{self.column_widths['method']}}} | "
                 f"{{:<{self.column_widths['result']}}} | "
                 f"{{:<{self.column_widths['duration']}}} |".format(
-                    "Host", "Sheet", "Test Name", "Method", "Result", "Duration (s)"
+                    "Host",
+                    "Sheet",
+                    "Test Name",
+                    "Method",
+                    "Result",
+                    "Duration (s)",
                 )
             )
             print(header_row)
@@ -401,13 +439,19 @@ class LiveProgressTable:
         self.print_headers_once()
 
         # Extract data with dynamic truncation based on column widths
-        host = getattr(test_result, "host", "")[: self.column_widths["host"] - 1]
-        sheet = getattr(test_result, "sheet", "")[: self.column_widths["sheet"] - 1]
+        host = getattr(test_result, "host", "")[
+            : self.column_widths["host"] - 1
+        ]
+        sheet = getattr(test_result, "sheet", "")[
+            : self.column_widths["sheet"] - 1
+        ]
         test_name = getattr(test_result, "test_name", "")[
             : self.column_widths["test_name"] - 1
         ]
         method = (
-            getattr(test_result, "method", "")[: self.column_widths["method"] - 1]
+            getattr(test_result, "method", "")[
+                : self.column_widths["method"] - 1
+            ]
             if hasattr(test_result, "method")
             else ""
         )
@@ -427,12 +471,20 @@ class LiveProgressTable:
             and getattr(test_result, "result", "") == "DRY-RUN"
         ):
             result = (
-                f"{ANSI_YELLOW}DRY-RUN{ANSI_RESET}" if self.supports_ansi else "DRY-RUN"
+                f"{ANSI_YELLOW}DRY-RUN{ANSI_RESET}"
+                if self.supports_ansi
+                else "DRY-RUN"
             )
         elif getattr(test_result, "passed", False):
-            result = f"{ANSI_GREEN}PASS{ANSI_RESET}" if self.supports_ansi else "PASS"
+            result = (
+                f"{ANSI_GREEN}PASS{ANSI_RESET}"
+                if self.supports_ansi
+                else "PASS"
+            )
         else:
-            result = f"{ANSI_RED}FAIL{ANSI_RESET}" if self.supports_ansi else "FAIL"
+            result = (
+                f"{ANSI_RED}FAIL{ANSI_RESET}" if self.supports_ansi else "FAIL"
+            )
 
         # Print formatted row with configurable widths
         row = (

@@ -24,12 +24,12 @@ validate_file() {
         echo -e "${RED}Error: File '$1' not found!${NC}"
         exit 1
     fi
-    
+
     if ! jq empty "$1" 2>/dev/null; then
         echo -e "${RED}Error: '$1' is not a valid JSON file!${NC}"
         exit 1
     fi
-    
+
     if ! jq -e '.results' "$1" >/dev/null 2>&1; then
         echo -e "${RED}Error: JSON file must contain 'results' array!${NC}"
         exit 1
@@ -180,7 +180,7 @@ show_summary_stats() {
     local avg_duration=$(cat "$JSON_FILE" | jq '[.results[].duration] | add / length')
     local max_duration=$(cat "$JSON_FILE" | jq '[.results[].duration] | max')
     local min_duration=$(cat "$JSON_FILE" | jq '[.results[].duration] | min')
-    
+
     printf "Total tests:      %d\n" "$total"
     printf "Passed tests:     %d (%.1f%%)\n" "$passed" "$(echo "$passed * 100 / $total" | bc -l)"
     printf "Failed tests:     %d (%.1f%%)\n" "$failed" "$(echo "$failed * 100 / $total" | bc -l)"
@@ -198,7 +198,7 @@ custom_jq_filter() {
 export_filtered_results() {
     get_input "Enter output filename: " output_file
     get_input "Enter jq filter: " filter
-    
+
     cat "$JSON_FILE" | jq "$filter" > "$output_file"
     echo -e "${GREEN}Results exported to '$output_file'${NC}"
 }
@@ -211,22 +211,22 @@ main() {
         echo "Example: $0 test_results.json"
         exit 1
     fi
-    
+
     JSON_FILE="$1"
-    
+
     # Validate the JSON file
     validate_file "$JSON_FILE"
-    
+
     show_header
     echo -e "${GREEN}Processing file: $JSON_FILE${NC}"
     echo
-    
+
     # Main menu loop
     while true; do
         show_menu
         read -r choice
         echo
-        
+
         case $choice in
             1) filter_passed_tests ;;
             2) filter_failed_tests ;;
@@ -247,7 +247,7 @@ main() {
             17) show_summary_stats ;;
             18) custom_jq_filter ;;
             19) export_filtered_results ;;
-            0) 
+            0)
                 echo -e "${BLUE}Goodbye!${NC}"
                 exit 0
                 ;;
@@ -255,7 +255,7 @@ main() {
                 echo -e "${RED}Invalid option. Please try again.${NC}"
                 ;;
         esac
-        
+
         echo
         echo -e "${YELLOW}Press Enter to continue...${NC}"
         read -r

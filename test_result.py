@@ -42,7 +42,9 @@ class TestStep:
         self.expected_status = expected_status
         self.pattern_match = pattern_match
         self.other_fields = other_fields or {}
-        self.result: Optional[TestResult] = None  # Will hold TestResult after execution
+        self.result: Optional[TestResult] = (
+            None  # Will hold TestResult after execution
+        )
 
 
 class TestFlow:

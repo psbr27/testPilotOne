@@ -48,7 +48,9 @@ def extract_log_info_regex(pattern_text):
     logger = logger_match.group(1) if logger_match else None
 
     # Extract key message parts
-    message_match = re.search(r'"message":"([^"]+(?:\\.[^"]*)*)"', pattern_text)
+    message_match = re.search(
+        r'"message":"([^"]+(?:\\.[^"]*)*)"', pattern_text
+    )
     message = message_match.group(1) if message_match else ""
 
     return {"level": level, "loggerName": logger, "message": message}
@@ -102,7 +104,9 @@ def check_flexible_log_pattern_v3(output, pattern_match):
             ):
 
                 matches_found += 1
-                logger.debug(f"Found matching level and logger in line {matches_found}")
+                logger.debug(
+                    f"Found matching level and logger in line {matches_found}"
+                )
 
                 # Check for key phrases in message
                 log_message = log_entry.get("message", "")

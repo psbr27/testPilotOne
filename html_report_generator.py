@@ -3,10 +3,11 @@ HTML Report Generator for Test Results
 Provides functionality to generate interactive HTML reports for test results
 """
 
-import os
 import json
+import os
 from datetime import datetime
 from typing import Any, Dict, List
+
 from test_results_exporter import TestResultsExporter
 
 
@@ -80,7 +81,7 @@ class HTMLReportGenerator(TestResultsExporter):
         .total { color: #2c3e50; }
         .passed { color: #27ae60; }
         .failed { color: #e74c3c; }
-        
+
         .sheet-tab {
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -271,7 +272,7 @@ class HTMLReportGenerator(TestResultsExporter):
             // Create pie charts for overall summary and each sheet
             createOverallPieChart();
             createSheetPieCharts();
-            
+
             // Toggle sheet content
             document.querySelectorAll('.sheet-header').forEach(header => {
                 header.addEventListener('click', function() {
@@ -283,7 +284,7 @@ class HTMLReportGenerator(TestResultsExporter):
                     }
                 });
             });
-            
+
             // Toggle test details
             document.querySelectorAll('.test-row').forEach(row => {
                 row.addEventListener('click', function() {
@@ -296,7 +297,7 @@ class HTMLReportGenerator(TestResultsExporter):
                     }
                 });
             });
-            
+
             // Toggle test group content
             document.querySelectorAll('.test-group-header').forEach(header => {
                 header.addEventListener('click', function() {
@@ -308,16 +309,16 @@ class HTMLReportGenerator(TestResultsExporter):
                     }
                 });
             });
-            
+
             // Filter buttons
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const filter = this.getAttribute('data-filter');
-                    
+
                     // Update active button
                     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
-                    
+
                     // Filter rows
                     document.querySelectorAll('.test-row').forEach(row => {
                         if (filter === 'all') {
@@ -333,13 +334,13 @@ class HTMLReportGenerator(TestResultsExporter):
                 });
             });
         });
-        
+
         // Function to create the overall summary pie chart
         function createOverallPieChart() {
             const ctx = document.getElementById('overall-chart').getContext('2d');
             const passed = parseInt(document.getElementById('overall-passed').textContent);
             const failed = parseInt(document.getElementById('overall-failed').textContent);
-            
+
             new Chart(ctx, {
                 type: 'pie',
                 data: {
@@ -361,18 +362,18 @@ class HTMLReportGenerator(TestResultsExporter):
                     }
                 }
             });
-            
+
             // Create sheet comparison chart
             createSheetComparisonChart();
         }
-        
+
         // Function to create pie charts for each sheet
         function createSheetPieCharts() {
             document.querySelectorAll('.sheet-chart').forEach(canvas => {
                 const ctx = canvas.getContext('2d');
                 const passed = parseInt(canvas.getAttribute('data-passed'));
                 const failed = parseInt(canvas.getAttribute('data-failed'));
-                
+
                 new Chart(ctx, {
                     type: 'pie',
                     data: {
@@ -396,29 +397,29 @@ class HTMLReportGenerator(TestResultsExporter):
                 });
             });
         }
-        
+
         // Function to create sheet comparison chart
         function createSheetComparisonChart() {
             const ctx = document.getElementById('sheet-comparison-chart').getContext('2d');
-            
+
             // Collect data from all sheet tabs
             const sheetNames = [];
             const passedCounts = [];
             const failedCounts = [];
-            
+
             document.querySelectorAll('.sheet-chart').forEach(canvas => {
                 // Get the sheet name from the closest sheet-tab
                 const sheetTab = canvas.closest('.sheet-tab');
                 const sheetName = sheetTab.querySelector('.sheet-header .sheet-summary span').textContent;
-                
+
                 const passed = parseInt(canvas.getAttribute('data-passed'));
                 const failed = parseInt(canvas.getAttribute('data-failed'));
-                
+
                 sheetNames.push(sheetName);
                 passedCounts.push(passed);
                 failedCounts.push(failed);
             });
-            
+
             new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -477,9 +478,12 @@ class HTMLReportGenerator(TestResultsExporter):
     def _extract_test_name(self, test_name: str) -> str:
         """Extract base test name by removing _<digits> suffix"""
         import re
-        return re.sub(r'_\d+$', '', test_name)
 
-    def export_to_html(self, test_results: List[Any], filename: str = None) -> str:
+        return re.sub(r"_\d+$", "", test_name)
+
+    def export_to_html(
+        self, test_results: List[Any], filename: str = None
+    ) -> str:
         """Export test results to an interactive HTML report"""
         if not filename:
             filename = self._generate_filename("html")
@@ -494,13 +498,17 @@ class HTMLReportGenerator(TestResultsExporter):
 
         # Calculate summary statistics
         total_tests = len(test_results)
-        passed_tests = sum(1 for r in test_results if getattr(r, "passed", False))
+        passed_tests = sum(
+            1 for r in test_results if getattr(r, "passed", False)
+        )
         failed_tests = total_tests - passed_tests
-        pass_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
+        pass_rate = (
+            (passed_tests / total_tests * 100) if total_tests > 0 else 0
+        )
 
         # Generate timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         # Generate HTML content
         html_content = f"""<!DOCTYPE html>
         <html lang="en">
@@ -519,7 +527,7 @@ class HTMLReportGenerator(TestResultsExporter):
                 <p style="text-align: center; color: #777; margin-top: -20px; margin-bottom: 30px; font-size: 14px;">
                     Generated on {timestamp}
                 </p>
-                
+
                 <div class="summary">
                     <div class="summary-item">
                         <h3>Total Tests</h3>
@@ -538,31 +546,37 @@ class HTMLReportGenerator(TestResultsExporter):
                         <p>{pass_rate:.1f}%</p>
                     </div>
                 </div>
-                
+
                 <div class="chart-container" style="width: 200px; height: 200px; margin: 0 auto;">
                     <canvas id="overall-chart"></canvas>
                 </div>
-                
+
                 <h2>Tests by Sheet</h2>
                 <div class="chart-container" style="width: 100%; height: 300px; margin: 20px auto;">
                     <canvas id="sheet-comparison-chart"></canvas>
                 </div>
-                
+
                 <div class="filter-options">
                     <button class="filter-btn active" data-filter="all">All Tests</button>
                     <button class="filter-btn" data-filter="passed">Passed Only</button>
                     <button class="filter-btn" data-filter="failed">Failed Only</button>
                 </div>
-                
+
                 <h2>Results by Sheet</h2>
         """
 
         # Add sheet tabs
         for sheet_name, sheet_results in results_by_sheet.items():
-            sheet_passed = sum(1 for r in sheet_results if getattr(r, "passed", False))
+            sheet_passed = sum(
+                1 for r in sheet_results if getattr(r, "passed", False)
+            )
             sheet_failed = len(sheet_results) - sheet_passed
-            sheet_pass_rate = (sheet_passed / len(sheet_results) * 100) if len(sheet_results) > 0 else 0
-            
+            sheet_pass_rate = (
+                (sheet_passed / len(sheet_results) * 100)
+                if len(sheet_results) > 0
+                else 0
+            )
+
             # Group tests by test name (without _<digits>)
             tests_by_name = {}
             for result in sheet_results:
@@ -571,7 +585,7 @@ class HTMLReportGenerator(TestResultsExporter):
                 if base_test_name not in tests_by_name:
                     tests_by_name[base_test_name] = []
                 tests_by_name[base_test_name].append(result)
-            
+
             # Determine sheet status
             if sheet_failed == 0:
                 status_class = "status-pass"
@@ -582,7 +596,7 @@ class HTMLReportGenerator(TestResultsExporter):
             else:
                 status_class = "status-mixed"
                 status_text = f"MIXED ({sheet_passed}/{len(sheet_results)})"
-            
+
             html_content += f"""
                 <div class="sheet-tab">
                     <div class="sheet-header">
@@ -605,14 +619,16 @@ class HTMLReportGenerator(TestResultsExporter):
                         </div>
                         <div class="test-groups">
             """
-            
+
             # Add test groups for this sheet
             for test_name, test_results in tests_by_name.items():
                 # Determine if all tests in this group passed
-                all_passed = all(getattr(r, "passed", False) for r in test_results)
+                all_passed = all(
+                    getattr(r, "passed", False) for r in test_results
+                )
                 group_status = "passed" if all_passed else "failed"
                 status_text = "PASS" if all_passed else "FAIL"
-                
+
                 html_content += f"""
                             <div class="test-group">
                                 <div class="test-group-header {group_status}">
@@ -635,7 +651,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                         </thead>
                                         <tbody>
                 """
-                
+
                 # Add test rows for this group
                 for i, result in enumerate(test_results):
                     step_name = getattr(result, "test_name", "Unknown")
@@ -646,7 +662,7 @@ class HTMLReportGenerator(TestResultsExporter):
                     status = "PASS" if passed else "FAIL"
                     row_class = "passed" if passed else "failed"
                     details_id = f"details-{sheet_name.replace(' ', '-')}-{test_name.replace(' ', '-')}-{i}"
-                    
+
                     html_content += f"""
                                             <tr class="test-row {row_class}" data-details="{details_id}">
                                                 <td class="test-name">{step_name}</td>
@@ -656,7 +672,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                 <td>{duration:.2f}s</td>
                                             </tr>
                     """
-                    
+
                     # Add collapsible details section for this test
                     command = getattr(result, "command", "")
                     error = getattr(result, "error", "")
@@ -666,7 +682,7 @@ class HTMLReportGenerator(TestResultsExporter):
                     actual_status = getattr(result, "actual_status", "N/A")
                     pattern_match = getattr(result, "pattern_match", "")
                     pattern_found = getattr(result, "pattern_found", "")
-                    
+
                     html_content += f"""
                                             <tr>
                                                 <td colspan="5" class="test-details" id="{details_id}">
@@ -676,7 +692,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{command}</pre>
                                                         </div>
                     """
-                    
+
                     if error:
                         html_content += f"""
                                                         <div class="detail-item">
@@ -684,7 +700,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{error}</pre>
                                                         </div>
                         """
-                    
+
                     if fail_reason:
                         html_content += f"""
                                                         <div class="detail-item">
@@ -692,7 +708,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{fail_reason}</pre>
                                                         </div>
                         """
-                    
+
                     html_content += f"""
                                                         <div class="detail-item">
                                                             <h4>Expected Status</h4>
@@ -703,7 +719,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{actual_status}</pre>
                                                         </div>
                     """
-                    
+
                     if pattern_match:
                         html_content += f"""
                                                         <div class="detail-item">
@@ -711,7 +727,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{pattern_match}</pre>
                                                         </div>
                         """
-                    
+
                     if pattern_found:
                         html_content += f"""
                                                         <div class="detail-item">
@@ -719,7 +735,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{pattern_found}</pre>
                                                         </div>
                         """
-                    
+
                     if output:
                         html_content += f"""
                                                         <div class="detail-item" style="grid-column: span 2;">
@@ -727,26 +743,26 @@ class HTMLReportGenerator(TestResultsExporter):
                                                             <pre>{output}</pre>
                                                         </div>
                         """
-                    
+
                     html_content += """
                                                     </div>
                                                 </td>
                                             </tr>
                     """
-                
+
                 html_content += """
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                 """
-            
+
             html_content += """
                         </div>
                     </div>
                 </div>
             """
-        
+
         # Close HTML document
         html_content += f"""
             </div>
@@ -756,9 +772,9 @@ class HTMLReportGenerator(TestResultsExporter):
         </body>
         </html>
         """
-        
+
         # Write HTML to file
         with open(filename, "w") as f:
             f.write(html_content)
-        
+
         return filename

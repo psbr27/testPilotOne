@@ -27,9 +27,13 @@ class TestResultsExporter:
     def _generate_filename(self, format_type: str) -> str:
         """Generate timestamped filename"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return os.path.join(self.results_dir, f"test_results_{timestamp}.{format_type}")
+        return os.path.join(
+            self.results_dir, f"test_results_{timestamp}.{format_type}"
+        )
 
-    def export_to_json(self, test_results: List[Any], filename: str = None) -> str:
+    def export_to_json(
+        self, test_results: List[Any], filename: str = None
+    ) -> str:
         """Export test results to JSON format"""
         if not filename:
             filename = self._generate_filename("json")
@@ -54,17 +58,24 @@ class TestResultsExporter:
             }
 
             # Add dry-run status if applicable
-            if hasattr(result, "result") and getattr(result, "result", "") == "DRY-RUN":
+            if (
+                hasattr(result, "result")
+                and getattr(result, "result", "") == "DRY-RUN"
+            ):
                 result_dict["status"] = "DRY-RUN"
             else:
-                result_dict["status"] = "PASS" if result_dict["passed"] else "FAIL"
+                result_dict["status"] = (
+                    "PASS" if result_dict["passed"] else "FAIL"
+                )
 
             results_data.append(result_dict)
 
         # Add summary information
         summary = {
             "total_tests": len(test_results),
-            "passed": sum(1 for r in test_results if getattr(r, "passed", False)),
+            "passed": sum(
+                1 for r in test_results if getattr(r, "passed", False)
+            ),
             "failed": len(test_results)
             - sum(1 for r in test_results if getattr(r, "passed", False)),
             "export_timestamp": datetime.now().isoformat(),
@@ -77,7 +88,9 @@ class TestResultsExporter:
 
         return filename
 
-    def export_to_csv(self, test_results: List[Any], filename: str = None) -> str:
+    def export_to_csv(
+        self, test_results: List[Any], filename: str = None
+    ) -> str:
         """Export test results to CSV format"""
         if not filename:
             filename = self._generate_filename("csv")
@@ -105,7 +118,9 @@ class TestResultsExporter:
                 ):
                     status = "DRY-RUN"
                 else:
-                    status = "PASS" if getattr(result, "passed", False) else "FAIL"
+                    status = (
+                        "PASS" if getattr(result, "passed", False) else "FAIL"
+                    )
 
                 row = [
                     getattr(result, "host", ""),
@@ -115,7 +130,9 @@ class TestResultsExporter:
                     status,
                     f"{getattr(result, 'duration', 0.0):.2f}",
                     getattr(result, "timestamp", ""),
-                    getattr(result, "error", "")[:200],  # Limit error message length
+                    getattr(result, "error", "")[
+                        :200
+                    ],  # Limit error message length
                 ]
                 writer.writerow(row)
 
@@ -136,7 +153,9 @@ class TestResultsExporter:
             f.write("TEST EXECUTION SUMMARY REPORT\n")
             f.write("=" * 80 + "\n\n")
 
-            f.write(f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(
+                f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            )
             f.write(f"Total Tests: {len(test_results)}\n")
             f.write(f"Passed: {passed}\n")
             f.write(f"Failed: {failed}\n")
@@ -180,20 +199,25 @@ class TestResultsExporter:
 
         return filename
 
-    def export_to_html(self, test_results: List[Any], filename: str = None, open_browser: bool = True) -> str:
+    def export_to_html(
+        self,
+        test_results: List[Any],
+        filename: str = None,
+        open_browser: bool = True,
+    ) -> str:
         """Export test results to HTML format and optionally open in browser"""
         if not filename:
             filename = self._generate_filename("html")
 
         # Import HTMLReportGenerator here to avoid circular imports
         from html_report_generator import HTMLReportGenerator
-        
+
         # Create HTML report generator and export
         html_generator = HTMLReportGenerator(self.results_dir)
         html_file = html_generator.export_to_html(test_results, filename)
-        
+
         # Open in browser if requested
         if open_browser:
             webbrowser.open(f"file://{os.path.abspath(html_file)}")
-            
+
         return html_file

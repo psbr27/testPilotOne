@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Tuple
 
+
 def _flatten_leaves(obj: Any, prefix: str = "") -> List[Tuple[str, Any]]:
     """
     Recursively traverse `obj` (dicts/lists) and return a list of
@@ -19,7 +20,10 @@ def _flatten_leaves(obj: Any, prefix: str = "") -> List[Tuple[str, Any]]:
         items.append((prefix, obj))
     return items
 
-def json_match_percent(expected: Dict[str, Any], actual: Dict[str, Any]) -> float:
+
+def json_match_percent(
+    expected: Dict[str, Any], actual: Dict[str, Any]
+) -> float:
     """
     Compute % of (path,value) pairs in `expected` that
     also appear exactly in `actual`.

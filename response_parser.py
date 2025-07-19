@@ -35,7 +35,9 @@ def parse_curl_output(output: str, error: str) -> dict:
         match = re.search(r"HTTP/[12](?:\.\d)? (\d{3})", error)
         if match:
             result["http_status"] = int(match.group(1))
-            logger.debug(f"Extracted HTTP status from error: {result['http_status']}")
+            logger.debug(
+                f"Extracted HTTP status from error: {result['http_status']}"
+            )
     if "http_status" not in result:
         result["http_status"] = None
         logger.debug("No HTTP status found in either output or error.")
@@ -49,12 +51,14 @@ def parse_curl_output(output: str, error: str) -> dict:
                 if ":" in header_line:
                     k, v = header_line.split(":", 1)
                     headers[k.strip().lower()] = v.strip()
-                    logger.debug(f"Header found: {k.strip().lower()} = {v.strip()}")
+                    logger.debug(
+                        f"Header found: {k.strip().lower()} = {v.strip()}"
+                    )
         result["headers"] = headers
 
     if result.get("headers", None):
         logger.debug(f"Extracted Headers ==> {result['headers']}")
-        
+
     # print headers information if headers are present
     if headers:
         logger.debug(f"Extracted {len(headers)} headers from response.")
@@ -68,7 +72,9 @@ def parse_curl_output(output: str, error: str) -> dict:
     lines = response.splitlines()
     header_end_idx = None
     for i, line in enumerate(lines):
-        if line.strip() == "<" or (line.startswith("< ") and line.strip() == "<"):
+        if line.strip() == "<" or (
+            line.startswith("< ") and line.strip() == "<"
+        ):
             header_end_idx = i
     if header_end_idx is not None and header_end_idx + 1 < len(lines):
         # Join everything after the last header as payload
@@ -81,7 +87,9 @@ def parse_curl_output(output: str, error: str) -> dict:
                 payload = json.loads(possible_json)
                 logger.debug("Parsed JSON payload successfully.")
             except Exception as e:
-                logger.debug(f"Failed to parse JSON payload: {e}. Using raw payload.")
+                logger.debug(
+                    f"Failed to parse JSON payload: {e}. Using raw payload."
+                )
                 payload = possible_json
     result["response_payload"] = payload
     # Reason: look for first line with 'Reason:'
@@ -123,7 +131,9 @@ def check_pod_logs(output, pattern_match):
                     continue
         except (IndexError, ValueError):
             pass
-    elif pattern_match.startswith('"request') or pattern_match.startswith('"instant'):
+    elif pattern_match.startswith('"request') or pattern_match.startswith(
+        '"instant'
+    ):
         # Example pattern: '"request":"{"profile-data":{"accountID":["12345678912345678912345678"],"imsi":["302720603942144"],"msisdn":["19195225555"]},"slfGroupName":"IMSGrp1"}"}'
         pattern_json = extract_request_json_manual(pattern_match)
         if pattern_json is None:
@@ -135,7 +145,9 @@ def check_pod_logs(output, pattern_match):
             info = piu.extract_log_info_regex(pattern_match)
             logger.debug(f"Level: {info['level']}")
             logger.debug(f"Logger: {info['loggerName']}")
-            logger.debug(f"Message (first 100 chars): {info['message'][:100]}...")
+            logger.debug(
+                f"Message (first 100 chars): {info['message'][:100]}..."
+            )
 
             result = piu.check_flexible_log_pattern_v3(output, pattern_match)
             if result:
@@ -143,7 +155,9 @@ def check_pod_logs(output, pattern_match):
                     f"Pattern match found in pod logs for pattern: {pattern_match}"
                 )
                 return True
-            logger.error(f"Failed to extract JSON from pattern_match: {pattern_match}")
+            logger.error(
+                f"Failed to extract JSON from pattern_match: {pattern_match}"
+            )
             return False
         for line in output.strip().split("\n"):
             try:
@@ -151,7 +165,9 @@ def check_pod_logs(output, pattern_match):
                 # Check if pattern_match is found in log_entry
                 # find subset of pattern_match in log_entry
                 if isinstance(log_entry, dict) and pattern_json is not None:
-                    if all(log_entry.get(k) == v for k, v in pattern_json.items()):
+                    if all(
+                        log_entry.get(k) == v for k, v in pattern_json.items()
+                    ):
                         return True
             except json.JSONDecodeError:
                 continue
@@ -181,7 +197,9 @@ def _validate_get_method_comparison(
                 try:
                     server_output = json.loads(server_output)
                 except json.JSONDecodeError:
-                    logger.debug("server_output is not valid JSON, using as-is")
+                    logger.debug(
+                        "server_output is not valid JSON, using as-is"
+                    )
             diff_result = jsondiff.diff(server_output, ref_payload)
         else:
             diff_result = jsondiff.diff(response_payload, ref_payload)
@@ -234,7 +252,10 @@ def _validate_status_code(
 
         return True, None
     except Exception:
-        return False, f"Unable to compare status: {actual_status} vs {expected_status}"
+        return (
+            False,
+            f"Unable to compare status: {actual_status} vs {expected_status}",
+        )
 
 
 def _parse_pattern_as_json(
@@ -245,13 +266,19 @@ def _parse_pattern_as_json(
         return pattern_match, True
     elif isinstance(pattern_match, str):
         pattern_match_str = pattern_match.strip()
-        if (pattern_match_str.startswith("{") and pattern_match_str.endswith("}")) or (
-            pattern_match_str.startswith("[") and pattern_match_str.endswith("]")
+        if (
+            pattern_match_str.startswith("{")
+            and pattern_match_str.endswith("}")
+        ) or (
+            pattern_match_str.startswith("[")
+            and pattern_match_str.endswith("]")
         ):
             try:
                 return json.loads(pattern_match_str), True
             except Exception as e:
-                logger.debug(f"pattern_match looks like JSON but failed to parse: {e}")
+                logger.debug(
+                    f"pattern_match looks like JSON but failed to parse: {e}"
+                )
     return None, False
 
 
@@ -292,7 +319,9 @@ def _validate_pattern_match(
         # Check in response payload if not found
         if not pattern_found and response_payload is not None:
             pattern_found = str(pattern_match) in str(response_payload)
-            logger.debug(f"Pattern search in response_payload: found={pattern_found}")
+            logger.debug(
+                f"Pattern search in response_payload: found={pattern_found}"
+            )
 
         # Check in compare_with_payload if still not found
         if not pattern_found and compare_with_payload is not None:
@@ -303,7 +332,9 @@ def _validate_pattern_match(
             )
             pattern_found = str(pattern_match) in compare_payload_str
             if pattern_found:
-                logger.debug(f"Pattern '{pattern_match}' found in compare_with_payload")
+                logger.debug(
+                    f"Pattern '{pattern_match}' found in compare_with_payload"
+                )
 
         # Final check for kubectl logs
         if not pattern_found and is_kubectl_logs and output:
@@ -356,7 +387,10 @@ def validate_test_result(
     # Step 1: Validate GET method comparison if applicable
     if method and method.upper() == "GET" and compare_with_payload is not None:
         passed, fail_reason = _validate_get_method_comparison(
-            response_payload, server_output, compare_with_payload, compare_with_key
+            response_payload,
+            server_output,
+            compare_with_payload,
+            compare_with_key,
         )
         if not passed:
             return passed, fail_reason, pattern_found
@@ -370,12 +404,14 @@ def validate_test_result(
 
     # Step 3: Validate pattern matching
     if pattern_match:
-        pattern_passed, pattern_fail_reason, pattern_found = _validate_pattern_match(
-            pattern_match,
-            output,
-            response_payload,
-            compare_with_payload,
-            is_kubectl_logs,
+        pattern_passed, pattern_fail_reason, pattern_found = (
+            _validate_pattern_match(
+                pattern_match,
+                output,
+                response_payload,
+                compare_with_payload,
+                is_kubectl_logs,
+            )
         )
         if not pattern_passed:
             passed = False

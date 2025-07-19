@@ -1,7 +1,9 @@
 import re
 import shlex
 from typing import Dict, List, Optional, Set
+
 import pandas as pd
+
 from test_result import TestFlow, TestStep
 
 
@@ -27,11 +29,15 @@ class ExcelParser:
 
         # Check if file exists and has content
         if not os.path.exists(self.excel_file_path):
-            raise FileNotFoundError(f"Excel file not found: {self.excel_file_path}")
+            raise FileNotFoundError(
+                f"Excel file not found: {self.excel_file_path}"
+            )
 
         file_size = os.path.getsize(self.excel_file_path)
         if file_size == 0:
-            raise ValueError(f"Excel file is empty (0 bytes): {self.excel_file_path}")
+            raise ValueError(
+                f"Excel file is empty (0 bytes): {self.excel_file_path}"
+            )
 
         try:
             # Try with openpyxl engine first (for .xlsx files)
@@ -61,7 +67,9 @@ class ExcelParser:
             for sheet in valid_sheets:
                 try:
                     loaded_sheets[sheet] = pd.read_excel(
-                        self.excel_file_path, sheet_name=sheet, engine="openpyxl"
+                        self.excel_file_path,
+                        sheet_name=sheet,
+                        engine="openpyxl",
                     )
                 except Exception:
                     loaded_sheets[sheet] = pd.read_excel(

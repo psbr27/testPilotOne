@@ -45,13 +45,13 @@ def find_local_modules():
     for py_file in Path(project_root).glob('*.py'):
         if py_file.name != 'test_pilot.py':
             modules.append(py_file.stem)
-    
+
     for init_file in Path(project_root).rglob('__init__.py'):
         package_path = init_file.parent
         relative_path = package_path.relative_to(project_root)
         module_name = str(relative_path).replace(os.sep, '.')
         modules.append(module_name)
-        
+
         for py_file in package_path.glob('*.py'):
             if py_file.name != '__init__.py':
                 full_module = f"{module_name}.{py_file.stem}"
@@ -123,7 +123,7 @@ pyinstaller --clean testPilot.spec
 if [ -d "dist/testPilot" ]; then
     log_info "Build completed successfully!"
     log_info "Binary location: dist/testPilot/"
-    
+
     # Test the binary
     log_info "Testing binary..."
     if ./dist/testPilot/testPilot --help &> /dev/null; then

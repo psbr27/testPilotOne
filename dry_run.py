@@ -22,7 +22,9 @@ def _build_command_for_host(
     logger = logging.getLogger("TestPilot")
 
     command = row.get("Command")
-    request_payload = row.get("Request Payload") if "Request Payload" in row else None
+    request_payload = (
+        row.get("Request Payload") if "Request Payload" in row else None
+    )
     method = row.get("Method", "GET") if "Method" in row else "GET"
     url = row.get("URL") if "URL" in row else None
     headers = {}
@@ -40,7 +42,9 @@ def _build_command_for_host(
                 url, svc_map, placeholder_pattern
             )
             substituted_headers = {
-                k: substitute_placeholders_func(str(v), svc_map, placeholder_pattern)
+                k: substitute_placeholders_func(
+                    str(v), svc_map, placeholder_pattern
+                )
                 for k, v in headers.items()
             }
             substituted_payload = (
@@ -54,7 +58,11 @@ def _build_command_for_host(
             # Build command based on SSH or non-SSH mode
             if use_ssh:
                 container = "appinfo"  # TODO: Make this configurable
-                cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
+                cli_type = (
+                    host_cli_map.get(host, "kubectl")
+                    if host_cli_map
+                    else "kubectl"
+                )
                 ssh_cmd, _ = build_ssh_k8s_curl_command(
                     namespace=namespace or "default",
                     container=container,
@@ -80,7 +88,9 @@ def _build_command_for_host(
             return f"[ERROR] {e}"
     else:
         # No URL, just substitute placeholders in command
-        return substitute_placeholders_func(command, svc_map, placeholder_pattern)
+        return substitute_placeholders_func(
+            command, svc_map, placeholder_pattern
+        )
 
 
 def _create_dry_run_result(
@@ -130,6 +140,7 @@ def dry_run_commands(
     # Robustly handle connector=None for dry-run
     use_ssh = connector is not None and getattr(connector, "use_ssh", False)
     import logging
+
     from test_pilot import print_results_table, substitute_placeholders
 
     logger = logging.getLogger("TestPilot")
@@ -141,20 +152,23 @@ def dry_run_commands(
     if show_table:
         try:
             from blessed_dashboard import create_blessed_dashboard
-            
+
             if display_mode == "blessed":
-                dashboard = create_blessed_dashboard(mode="full", max_visible_rows=20)
+                dashboard = create_blessed_dashboard(
+                    mode="full", max_visible_rows=20
+                )
             elif display_mode == "progress":
                 dashboard = create_blessed_dashboard(mode="progress")
             else:  # simple
                 dashboard = create_blessed_dashboard(mode="simple")
-            
+
             dashboard.start()
-            
+
         except ImportError as e:
             logger.warning(f"Blessed dashboard not available: {e}")
             # Fallback to simple print-based display
             from console_table_fmt import LiveProgressTable
+
             dashboard = LiveProgressTable()
     for sheet in valid_sheets:
         df = excel_parser.get_sheet(sheet)
@@ -178,15 +192,25 @@ def dry_run_commands(
                 )
 
                 for host in hosts_to_process:
-                    host_key = host['name'] if isinstance(host, dict) and 'name' in host else host
+                    host_key = (
+                        host["name"]
+                        if isinstance(host, dict) and "name" in host
+                        else host
+                    )
                     svc_map = svc_maps.get(host_key, {})
 
                     # Get namespace for SSH connections
                     namespace = None
                     if use_ssh:
-                        host_cfg = connector.get_host_config(host) if connector is not None else None
+                        host_cfg = (
+                            connector.get_host_config(host)
+                            if connector is not None
+                            else None
+                        )
                         namespace = (
-                            getattr(host_cfg, "namespace", None) if host_cfg else None
+                            getattr(host_cfg, "namespace", None)
+                            if host_cfg
+                            else None
                         )
 
                     # Build command
@@ -214,7 +238,7 @@ def dry_run_commands(
                     # Update dashboard if enabled
                     if dashboard:
                         dashboard.add_result(_convert_to_result_object(result))
-    
+
     # Print final summary if dashboard is enabled
     if dashboard:
         dashboard.print_final_summary()

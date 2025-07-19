@@ -25,7 +25,9 @@ def extract_request_json_regex(pattern_match: str) -> Optional[Dict[str, Any]]:
 
 
 # Method 2: Manual parsing approach
-def extract_request_json_manual(pattern_match: str) -> Optional[Dict[str, Any]]:
+def extract_request_json_manual(
+    pattern_match: str,
+) -> Optional[Dict[str, Any]]:
     """Extract JSON from pattern using manual parsing approach."""
     if not isinstance(pattern_match, str):
         logger.debug("Invalid input: pattern_match must be a string")
@@ -116,12 +118,17 @@ def check_flexible_log_pattern(output: str, pattern_match: str) -> bool:
                 # Check level match
                 if log_entry.get("level") == search_criteria["level"]:
                     # Check logger match
-                    if log_entry.get("loggerName") == search_criteria["loggerName"]:
+                    if (
+                        log_entry.get("loggerName")
+                        == search_criteria["loggerName"]
+                    ):
                         # Check if message contains key words
                         log_message = log_entry.get("message", "")
                         if any(
                             keyword in log_message
-                            for keyword in search_criteria["message_keywords"][:3]
+                            for keyword in search_criteria["message_keywords"][
+                                :3
+                            ]
                         ):
                             return True
 
@@ -131,7 +138,9 @@ def check_flexible_log_pattern(output: str, pattern_match: str) -> bool:
         return False
 
     except json.JSONDecodeError as e:
-        logger.debug(f"Pattern is not valid JSON, falling back to string matching: {e}")
+        logger.debug(
+            f"Pattern is not valid JSON, falling back to string matching: {e}"
+        )
         # Fallback to simple string matching
         return pattern_match in output
     except (AttributeError, TypeError) as e:

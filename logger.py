@@ -43,8 +43,12 @@ def get_logger(
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 log_file = os.path.join(log_dir, f"testpilot_{timestamp}.log")
 
-                file_handler = logging.FileHandler(log_file, mode="w", encoding="utf-8")
-                file_handler.setLevel(logging.DEBUG)  # File gets more detailed logs
+                file_handler = logging.FileHandler(
+                    log_file, mode="w", encoding="utf-8"
+                )
+                file_handler.setLevel(
+                    logging.DEBUG
+                )  # File gets more detailed logs
                 file_handler.setFormatter(formatter)
                 logger.addHandler(file_handler)
 
@@ -55,11 +59,15 @@ def get_logger(
                 error_handler = logging.FileHandler(
                     error_log_file, mode="w", encoding="utf-8"
                 )
-                error_handler.setLevel(logging.ERROR)  # Only errors and failures
+                error_handler.setLevel(
+                    logging.ERROR
+                )  # Only errors and failures
                 error_handler.setFormatter(formatter)
                 logger.addHandler(error_handler)
 
-                logger.debug(f"Logging to files: {log_file} and {error_log_file}")
+                logger.debug(
+                    f"Logging to files: {log_file} and {error_log_file}"
+                )
 
             except (OSError, PermissionError) as e:
                 logger.warning(
@@ -86,14 +94,20 @@ def get_failure_logger(name: str = "TestPilot.Failures") -> logging.Logger:
 
         # Failure-specific log file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        failure_log_file = os.path.join("logs", f"test_failures_{timestamp}.log")
+        failure_log_file = os.path.join(
+            "logs", f"test_failures_{timestamp}.log"
+        )
 
         try:
-            handler = logging.FileHandler(failure_log_file, mode="w", encoding="utf-8")
+            handler = logging.FileHandler(
+                failure_log_file, mode="w", encoding="utf-8"
+            )
             handler.setLevel(logging.ERROR)
 
             # Structured formatter for failures
-            formatter = logging.Formatter("%(asctime)s|%(levelname)s|%(message)s")
+            formatter = logging.Formatter(
+                "%(asctime)s|%(levelname)s|%(message)s"
+            )
             handler.setFormatter(formatter)
             logger.addHandler(handler)
 

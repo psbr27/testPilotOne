@@ -31,18 +31,24 @@ def build_curl_command(
         if isinstance(payload, str) and payload.strip().endswith(".json"):
             payload_path = os.path.join(payloads_folder, payload.strip())
             if not os.path.isfile(payload_path):
-                raise FileNotFoundError(f"Payload file not found: {payload_path}")
+                raise FileNotFoundError(
+                    f"Payload file not found: {payload_path}"
+                )
             try:
                 with open(payload_path, "r", encoding="utf-8") as f:
                     resolved_payload = f.read().strip()
             except (IOError, OSError) as e:
-                logger.error(f"Failed to read payload file {payload_path}: {e}")
+                logger.error(
+                    f"Failed to read payload file {payload_path}: {e}"
+                )
                 raise
         elif direct_json_allowed:
             # Try to pretty-print if valid JSON, else use as-is
             if isinstance(payload, (dict, list)):
                 try:
-                    resolved_payload = json.dumps(payload, separators=(",", ":"))
+                    resolved_payload = json.dumps(
+                        payload, separators=(",", ":")
+                    )
                 except (TypeError, ValueError) as e:
                     logger.warning(f"Failed to serialize payload to JSON: {e}")
                     resolved_payload = str(payload)
@@ -50,15 +56,19 @@ def build_curl_command(
                 try:
                     # Validate and reformat JSON string
                     parsed = json.loads(payload)
-                    resolved_payload = json.dumps(parsed, separators=(",", ":"))
+                    resolved_payload = json.dumps(
+                        parsed, separators=(",", ":")
+                    )
                 except (json.JSONDecodeError, TypeError) as e:
-                    logger.debug(f"Payload is not valid JSON, using as-is: {e}")
+                    logger.debug(
+                        f"Payload is not valid JSON, using as-is: {e}"
+                    )
                     resolved_payload = payload.strip()
             else:
                 resolved_payload = str(payload)
         else:
             resolved_payload = None
-        if resolved_payload and resolved_payload != 'nan':
+        if resolved_payload and resolved_payload != "nan":
             payload_arg = f"-d {shlex.quote(resolved_payload)}"
 
     # Fetch nf_name from config/hosts.json if available
@@ -69,8 +79,8 @@ def build_curl_command(
     except (IOError, OSError, json.JSONDecodeError) as e:
         logger.error(f"Failed to read or parse config/hosts.json: {e}")
         nf_name = "SLF"
-        
-    # if resolved_payload is true, then try to search for nfInstanceId 
+
+    # if resolved_payload is true, then try to search for nfInstanceId
     # in the payload, if that is found then append to safe_url
     if nf_name.lower() != "slf" and resolved_payload:
         parsed = json.loads(resolved_payload)
@@ -86,7 +96,7 @@ def build_curl_command(
         if nfInstanceId:
             url = f"{url}{nfInstanceId}"
             logger.debug(f"Appending nfInstanceId to URL: {nfInstanceId}")
-    
+
     # Handle headers - escape each header value to prevent injection
     header_args = []
     for k, v in headers.items():
@@ -96,9 +106,7 @@ def build_curl_command(
 
     header_str = " ".join(header_args)
     if not header_str:
-        header_str = (
-            "-H 'Content-Type: application/json'"  # Default header if none provided
-        )
+        header_str = "-H 'Content-Type: application/json'"  # Default header if none provided
 
     # Escape extra arguments if provided
     extra_args = ""
@@ -127,7 +135,7 @@ def build_ssh_k8s_curl_command(
 ) -> Tuple[str, Optional[str]]:
     """
     Returns a kubectl/oc exec command that runs curl inside a pod via SSH.
-    
+
     Args:
         cli_type: The CLI tool to use ('kubectl' or 'oc'). Defaults to 'kubectl'.
     """
@@ -168,7 +176,7 @@ def build_pod_mode(
     so the final curl command will be curl command as it is from the excel file
     with out kubectl exec appended to the original curl command
     """
-    
+
     curl_cmd, resolved_payload = build_curl_command(
         url,
         method=method,

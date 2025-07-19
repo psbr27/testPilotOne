@@ -8,7 +8,11 @@ from typing import Dict, List, Optional, Tuple
 import paramiko
 
 from logger import get_logger
-from utils.config_resolver import load_config_with_env, validate_host_config, mask_sensitive_data
+from utils.config_resolver import (
+    load_config_with_env,
+    mask_sensitive_data,
+    validate_host_config,
+)
 
 logger = get_logger("SSHConnector")
 
@@ -49,10 +53,12 @@ class SSHConnector:
         try:
             # Load config with environment variable resolution
             data = load_config_with_env(self.config_file)
-            
+
             # Log masked configuration for debugging
             masked_config = mask_sensitive_data(data)
-            logger.debug(f"Loaded configuration (masked): {json.dumps(masked_config, indent=2)}")
+            logger.debug(
+                f"Loaded configuration (masked): {json.dumps(masked_config, indent=2)}"
+            )
         except ValueError as e:
             logger.error(f"Configuration error: {e}")
             raise
@@ -62,7 +68,9 @@ class SSHConnector:
 
         self.use_ssh = data.get("use_ssh", False)
         if not self.use_ssh:
-            logger.warning("SSH connections are globally disabled via 'use_ssh': false")
+            logger.warning(
+                "SSH connections are globally disabled via 'use_ssh': false"
+            )
             return
 
         # Load SSH security settings
@@ -86,14 +94,16 @@ class SSHConnector:
             except ValueError as e:
                 logger.error(f"Invalid host configuration: {e}")
                 raise
-            
+
             # Expand paths for key files
             key_file = host.get("key_file")
             if key_file:
                 key_file = os.path.expanduser(key_file)
                 if not os.path.exists(key_file):
-                    logger.warning(f"SSH key file not found for host '{host['name']}': {key_file}")
-            
+                    logger.warning(
+                        f"SSH key file not found for host '{host['name']}': {key_file}"
+                    )
+
             host_cfg = SSHHostConfig(
                 name=host["name"],
                 hostname=host["hostname"],
@@ -145,7 +155,9 @@ class SSHConnector:
                 if os.path.exists(self.known_hosts_file):
                     try:
                         ssh.load_host_keys(self.known_hosts_file)
-                        logger.debug(f"Loaded known hosts from {self.known_hosts_file}")
+                        logger.debug(
+                            f"Loaded known hosts from {self.known_hosts_file}"
+                        )
                     except Exception as e:
                         logger.warning(f"Failed to load known hosts file: {e}")
 
@@ -157,8 +169,14 @@ class SSHConnector:
                     hostname=host_config.hostname,
                     port=host_config.port,
                     username=host_config.username,
-                    key_filename=host_config.key_file if host_config.key_file else None,
-                    password=host_config.password if not host_config.key_file else None,
+                    key_filename=(
+                        host_config.key_file if host_config.key_file else None
+                    ),
+                    password=(
+                        host_config.password
+                        if not host_config.key_file
+                        else None
+                    ),
                     timeout=10,
                 )
                 logger.debug(
@@ -181,7 +199,9 @@ class SSHConnector:
 
             # Wait before retry (except on last attempt)
             if attempt < self.max_retries - 1:
-                logger.debug(f"Waiting {self.retry_delay} seconds before retry...")
+                logger.debug(
+                    f"Waiting {self.retry_delay} seconds before retry..."
+                )
                 time.sleep(self.retry_delay)
 
         # All attempts failed
@@ -206,7 +226,9 @@ class SSHConnector:
             logger.warning("No host configurations found to connect to")
             return
 
-        with ThreadPoolExecutor(max_workers=len(host_configs_to_connect)) as executor:
+        with ThreadPoolExecutor(
+            max_workers=len(host_configs_to_connect)
+        ) as executor:
             futures = {
                 executor.submit(self._connect_host, hc): hc.name
                 for hc in host_configs_to_connect
@@ -223,7 +245,9 @@ class SSHConnector:
         def run_on_host(name, conn):
             try:
                 # Set timeout for the command execution
-                stdin, stdout, stderr = conn.exec_command(command, timeout=timeout)
+                stdin, stdout, stderr = conn.exec_command(
+                    command, timeout=timeout
+                )
                 # Read with timeout
                 stdout_data = stdout.read().decode().strip()
                 stderr_data = stderr.read().decode().strip()
@@ -233,14 +257,18 @@ class SSHConnector:
                 return name, "", str(e)
 
         # Validate connections exist
-        valid_targets = [name for name in target_hosts if name in self.connections]
+        valid_targets = [
+            name for name in target_hosts if name in self.connections
+        ]
         if not valid_targets:
             logger.error("No valid SSH connections available for target hosts")
             return results
 
         with ThreadPoolExecutor(max_workers=len(valid_targets)) as executor:
             futures = {
-                executor.submit(run_on_host, name, self.connections[name]): name
+                executor.submit(
+                    run_on_host, name, self.connections[name]
+                ): name
                 for name in valid_targets
             }
 

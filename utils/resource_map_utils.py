@@ -1,16 +1,19 @@
 import json
-import re
 import os
+import re
+
 
 def load_resource_map(resource_map_path):
     """Load the resource map from the given JSON file."""
     with open(resource_map_path, "r") as f:
         return json.load(f)
 
+
 def save_resource_map(resource_map, resource_map_path):
     """Save the resource map to the given JSON file."""
     with open(resource_map_path, "w") as f:
         json.dump(resource_map, f, indent=4)
+
 
 def map_localhost_url(url, resource_map):
     """
@@ -27,6 +30,7 @@ def map_localhost_url(url, resource_map):
         return url  # No mapping found
     return re.sub(r"http://localhost:(\d+)", f"http://{fqdn}:\\1", url)
 
+
 def build_resource_map_from_virtualservices(virtualservice_fqdns):
     """
     Given a list of FQDNs, build a resource map where the key is the service name (first segment) and the value is the FQDN.
@@ -41,14 +45,24 @@ def build_resource_map_from_virtualservices(virtualservice_fqdns):
             resource_map[key] = fqdn
     return resource_map
 
+
 def discover_virtualservices(namespace=None):
     """
     Discover virtualservices using kubectl. Returns a list of FQDNs.
     """
     import subprocess
+
     cmd = ["kubectl", "get", "virtualservices", "-o", "json"]
     if namespace:
-        cmd = ["kubectl", "get", "virtualservices", "-n", namespace, "-o", "json"]
+        cmd = [
+            "kubectl",
+            "get",
+            "virtualservices",
+            "-n",
+            namespace,
+            "-o",
+            "json",
+        ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"kubectl error: {result.stderr}")
@@ -60,7 +74,10 @@ def discover_virtualservices(namespace=None):
         fqdns.extend(hosts)
     return fqdns
 
-def automate_virtualservice_mapping_and_url_rewriting(urls, resource_map_path="config/resource_map.json", namespace=None):
+
+def automate_virtualservice_mapping_and_url_rewriting(
+    urls, resource_map_path="config/resource_map.json", namespace=None
+):
     """
     Automate the process: discover virtualservices, build & save resource map, rewrite localhost URLs.
     Returns the rewritten URLs.
@@ -73,6 +90,7 @@ def automate_virtualservice_mapping_and_url_rewriting(urls, resource_map_path="c
     # Step 3: Rewrite URLs
     rewritten_urls = [map_localhost_url(url, resource_map) for url in urls]
     return rewritten_urls
+
 
 def get_connect_to_and_pod_mode(hosts_json_path):
     """

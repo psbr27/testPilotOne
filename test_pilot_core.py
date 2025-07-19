@@ -3,15 +3,12 @@
 # =============================================================================
 
 import json
+import os
 import re
 import subprocess
 import sys
 import time
-import os
 from pprint import pprint
-from utils.resource_map_utils import map_localhost_url
-from utils.myutils import prettify_curl_output, replace_placeholder_in_command
-from utils.kubectl_logs_search import search_in_custom_output
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
@@ -20,6 +17,9 @@ from curl_builder import build_ssh_k8s_curl_command
 from logger import get_failure_logger, get_logger
 from response_parser import parse_curl_output
 from test_result import TestFlow, TestResult, TestStep
+from utils.kubectl_logs_search import search_in_custom_output
+from utils.myutils import prettify_curl_output, replace_placeholder_in_command
+from utils.resource_map_utils import map_localhost_url
 from validation_engine import ValidationContext, ValidationDispatcher
 
 # Python 3.8+ compatibility for Pattern type
@@ -34,7 +34,9 @@ logger = get_logger("TestPilot.Core")
 failure_logger = get_failure_logger("TestPilot.Failures")
 
 
-def save_kubectl_logs(raw_output, host, row_idx, test_name, dir_path="kubectl_logs"):
+def save_kubectl_logs(
+    raw_output, host, row_idx, test_name, dir_path="kubectl_logs"
+):
     os.makedirs(dir_path, exist_ok=True)
     safe_test_name = re.sub(r"[^a-zA-Z0-9_.-]", "_", str(test_name))
     filename = f"kubectl_logs_{host}_{safe_test_name}_{row_idx}.json"
@@ -159,7 +161,9 @@ def build_url_based_command(
         # substituted_url = substitute_placeholders(
         #     safe_str(url), svc_map, placeholder_pattern
         # )
-        substituted_url = replace_placeholder_in_command(safe_str(url), svc_map)
+        substituted_url = replace_placeholder_in_command(
+            safe_str(url), svc_map
+        )
         ssh_cmd, _ = build_ssh_k8s_curl_command(
             namespace=namespace or "default",
             container=pod_exec,
@@ -189,9 +193,7 @@ def build_kubectl_logs_command(command, namespace, connector, host):
             f"grep '{to_search_pod_name}' | awk '{{print $1}}'"
         )
     else:
-        find_pod = (
-            f"kubectl get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
-        )
+        find_pod = f"kubectl get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
     # Get all matching pod names
     if connector.use_ssh:
         result = connector.run_command(find_pod, [host])
@@ -200,26 +202,38 @@ def build_kubectl_logs_command(command, namespace, connector, host):
             line.strip() for line in res["output"].splitlines() if line.strip()
         ]
     else:
-        result = subprocess.run(find_pod, shell=True, capture_output=True, text=True)
+        result = subprocess.run(
+            find_pod, shell=True, capture_output=True, text=True
+        )
         pod_names = [
             line.strip() for line in result.stdout.splitlines() if line.strip()
         ]
     if not pod_names:
-        logger.error(f"No pod found matching '{to_search_pod_name}' on host {host}")
+        logger.error(
+            f"No pod found matching '{to_search_pod_name}' on host {host}"
+        )
         return None
 
     commands = [
-        command.replace(f"{{{to_search_pod_name}}}", pod_name) for pod_name in pod_names
+        command.replace(f"{{{to_search_pod_name}}}", pod_name)
+        for pod_name in pod_names
     ]
     return commands
 
 
 def build_command_for_step(
-    step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host, connector
+    step_data,
+    svc_map,
+    placeholder_pattern,
+    namespace,
+    host_cli_map,
+    host,
+    connector,
 ):  # host_cli_map now required
     """Build the appropriate command for a test step, with pod_mode support."""
-    import os
     import json
+    import os
+
     from curl_builder import build_pod_mode
 
     url = step_data["url"]
@@ -227,7 +241,9 @@ def build_command_for_step(
 
     # Check for pod_mode in config/hosts.json
     pod_mode = False
-    config_path = os.path.join(os.path.dirname(__file__), "config", "hosts.json")
+    config_path = os.path.join(
+        os.path.dirname(__file__), "config", "hosts.json"
+    )
     try:
         with open(config_path, "r") as f:
             config = json.load(f)
@@ -250,7 +266,9 @@ def build_command_for_step(
             # substituted_url = substitute_placeholders(
             #     safe_str(url), svc_map, placeholder_pattern
             # )
-            substituted_url = replace_placeholder_in_command(safe_str(url), svc_map)
+            substituted_url = replace_placeholder_in_command(
+                safe_str(url), svc_map
+            )
         curl_cmd, _ = build_pod_mode(
             substituted_url,
             method=method,
@@ -262,12 +280,24 @@ def build_command_for_step(
         return curl_cmd
     elif url:
         return build_url_based_command(
-            step_data, svc_map, placeholder_pattern, namespace, host_cli_map, host
+            step_data,
+            svc_map,
+            placeholder_pattern,
+            namespace,
+            host_cli_map,
+            host,
         )  # host_cli_map passed
-    elif command and (command.startswith("kubectl") or command.startswith("oc")):
+    elif command and (
+        command.startswith("kubectl") or command.startswith("oc")
+    ):
         # update method to KUBECTL in step_data method
         step_data["method"] = "KUBCTL"
-        return build_kubectl_logs_command(command, namespace, connector, host, host_cli_map), host_cli_map
+        return (
+            build_kubectl_logs_command(
+                command, namespace, connector, host, host_cli_map
+            ),
+            host_cli_map,
+        )
     else:
         logger.warning(f"URL is required for command execution: {command}")
         return None
@@ -287,7 +317,9 @@ def execute_command(command, host, connector):
         output = res["output"]
         error = res["error"]
     else:
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result = subprocess.run(
+            command, shell=True, capture_output=True, text=True
+        )
         output = result.stdout.strip()
         error = result.stderr.strip()
     duration = time.time() - start_time
@@ -299,7 +331,16 @@ def execute_command(command, host, connector):
 
 
 def validate_and_create_result(
-    step, flow, step_data, parsed_output, output, error, duration, host, command, args=None
+    step,
+    flow,
+    step_data,
+    parsed_output,
+    output,
+    error,
+    duration,
+    host,
+    command,
+    args=None,
 ):
     """Validate test results and create TestResult object using modular validation engine."""
     expected_status = step_data["expected_status"]
@@ -329,7 +370,9 @@ def validate_and_create_result(
         response_payload = None
 
     # Use actual_status and response_body from parsed_output
-    actual_status = parsed_output.get("http_status") or parsed_output.get("status_code")
+    actual_status = parsed_output.get("http_status") or parsed_output.get(
+        "status_code"
+    )
     response_body = parsed_output.get("raw_output")
     response_headers = parsed_output.get("headers")
 
@@ -363,8 +406,12 @@ def validate_and_create_result(
         error=error,
         expected_status=expected_status,
         actual_status=actual_status,
-        pattern_match=(str(pattern_match) if pattern_match is not None else None),
-        pattern_found=result.details.get("pattern_found") if result.details else None,
+        pattern_match=(
+            str(pattern_match) if pattern_match is not None else None
+        ),
+        pattern_found=(
+            result.details.get("pattern_found") if result.details else None
+        ),
         passed=result.passed,
         fail_reason=result.fail_reason,
         test_name=flow.test_name,
@@ -374,7 +421,9 @@ def validate_and_create_result(
     return test_result
 
 
-def log_test_result(test_result: TestResult, flow: TestFlow, step: TestStep) -> None:
+def log_test_result(
+    test_result: TestResult, flow: TestFlow, step: TestStep
+) -> None:
     """Log test result with appropriate level and structured failure logging."""
     if not test_result.passed:
         # Standard console/file logging
@@ -503,7 +552,9 @@ def process_single_step(
             all_commands.append(command)
             # Try to extract pod name for log file naming
             pod_name = None
-            if command.startswith("kubectl logs") or command.startswith("oc logs"):
+            if command.startswith("kubectl logs") or command.startswith(
+                "oc logs"
+            ):
                 parts = command.split()
                 try:
                     pod_name = parts[2]
@@ -519,7 +570,9 @@ def process_single_step(
                 )
 
             if not show_table:
-                logger.debug(f"[CALLFLOW] Command executed in {duration:.2f} seconds")
+                logger.debug(
+                    f"[CALLFLOW] Command executed in {duration:.2f} seconds"
+                )
                 logger.info(f"[CALLFLOW] Output from server: {output}")
                 if error:
                     logger.info(f"[CALLFLOW] HTTP Output from server: {error}")
@@ -555,8 +608,12 @@ def process_single_step(
             final_result = matched_result
             final_result.passed = True
             final_result.fail_reason = None
-            final_result.output = matched_output if matched_output is not None else ""
-            final_result.error = matched_error if matched_error is not None else ""
+            final_result.output = (
+                matched_output if matched_output is not None else ""
+            )
+            final_result.error = (
+                matched_error if matched_error is not None else ""
+            )
             final_result.duration = (
                 matched_duration if matched_duration is not None else 0.0
             )

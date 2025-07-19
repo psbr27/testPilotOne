@@ -139,7 +139,7 @@ def load_aws_secrets():
     client = boto3.client('secretsmanager')
     response = client.get_secret_value(SecretId='testpilot/prod')
     secrets = json.loads(response['SecretString'])
-    
+
     for key, value in secrets.items():
         os.environ[key] = value
 
@@ -171,7 +171,7 @@ ValueError: Required environment variable 'PROD_HOSTNAME' not found
 Warning: SSH key file not found for host 'production': /path/to/key
 ```
 
-**Solution**: 
+**Solution**:
 1. Check the path in your `.env` file
 2. Ensure the key file exists and has correct permissions
 3. Use absolute paths or `~` for home directory

@@ -42,7 +42,9 @@ try:
                 TimeRemainingColumn(),
                 expand=True,
             )
-            self.progress_task = self.progress.add_task("Progress", total=total_steps)
+            self.progress_task = self.progress.add_task(
+                "Progress", total=total_steps
+            )
             self.live = None
             self.lock = threading.Lock()
 
@@ -54,9 +56,14 @@ try:
                 host = getattr(r, "host", "")
                 sheet = getattr(r, "sheet", "")
                 test_name = getattr(r, "test_name", "")
-                method = getattr(r, "method", "") if hasattr(r, "method") else ""
+                method = (
+                    getattr(r, "method", "") if hasattr(r, "method") else ""
+                )
                 duration = f"{getattr(r, 'duration', 0.0):.2f}"
-                if hasattr(r, "result") and getattr(r, "result", "") == "DRY-RUN":
+                if (
+                    hasattr(r, "result")
+                    and getattr(r, "result", "") == "DRY-RUN"
+                ):
                     result = Text("DRY-RUN", style="yellow")
                 elif getattr(r, "passed", False):
                     result = Text("PASS", style="green")
@@ -67,22 +74,24 @@ try:
 
         def start(self):
             self.live = Live(
-                self._render_dashboard(), refresh_per_second=10, console=self.console
+                self._render_dashboard(),
+                refresh_per_second=10,
+                console=self.console,
             )
             self.live.__enter__()
 
         def _render_dashboard(self):
             from rich.layout import Layout
             from rich.panel import Panel
-            
+
             table = self._create_table()
             progress_display = self.progress.get_renderable()
-            
+
             # Create a layout to combine progress and table
             layout = Layout()
             layout.split_column(
                 Layout(Panel(progress_display, title="Progress", height=3)),
-                Layout(Panel(table, title="Test Results"))
+                Layout(Panel(table, title="Test Results")),
             )
             return layout
 
@@ -90,7 +99,9 @@ try:
             with self.lock:
                 self.all_results.append(test_result)
                 self.completed_steps += 1
-                self.progress.update(self.progress_task, completed=self.completed_steps)
+                self.progress.update(
+                    self.progress_task, completed=self.completed_steps
+                )
                 self.live.update(self._render_dashboard())
 
         def stop(self):
@@ -99,7 +110,9 @@ try:
             self.progress.stop()
 
         def print_final_summary(self):
-            passed = sum(1 for r in self.all_results if getattr(r, "passed", False))
+            passed = sum(
+                1 for r in self.all_results if getattr(r, "passed", False)
+            )
             failed = len(self.all_results) - passed
             self.console.print(
                 f"\n[bold]FINAL SUMMARY:[/bold] [green]{passed} PASSED[/green] | [red]{failed} FAILED[/red] | {len(self.all_results)} TOTAL"
