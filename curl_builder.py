@@ -123,9 +123,13 @@ def build_ssh_k8s_curl_command(
     payloads_folder: str = "payloads",
     pod_pattern: str = "-[a-z0-9]+-[a-z0-9]+$",
     extra_curl_args: Optional[List[str]] = None,
+    cli_type: str = "kubectl",
 ) -> Tuple[str, Optional[str]]:
     """
-    Returns a kubectl exec command that runs curl inside a pod via SSH.
+    Returns a kubectl/oc exec command that runs curl inside a pod via SSH.
+    
+    Args:
+        cli_type: The CLI tool to use ('kubectl' or 'oc'). Defaults to 'kubectl'.
     """
     curl_cmd, resolved_payload = build_curl_command(
         url,
@@ -143,11 +147,11 @@ def build_ssh_k8s_curl_command(
     pod_pattern = f"{container}-[a-z0-9]+-[a-z0-9]+$"
     safe_pod_pattern = shlex.quote(pod_pattern)
 
-    # Build kubectl commands with proper escaping
-    pod_find = f"kubectl get po -n {safe_namespace} | awk '{{print $1}}' | grep -E {safe_pod_pattern} | head -n 1"
+    # Build kubectl/oc commands with proper escaping
+    pod_find = f"{cli_type} get po -n {safe_namespace} | awk '{{print $1}}' | grep -E {safe_pod_pattern} | head -n 1"
 
     # Note: curl_cmd is already escaped from build_curl_command
-    exec_cmd = f"{pod_find} | xargs -I{{}} kubectl exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
+    exec_cmd = f"{pod_find} | xargs -I{{}} {cli_type} exec -it {{}} -n {safe_namespace} -c {safe_container} -- {curl_cmd}"
     return exec_cmd, resolved_payload
 
 

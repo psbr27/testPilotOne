@@ -18,14 +18,14 @@ def map_localhost_url(url, resource_map):
     Example:
     http://localhost:5001/nudr-config/v1/... -> http://ocslf-nudr-config.ocnrfslf.svc.tailgate.lab.us.oracle.com:5001/nudr-config/v1/...
     """
-    match = re.search(r"http://localhost:(\\d+)/(\\w+)", url)
+    match = re.search(r"http://localhost:(\d+)/(\w+)", url)
     if not match:
         return url  # No mapping possible
     port, key = match.groups()
     fqdn = resource_map.get(key)
     if not fqdn:
         return url  # No mapping found
-    return re.sub(r"http://localhost:(\\d+)", f"http://{fqdn}:\\1", url)
+    return re.sub(r"http://localhost:(\d+)", f"http://{fqdn}:\\1", url)
 
 def build_resource_map_from_virtualservices(virtualservice_fqdns):
     """
@@ -35,7 +35,7 @@ def build_resource_map_from_virtualservices(virtualservice_fqdns):
     resource_map = {}
     for fqdn in virtualservice_fqdns:
         # Extract the service key from the FQDN, e.g., ocslf-nudr-config -> nudr-config
-        match = re.match(r"[\w-]+-(\w+)\\.", fqdn)
+        match = re.match(r"[\w-]+-(\w+)\.", fqdn)
         if match:
             key = match.group(1)
             resource_map[key] = fqdn

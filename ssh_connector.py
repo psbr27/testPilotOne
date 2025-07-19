@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple
 import paramiko
 
 from logger import get_logger
+from utils.config_resolver import load_config_with_env, validate_host_config, mask_sensitive_data
 
 logger = get_logger("SSHConnector")
 
@@ -45,8 +46,19 @@ class SSHConnector:
         self._load_config()
 
     def _load_config(self):
-        with open(self.config_file, "r") as f:
-            data = json.load(f)
+        try:
+            # Load config with environment variable resolution
+            data = load_config_with_env(self.config_file)
+            
+            # Log masked configuration for debugging
+            masked_config = mask_sensitive_data(data)
+            logger.debug(f"Loaded configuration (masked): {json.dumps(masked_config, indent=2)}")
+        except ValueError as e:
+            logger.error(f"Configuration error: {e}")
+            raise
+        except FileNotFoundError as e:
+            logger.error(f"Configuration file not found: {e}")
+            raise
 
         self.use_ssh = data.get("use_ssh", False)
         if not self.use_ssh:
@@ -68,11 +80,25 @@ class SSHConnector:
             )
 
         for host in data.get("hosts", []):
+            # Validate host configuration
+            try:
+                validate_host_config(host)
+            except ValueError as e:
+                logger.error(f"Invalid host configuration: {e}")
+                raise
+            
+            # Expand paths for key files
+            key_file = host.get("key_file")
+            if key_file:
+                key_file = os.path.expanduser(key_file)
+                if not os.path.exists(key_file):
+                    logger.warning(f"SSH key file not found for host '{host['name']}': {key_file}")
+            
             host_cfg = SSHHostConfig(
                 name=host["name"],
                 hostname=host["hostname"],
                 username=host["username"],
-                key_file=host.get("key_file"),
+                key_file=key_file,
                 password=host.get("password"),
                 port=host.get("port", 22),
                 namespace=host.get("namespace"),

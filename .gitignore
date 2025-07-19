@@ -224,3 +224,48 @@ temp/
 config/local_hosts.json
 config/*_local.json
 
+# SECURITY: Never commit actual configuration files with credentials
+config/hosts.json
+config/hosts.json.*
+!config/hosts.json.template
+!config/hosts.*.template
+
+# Environment-specific configurations
+config/*.dev.json
+config/*.staging.json
+config/*.production.json
+
+# Credential files
+credentials/
+.credentials/
+*.creds
+*.credentials
+
+# Private SSH keys - NEVER commit these
+id_rsa
+id_rsa.*
+id_dsa
+id_dsa.*
+id_ecdsa
+id_ecdsa.*
+id_ed25519
+id_ed25519.*
+*.ppk
+
+# Environment files with secrets
+.env.*
+!.env.template
+!.env.example
+
+# Kubernetes secrets
+*-secret.yaml
+*-secret.yml
+secrets/
+
+# Payloads that might contain sensitive data
+payloads/*.json
+!payloads/*.example.json
+
+# kubectl logs that might contain sensitive information
+kubectl_logs/
+

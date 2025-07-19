@@ -85,8 +85,13 @@ def compare_dicts_ignore_timestamp(filtered_dict1, filtered_dict2):
                     'dict1_value': val1,
                     'dict2_value': val2
                 }
-            else:
-                comparison['equal'] = True  # If all common keys match, set equal to True
+        
+        # Set equal to True only if no differences found and same structure
+        comparison['equal'] = (
+            len(comparison['value_differences']) == 0 and 
+            len(comparison['only_in_dict1']) == 0 and 
+            len(comparison['only_in_dict2']) == 0
+        )
         
         # Create summary
         comparison['summary'] = {
@@ -109,26 +114,3 @@ def compare_dicts_ignore_timestamp(filtered_dict1, filtered_dict2):
         }
         
     return comparison
-
-# # Your test data
-# dict1 = {'Timestamp': 'Mon, 02 May 2022 07:26:25 UTC', 'Load-Metric': '0.23533762%', 'NF-Instance': '5a7bd676-ceeb-44bb-95e0-f6a55a328b03'}
-# dict2 = {'Load-Metric': '2%', 'NF-Service-Instance': '5a7bd676-ceeb-44bb-95e0-f6a55a328b03'}
-
-# # Compare the dictionaries
-# result = compare_dicts_ignore_timestamp(dict1, dict2)
-
-# # Print results
-# print("=== Dictionary Comparison (Ignoring Timestamps) ===")
-# print(f"Dictionaries are equal: {result['equal']}")
-# print(f"\nKeys only in dict1: {result['only_in_dict1']}")
-# print(f"Keys only in dict2: {result['only_in_dict2']}")
-# print(f"Common keys: {result['common_keys']}")
-
-# if result['value_differences']:
-#     print(f"\nValue differences:")
-#     for key, values in result['value_differences'].items():
-#         print(f"  {key}: '{values['dict1_value']}' vs '{values['dict2_value']}'")
-
-# print(f"\n=== Summary ===")
-# for key, value in result['summary'].items():
-#     print(f"{key.replace('_', ' ').title()}: {value}")

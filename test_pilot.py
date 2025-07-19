@@ -15,15 +15,16 @@ import argparse
 import datetime
 import json
 import os
+import platform
 import re
-import time
-import sys
 import subprocess
+import sys
+import time
+
 import pandas as pd
 from tabulate import tabulate
+
 from build_info import BUILD_EPOCH, BUILD_DATE, APP_VERSION
-import platform, sys, json, os
-import pandas, tabulate
 from console_table_fmt import LiveProgressTable
 from dry_run import dry_run_commands
 from excel_parser import ExcelParser, parse_excel_to_flows
@@ -31,6 +32,7 @@ from logger import get_logger
 from ssh_connector import SSHConnector
 from test_pilot_core import process_single_step
 from utils.myutils import set_pdb_trace
+from utils.config_resolver import load_config_with_env, mask_sensitive_data
 
 logger = get_logger("TestPilot")
 
@@ -103,8 +105,23 @@ def parse_args():
 
 
 def load_config_and_targets(config_file):
-    with open(config_file, "r") as f:
-        data = json.load(f)
+    try:
+        # Use the secure config loader
+        data = load_config_with_env(config_file)
+        
+        # Check for sensitive data in config
+        check_config_security(data)
+        
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found: {config_file}")
+        logger.info("Please create a config file from the template:")
+        logger.info(f"  cp {config_file}.template {config_file}")
+        logger.info("  Then update it with your settings")
+        sys.exit(1)
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        sys.exit(1)
+    
     connect_to = data.get("connect_to")
     if isinstance(connect_to, str):
         target_hosts = [connect_to]
@@ -113,6 +130,29 @@ def load_config_and_targets(config_file):
     else:
         target_hosts = []
     return data, target_hosts
+
+
+def check_config_security(config):
+    """Check configuration for potential security issues."""
+    warnings = []
+    
+    # Check for hardcoded passwords
+    for host in config.get("hosts", []):
+        if host.get("password") and not host["password"].startswith("${"):
+            warnings.append(f"Host '{host.get('name', 'unknown')}' has a hardcoded password")
+        
+        # Check for hardcoded private key paths that might be committed
+        key_file = host.get("key_file", "")
+        if key_file and not key_file.startswith("${") and not key_file.startswith("~"):
+            if any(pattern in key_file for pattern in ["config/", "keys/", ".ssh/"]):
+                warnings.append(f"Host '{host.get('name', 'unknown')}' has a key file in project directory")
+    
+    if warnings:
+        logger.warning("🔒 Security warnings detected in configuration:")
+        for warning in warnings:
+            logger.warning(f"  - {warning}")
+        logger.warning("Consider using environment variables for sensitive data.")
+        logger.warning("See docs/SECURE_CONFIGURATION.md for guidance.")
 
 
 def load_excel_and_sheets(input_path):
@@ -595,6 +635,8 @@ def main():
         # Use dummy mapping for dry-run: map each placeholder to a dummy value for each host
         dummy_map = {p: f"dummy-{p}" for p in placeholders}
         svc_maps = {host['name'] if isinstance(host, dict) else host: dummy_map for host in target_hosts}
+        # Create a dummy host_cli_map for dry run
+        dummy_host_cli_map = {host['name'] if isinstance(host, dict) else host: "kubectl" for host in target_hosts}
         dry_run_commands(
             excel_parser,
             valid_sheets,
@@ -602,6 +644,7 @@ def main():
             target_hosts,
             svc_maps,
             placeholder_pattern,
+            host_cli_map=dummy_host_cli_map,
             show_table=show_table,
             display_mode=args.display_mode,
         )
@@ -628,7 +671,7 @@ def main():
     connector.connect_all(target_hosts)
     host_cli_map = {}
     if pod_mode:
-        svc_maps = resolve_service_map_local(placeholders, host_cli_map, namespace=namespace)
+        svc_maps = resolve_service_map_local(placeholders, host_cli_map)
     elif connector.use_ssh:
         if not connector.get_all_connections():
             logger.error(

@@ -162,6 +162,7 @@ def build_url_based_command(
         substituted_url = replace_placeholder_in_command(
             safe_str(url), svc_map
         )
+        cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
         ssh_cmd, _ = build_ssh_k8s_curl_command(
             namespace=namespace or "default",
             container=pod_exec,
@@ -170,10 +171,8 @@ def build_url_based_command(
             headers={k: safe_str(v) for k, v in headers.items()},
             payload=safe_str(request_payload),
             payloads_folder="payloads",
+            cli_type=cli_type,
         )
-        cli_type = host_cli_map.get(host, "kubectl") if host_cli_map else "kubectl"
-        if cli_type == "oc":
-            ssh_cmd = ssh_cmd.replace("kubectl", "oc")
         return ssh_cmd
     except Exception as e:
         logger.error(f"Failed to build SSH curl command: {e}")
