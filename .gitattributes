@@ -1,0 +1,9 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files should use LF
+*.py text eol=lf
+
+# Windows files should use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
