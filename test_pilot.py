@@ -254,7 +254,7 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders, host_cli_map)
 
 
 def resolve_service_map_local(
-    placeholders, target_hosts=None, host_cli_map, namespace=None, config_file="config/hosts.json"
+    placeholders, target_hosts=None, host_cli_map=None, namespace=None, config_file="config/hosts.json"
 ):
     svc_maps = {}
     # If namespace is not provided, try to fetch from config using connect_to host

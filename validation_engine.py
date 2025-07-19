@@ -371,11 +371,10 @@ class ValidationDispatcher:
             )
             result = VALIDATION_STRATEGIES["kubectl_pattern"].validate(context)
             if result is not None:
-                if result is not None:
                 self.logger.debug(
-                        f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
-                    )
-                    return result
+                    f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
+                )
+                return result
 
 
 
