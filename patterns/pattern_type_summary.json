@@ -1,0 +1,95 @@
+{
+  "json_extracted": {
+    "count": 35,
+    "examples": [
+      {
+        "original": "\"autoCreate\":true",
+        "converted": {
+          "autoCreate": true
+        }
+      },
+      {
+        "original": "\"level\": \"DEBUG\"",
+        "converted": {
+          "level": "DEBUG"
+        }
+      },
+      {
+        "original": "\"level\": \"DEBUG\"",
+        "converted": {
+          "level": "DEBUG"
+        }
+      }
+    ],
+    "sheets": [
+      "SLFRegistration-NRF",
+      "SubscriberActivity",
+      "ErrorCodes-igw",
+      "ErrorCodes-egw",
+      "UserAgentHeader-igw",
+      "podProtection-igw",
+      "AutoCreateSubs",
+      "ServiceLogLevel",
+      "UserAgentHeader-egw",
+      "ControlledShutdown",
+      "SBICorrelationHeader",
+      "SBIOverload-igw",
+      "ProvisioningLogs",
+      "ServerHeader",
+      "SLFRegistrationProfile",
+      "NFScoring"
+    ]
+  },
+  "json_object": {
+    "count": 7,
+    "examples": [
+      {
+        "original": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
+        "converted": "3gpp-sbi-correlation-info: imsi-302720603940001"
+      },
+      {
+        "original": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
+        "converted": "3gpp-sbi-correlation-info: imsi-302720603940001"
+      },
+      {
+        "original": "\"3gpp-sbi-correlation-info: msisdn-19195220001\"",
+        "converted": "3gpp-sbi-correlation-info: msisdn-19195220001"
+      }
+    ],
+    "sheets": [
+      "ErrorLogsEnhancement",
+      "SBICorrelationHeader"
+    ]
+  },
+  "http_header": {
+    "count": 10,
+    "examples": [
+      {
+        "original": "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+        "converted": {
+          "header_type": "server",
+          "server_value": "UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03"
+        }
+      },
+      {
+        "original": "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+        "converted": {
+          "header_type": "server",
+          "server_value": "UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03"
+        }
+      },
+      {
+        "original": "3gpp-Sbi-Lci",
+        "converted": {
+          "header_type": "3gpp_sbi",
+          "header_name": "3gpp-Sbi-Lci",
+          "header_value": null
+        }
+      }
+    ],
+    "sheets": [
+      "ServerHeader",
+      "LciOciHeader-igw"
+    ]
+  }
+}

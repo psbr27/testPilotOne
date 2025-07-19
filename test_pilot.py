@@ -32,11 +32,21 @@ from ssh_connector import SSHConnector
 from test_pilot_core import process_single_step
 from utils.myutils import set_pdb_trace
 
+# Import pattern processing modules
+from patterns.pattern_match_parser import PatternMatchParser
+from patterns.pattern_to_dict_converter import PatternToDictConverter, integrate_with_excel_parser
+
 logger = get_logger("TestPilot")
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="TestPilot")
+    parser.add_argument(
+        "--step-delay",
+        type=float,
+        default=1,
+        help="Delay (in seconds) between each test step [default: 1]",
+    )
     parser.add_argument(
         "-v",
         "--version",
@@ -180,7 +190,7 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
         except Exception as e:
             logger.error(f"Failed to resolve services on host {host}: {e}")
 
-    # fallback to get services command
+    # fallback to get services command if there are no virtual services
     for host in target_hosts:
         if not len(svc_maps[host]):
             kubectl_cmd = f"kubectl get svc -n {namespace} -o json"
@@ -201,7 +211,11 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
 
 
 def resolve_service_map_local(
+<<<<<<< Updated upstream
     placeholders, namespace=None, config_file="config/hosts.json"
+=======
+    placeholders, target_hosts=None, namespace=None, config_file="config/hosts.json"
+>>>>>>> Stashed changes
 ):
     svc_maps = {}
     # If namespace is not provided, try to fetch from config using connect_to host
@@ -258,31 +272,34 @@ def resolve_service_map_local(
             # compare hosts with placeholders
             for svc_host in hosts:
                 for p in placeholders:
-                    if isinstance(svc_host, list) and p in svc_host[0]:
+                    #TODO may we dont need to check first svc_host[0] rather copy the whole thing
+                    if isinstance(svc_host, list) and p in svc_host[0]: 
                         host_map[p] = f"{svc_host}"
             svc_maps[connect_to] = host_map
-        else:
-            # In pod_mode, check for resource_map.json in config/
-            resource_map_path = os.path.join(
-                os.path.dirname(config_file), "resource_map.json"
-            )
-            if os.path.isfile(resource_map_path):
-                try:
-                    with open(resource_map_path, "r") as f:
-                        svc_json = json.load(f)
-                    logger.debug(
-                        f"pod_mode enabled: using resource_map.json at {resource_map_path} for service maps."
-                    )
-                    svc_maps[connect_to] = svc_json 
-                except Exception as e:
-                    logger.error(
-                        f"Failed to load resource_map.json: {e}. Falling back to local service map resolution."
-                    )
-            else:
-                logger.error(
-                    "pod_mode enabled: resource_map.json not found, please add it to config/ directory."
+
+        for host in target_hosts:
+            if not len(svc_maps[host]): 
+                # In pod_mode, check for resource_map.json in config/
+                resource_map_path = os.path.join(
+                    os.path.dirname(config_file), "resource_map.json"
                 )
-                sys.exit(1)
+                if os.path.isfile(resource_map_path):
+                    try:
+                        with open(resource_map_path, "r") as f:
+                            svc_json = json.load(f)
+                        logger.debug(
+                            f"pod_mode enabled: using resource_map.json at {resource_map_path} for service maps."
+                        )
+                        svc_maps[connect_to] = svc_json 
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to load resource_map.json: {e}. Falling back to local service map resolution."
+                        )
+                else:
+                    logger.error(
+                        "pod_mode enabled: resource_map.json not found, please add it to config/ directory."
+                    )
+                    sys.exit(1)
 
     except Exception as e:
         logger.error(f"Failed to resolve services locally: {e}")
@@ -338,25 +355,30 @@ def execute_flows(
     host_cli_map=None,
     show_table=True,
     display_mode="blessed",
+<<<<<<< Updated upstream
+=======
+    userargs=None,
+    step_delay=1,
+>>>>>>> Stashed changes
 ):
     test_results = []
     dashboard = None
 
     if show_table:
         try:
-            from blessed_dashboard import create_blessed_dashboard
+            from print_table import PrintTableDashboard
 
-            if display_mode == "blessed":
-                dashboard = create_blessed_dashboard(mode="full")
+            if display_mode == "blessed" or display_mode == "full":
+                dashboard = PrintTableDashboard(mode="full")
             elif display_mode == "progress":
-                dashboard = create_blessed_dashboard(mode="progress")
+                dashboard = PrintTableDashboard(mode="progress")
             else:  # simple
-                dashboard = create_blessed_dashboard(mode="simple")
+                dashboard = PrintTableDashboard(mode="simple")
 
             dashboard.start()
 
         except ImportError as e:
-            logger.warning(f"Blessed dashboard not available: {e}")
+            logger.warning(f"PrintTable dashboard not available: {e}")
             # Fallback to simple print-based display
             from console_table_fmt import LiveProgressTable
 
@@ -375,6 +397,11 @@ def execute_flows(
                 test_results,
                 show_table,
                 dashboard,
+<<<<<<< Updated upstream
+=======
+                args=userargs,
+                step_delay=step_delay,
+>>>>>>> Stashed changes
             )
     # Print final summary if dashboard is present
     if dashboard:
@@ -416,6 +443,9 @@ def export_workflow_results(test_results, flows):
 
     # Export summary report
     summary_file = exporter.export_summary_report(test_results)
+    
+    # Export HTML report
+    html_file = exporter.export_to_html(test_results)
 
     # Log export information
     logger.debug(f"\nTest results exported to:")
@@ -423,6 +453,12 @@ def export_workflow_results(test_results, flows):
     logger.debug(f"  - JSON: {json_file}")
     logger.debug(f"  - CSV: {csv_file}")
     logger.debug(f"  - Summary: {summary_file}")
+    logger.debug(f"  - HTML: {html_file}")
+    
+    # Print HTML report path to console (more visible)
+    print(f"\n📊 Interactive HTML report generated: {html_file}")
+    print("   The report will open automatically in your default browser.")
+
 
     # Workflow-level summary
     logger.debug("\n===== WORKFLOW SUMMARY =====")
@@ -513,6 +549,93 @@ def safe_str(val):
     return str(val)
 
 
+def process_patterns(input_path):
+    """
+    Process patterns from Excel file and generate enhanced pattern matches JSON file.
+    This function is integrated from patterns/pattern_main.py.
+    
+    Args:
+        input_path (str): Path to the Excel file
+        
+    Returns:
+        dict: Enhanced pattern data
+    """
+    logger.info("🚀 Processing patterns from Excel file...")
+    
+    try:
+        # Step 1: Parse Excel file for pattern matches
+        logger.debug("📊 Parsing Excel file for patterns...")
+        parser = PatternMatchParser(input_path)
+        raw_pattern_data = parser.extract_pattern_matches()
+        
+        # Step 2: Convert patterns to dictionaries
+        logger.debug("🔄 Converting patterns to dictionaries...")
+        enhanced_data = integrate_with_excel_parser(raw_pattern_data)
+        
+        # Step 3: Export results to patterns directory
+        logger.debug("💾 Exporting enhanced pattern matches...")
+        patterns_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "patterns")
+        os.makedirs(patterns_dir, exist_ok=True)
+        
+        # Create filename based on input Excel filename
+        base_filename = os.path.splitext(os.path.basename(input_path))[0]
+        output_file = os.path.join(patterns_dir, f"{base_filename}_enhanced_pattern_matches.json")
+        
+        # Export the enhanced data
+        with open(output_file, 'w') as f:
+            json.dump(enhanced_data, f, indent=2)
+        logger.info(f"✅ Enhanced pattern matches exported to: {output_file}")
+        
+        # Create pattern type summary
+        summary = create_pattern_summary(enhanced_data)
+        summary_file = os.path.join(patterns_dir, "pattern_type_summary.json")
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=2)
+        logger.debug(f"📊 Pattern type summary exported to: {summary_file}")
+        
+        return enhanced_data
+    except Exception as e:
+        logger.error(f"❌ Error processing patterns: {e}")
+        return None
+
+
+def create_pattern_summary(enhanced_data):
+    """
+    Create a summary of all unique pattern types and their frequencies.
+    This function is integrated from patterns/pattern_main.py.
+    """
+    pattern_type_summary = {}
+    enhanced_patterns = enhanced_data['enhanced_patterns']
+    
+    for sheet_name, patterns in enhanced_patterns.items():
+        for pattern_entry in patterns:
+            converted = pattern_entry['converted_pattern']
+            pattern_type = converted['pattern_type']
+            
+            if pattern_type not in pattern_type_summary:
+                pattern_type_summary[pattern_type] = {
+                    'count': 0,
+                    'examples': [],
+                    'sheets': set()
+                }
+            
+            pattern_type_summary[pattern_type]['count'] += 1
+            pattern_type_summary[pattern_type]['sheets'].add(sheet_name)
+            
+            # Keep first 3 examples
+            if len(pattern_type_summary[pattern_type]['examples']) < 3:
+                pattern_type_summary[pattern_type]['examples'].append({
+                    'original': pattern_entry['pattern_match'],
+                    'converted': converted['data']
+                })
+    
+    # Convert sets to lists for JSON serialization
+    for pattern_type in pattern_type_summary:
+        pattern_type_summary[pattern_type]['sheets'] = list(pattern_type_summary[pattern_type]['sheets'])
+    
+    return pattern_type_summary
+
+
 def main():
     # Early version check: allow -v/--version without requiring -i/-m
     if "-v" in sys.argv or "--version" in sys.argv:
@@ -577,6 +700,17 @@ def main():
             sys.exit(1)
         valid_sheets = [args.sheet]
         logger.debug(f"Running tests for sheet: {args.sheet}")
+        
+    # Process patterns from Excel file and generate enhanced pattern matches
+    # This step has to be at the beginning where it processes and creates files
+    # in the patterns folder, overwriting them each time the logic runs
+    logger.info("Processing patterns from Excel file...")
+    enhanced_patterns = process_patterns(args.input)
+    if enhanced_patterns:
+        logger.info("Pattern processing completed successfully")
+    else:
+        logger.warning("Pattern processing failed or no patterns found")
+        
     placeholders, placeholder_pattern = extract_placeholders(excel_parser, valid_sheets)
     logger.info(f"Patterns found from excel: {placeholders}")
     # Dummy hosts list for dry-run (use names from hosts.json)
@@ -638,7 +772,7 @@ def main():
         if len(target_hosts) > 1:
             logger.error("Non-SSH mode supports only one target host. Aborting.")
             sys.exit(1)
-        svc_maps = resolve_service_map_local(placeholders)
+        svc_maps = resolve_service_map_local(placeholders, target_hosts)
 
     logger.info(f"Service maps resolved: {svc_maps}")
 
@@ -663,6 +797,12 @@ def main():
         host_cli_map=host_cli_map,
         show_table=show_table,
         display_mode=args.display_mode,
+<<<<<<< Updated upstream
+=======
+        userargs=args,
+        step_delay=args.step_delay,
+
+>>>>>>> Stashed changes
     )
 
 

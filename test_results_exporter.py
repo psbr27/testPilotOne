@@ -6,6 +6,7 @@
 import csv
 import json
 import os
+import webbrowser
 from datetime import datetime
 from typing import Any, Dict, List
 
@@ -178,3 +179,21 @@ class TestResultsExporter:
             f.write("\n" + "=" * 80 + "\n")
 
         return filename
+
+    def export_to_html(self, test_results: List[Any], filename: str = None, open_browser: bool = True) -> str:
+        """Export test results to HTML format and optionally open in browser"""
+        if not filename:
+            filename = self._generate_filename("html")
+
+        # Import HTMLReportGenerator here to avoid circular imports
+        from html_report_generator import HTMLReportGenerator
+        
+        # Create HTML report generator and export
+        html_generator = HTMLReportGenerator(self.results_dir)
+        html_file = html_generator.export_to_html(test_results, filename)
+        
+        # Open in browser if requested
+        if open_browser:
+            webbrowser.open(f"file://{os.path.abspath(html_file)}")
+            
+        return html_file

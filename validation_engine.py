@@ -7,11 +7,34 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 import ast
+import os
 from deepdiff import DeepDiff
 
 from logger import get_logger
 from utils.myutils import compare_dicts_ignore_timestamp
 import utils.parse_pattern_match as parse_pattern_match
+<<<<<<< Updated upstream
+=======
+import utils.parse_key_strings as parse_key_strings
+
+# --- Flexible Status Code Range Helper ---
+def status_matches(expected, actual):
+    """
+    Returns True if actual status matches expected.
+    - If expected is a string like '2XX', '3XX', etc., match any status in that range.
+    - If expected is a string or int like '200', 200, match exactly.
+    """
+    if expected is None or actual is None:
+        return False
+    try:
+        if isinstance(expected, str) and expected.endswith("XX") and len(expected) == 3 and expected[0].isdigit():
+            base = int(expected[0])
+            return 100 * base <= int(actual) < 100 * (base + 1)
+        else:
+            return int(expected) == int(actual)
+    except Exception:
+        return False
+>>>>>>> Stashed changes
 
 def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
     try:
@@ -32,7 +55,7 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
             False,
             f"Response payload does not match expected payload. Difference: {diff}",
         )
-    return ValidationResult(True, "Response payload matches expected payload")
+    return ValidationResult(True)
 
 
 # --- Context and Result Data Classes ---
@@ -50,6 +73,12 @@ class ValidationContext:
     response_headers: Optional[Dict[str, Any]]
     is_kubectl: bool = False
     saved_payload: Optional[Any] = None
+<<<<<<< Updated upstream
+=======
+    args: Optional[Any] = None
+    sheet_name: Optional[str] = None  # Sheet name for enhanced pattern matching
+    row_idx: Optional[int] = None  # Row index for enhanced pattern matching
+>>>>>>> Stashed changes
     # Add more as needed
 
 
@@ -84,39 +113,14 @@ class GetCompareWithPutValidator(ValidationStrategy):
 class PutStatusAndPayloadValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.PutStatusAndPayloadValidator")
-        if context.method and context.method.upper() == "PUT":
-            try:
-                if context.expected_status is None or context.actual_status is None:
-                    logger.debug("Expected status or actual status is None")
-                    return ValidationResult(
-                        False, fail_reason="Expected status or actual status is None"
-                    )
-                expected_status_int = int(context.expected_status)
-                actual_status_int = int(context.actual_status)
-                if (expected_status_int in (200, 201)) and (
-                    actual_status_int in (200, 201)
-                ):
-                    logger.debug("PUT: Accepting both 200 and 201 as valid status")
-                    pass  # continue to payload check
-                elif actual_status_int != expected_status_int:
-                    logger.debug(
-                        f"Status mismatch: {actual_status_int} != {expected_status_int}"
-                    )
-                    return ValidationResult(
-                        False,
-                        fail_reason=f"Status mismatch: {actual_status_int} != {expected_status_int}",
-                    )
-            except Exception:
-                logger.debug(
-                    f"Unable to compare status: {context.actual_status} vs {context.expected_status}"
-                )
-                return ValidationResult(
-                    False,
-                    fail_reason=f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
-                )
-        elif context.actual_status != context.expected_status:
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if not status_matches(context.expected_status, context.actual_status):
             logger.debug(
-                f"Status mismatch: {context.actual_status} != {context.expected_status}"
+                f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
             )
             return ValidationResult(
                 False,
@@ -142,39 +146,14 @@ class PutStatusAndPayloadValidator(ValidationStrategy):
 class PutStatusAndPatternValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.PutStatusAndPatternValidator")
-        if context.method and context.method.upper() == "PUT":
-            try:
-                if context.expected_status is None or context.actual_status is None:
-                    logger.debug("Expected status or actual status is None")
-                    return ValidationResult(
-                        False, fail_reason="Expected status or actual status is None"
-                    )
-                expected_status_int = int(context.expected_status)
-                actual_status_int = int(context.actual_status)
-                if (expected_status_int in (200, 201)) and (
-                    actual_status_int in (200, 201)
-                ):
-                    logger.debug("PUT: Accepting both 200 and 201 as valid status")
-                    pass  # continue to pattern check
-                elif actual_status_int != expected_status_int:
-                    logger.debug(
-                        f"Status mismatch: {actual_status_int} != {expected_status_int}"
-                    )
-                    return ValidationResult(
-                        False,
-                        fail_reason=f"Status mismatch: {actual_status_int} != {expected_status_int}",
-                    )
-            except Exception:
-                logger.debug(
-                    f"Unable to compare status: {context.actual_status} vs {context.expected_status}"
-                )
-                return ValidationResult(
-                    False,
-                    fail_reason=f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
-                )
-        elif context.actual_status != context.expected_status:
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if not status_matches(context.expected_status, context.actual_status):
             logger.debug(
-                f"Status mismatch: {context.actual_status} != {context.expected_status}"
+                f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
             )
             return ValidationResult(
                 False,
@@ -208,9 +187,14 @@ class PutStatusAndPatternValidator(ValidationStrategy):
 class PutStatusPayloadPatternValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.PutStatusPayloadPatternValidator")
-        if context.actual_status != context.expected_status:
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if not status_matches(context.expected_status, context.actual_status):
             logger.debug(
-                f"Status mismatch: {context.actual_status} != {context.expected_status}"
+                f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
             )
             return ValidationResult(
                 False,
@@ -235,6 +219,12 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
+<<<<<<< Updated upstream
+=======
+            args=context.args,  # Pass args
+            sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
+            row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+>>>>>>> Stashed changes
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -383,11 +373,22 @@ class ValidationDispatcher:
                 "Selected strategy: kubectl_pattern (kubectl log validation)"
             )
             result = VALIDATION_STRATEGIES["kubectl_pattern"].validate(context)
+<<<<<<< Updated upstream
             self.logger.debug(
                 f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
             )
             return result
         self.logger.warning("No matching validation rule implemented for this context")
+=======
+            if result is not None:
+                self.logger.debug(
+                    f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
+                )
+                return result
+
+
+        #self.logger.warning("No matching validation rule implemented for this context")
+>>>>>>> Stashed changes
         return ValidationResult(False, "No matching validation rule implemented yet")
 
 
@@ -397,41 +398,16 @@ class ValidationDispatcher:
 class PutStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.PutStatusOnlyValidator")
-        if context.method and context.method.upper() == "PUT":
-            try:
-                if context.expected_status is None or context.actual_status is None:
-                    logger.debug("Expected status or actual status is None")
-                    return ValidationResult(
-                        False, fail_reason="Expected status or actual status is None"
-                    )
-                expected_status_int = int(context.expected_status)
-                actual_status_int = int(context.actual_status)
-                if (expected_status_int in (200, 201)) and (
-                    actual_status_int in (200, 201)
-                ):
-                    logger.debug("PUT: Accepting both 200 and 201 as valid status")
-                    return ValidationResult(True)
-                elif actual_status_int != expected_status_int:
-                    logger.debug(
-                        f"Status mismatch: {actual_status_int} != {expected_status_int}"
-                    )
-                    return ValidationResult(
-                        False,
-                        fail_reason=f"Status mismatch: {actual_status_int} != {expected_status_int}",
-                    )
-            except Exception:
-                logger.debug(
-                    f"Unable to compare status: {context.actual_status} vs {context.expected_status}"
-                )
-                return ValidationResult(
-                    False,
-                    fail_reason=f"Unable to compare status: {context.actual_status} vs {context.expected_status}",
-                )
-        if context.actual_status == context.expected_status:
-            logger.debug("PUT status only validation passed")
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if status_matches(context.expected_status, context.actual_status):
+            logger.debug("PUT status only validation passed (range-aware)")
             return ValidationResult(True)
         logger.debug(
-            f"Status mismatch: {context.actual_status} != {context.expected_status}"
+            f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
         )
         return ValidationResult(
             False,
@@ -448,6 +424,7 @@ class KubectlPatternValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.KubectlPatternValidator")
 
+<<<<<<< Updated upstream
         body_str = str(context.response_body or "")
         pattern_str = context.pattern_match.strip() if context.pattern_match else ""
 
@@ -468,6 +445,62 @@ class KubectlPatternValidator(ValidationStrategy):
             return ValidationResult(
                 False, fail_reason=f"Patterns not found in kubectl output: {missing}"
             )
+=======
+        # Check for enhanced pattern matches if sheet_name and row_idx are provided
+        if context.sheet_name is not None and context.row_idx is not None:
+            try:
+                # increment row index to match 
+                row_idx_adjusted = context.row_idx + 1  # Create a copy to avoid modifying the original
+                enhanced_pattern = load_enhanced_pattern_matches(context.sheet_name, row_idx_adjusted)
+                if enhanced_pattern:
+                    logger.debug(f"Found enhanced pattern match for sheet '{context.sheet_name}' row {row_idx_adjusted}")
+                    
+                    # Process based on pattern_type
+                    if enhanced_pattern.get("pattern_type") == "json_extracted":
+                        pattern_data = enhanced_pattern.get("data", {})
+                        body_str = str(context.response_body or "")
+                        
+                        # Try to find JSON objects in kubectl output lines
+                        try:
+                            lines = body_str.split("\n")
+                            for line in lines:
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                    
+                                try:
+                                    line_json = json.loads(line)
+                                    # Check if all keys and values in pattern_data exist in line_json
+                                    match_found = False
+                                    expected_value = None
+                                    for key, expected_value in pattern_data.items():
+                                        if key in line_json:
+                                            # exact match
+                                            if line_json[key] == expected_value:
+                                                match_found = True
+                                                break   
+                                            # substring match
+                                            elif expected_value in line_json[key]:
+                                                logger.info(f"Found phrase {expected_value} in {line_json[key]}")
+                                                match_found = True
+                                                break                                            
+                                    if match_found:
+                                        return ValidationResult(True)
+                                except json.JSONDecodeError:
+                                    # Not a JSON line, continue to next line
+                                    continue
+                        except Exception as e:
+                            logger.error(f"Error processing kubectl output with enhanced pattern: {e}")
+                            # Don't return here, continue to try other validation methods
+            except Exception as e:
+                logger.error(f"Error in enhanced pattern matching: {e}")
+                # Continue to try other validation methods
+        
+        # If we reach here, either there was no enhanced pattern match or it failed
+        # Fall back to default pattern matching or return failure
+        logger.debug("No enhanced pattern match found or pattern matching failed")
+        return ValidationResult(False, fail_reason="Pattern not found in kubectl logs")
+>>>>>>> Stashed changes
 
         logger.debug(f"All patterns matched in kubectl output: {subpatterns}")
         return ValidationResult(True)
@@ -476,9 +509,14 @@ class KubectlPatternValidator(ValidationStrategy):
 class GetFullValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetFullValidator")
-        if context.actual_status != context.expected_status:
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if not status_matches(context.expected_status, context.actual_status):
             logger.debug(
-                f"Status mismatch: {context.actual_status} != {context.expected_status}"
+                f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
             )
             return ValidationResult(
                 False,
@@ -490,6 +528,12 @@ class GetFullValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
+<<<<<<< Updated upstream
+=======
+            args=context.args,  # Pass args
+            sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
+            row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+>>>>>>> Stashed changes
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -545,9 +589,14 @@ class GetStatusAndPatternValidator(ValidationStrategy):
         logger = get_logger("ValidationEngine.GetStatusAndPatternValidator")
 
         # Step 1: Check HTTP status
-        if context.actual_status != context.expected_status:
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if not status_matches(context.expected_status, context.actual_status):
             logger.debug(
-                f"Status mismatch: {context.actual_status} != {context.expected_status}"
+                f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
             )
             return ValidationResult(
                 False,
@@ -561,6 +610,12 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
+<<<<<<< Updated upstream
+=======
+            args=context.args,  # Pass args
+            sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
+            row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+>>>>>>> Stashed changes
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -569,16 +624,53 @@ class GetStatusAndPatternValidator(ValidationStrategy):
         return ValidationResult(True)
 
 
+def load_enhanced_pattern_matches(sheet_name: str, row_idx: int) -> Optional[Dict]:
+    """
+    Load enhanced pattern matches from the JSON file based on sheet name and row index.
+    Returns the converted_pattern if found, None otherwise.
+    """
+    try:
+        # Find all pattern files in the patterns directory
+        pattern_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "patterns")
+        pattern_files = [f for f in os.listdir(pattern_dir) if f.endswith("enhanced_pattern_matches.json")]
+        
+        for file_name in pattern_files:
+            file_path = os.path.join(pattern_dir, file_name)
+            with open(file_path, 'r') as f:
+                pattern_data = json.load(f)
+                
+            if "enhanced_patterns" in pattern_data:
+                # Check if the sheet exists in the enhanced pattern matches
+                if sheet_name in pattern_data["enhanced_patterns"]:
+                    # Find the entry with matching row_number
+                    for entry in pattern_data["enhanced_patterns"][sheet_name]:
+                        if entry.get("row_number") == row_idx:
+                            return entry.get("converted_pattern")
+    except Exception as e:
+        # Log error but continue with normal pattern matching
+        logger = get_logger("ValidationEngine.EnhancedPatternMatcher")
+        logger.error(f"Error loading enhanced pattern matches: {e}")
+    
+    return None
+
+
 def match_patterns_in_headers_and_body(
     pattern: Optional[str],
     headers: Optional[Dict[str, Any]],
     body: Optional[Any],
     logger,
+<<<<<<< Updated upstream
+=======
+    args=None,  # <-- add args parameter
+    sheet_name: Optional[str] = None,  # Sheet name for enhanced pattern matching
+    row_idx: Optional[int] = None,  # Row index for enhanced pattern matching
+>>>>>>> Stashed changes
 ) -> ValidationResult:
     """
     Checks if the pattern exists in the response body or headers.
     Returns ValidationResult(True) if found, otherwise ValidationResult(False, reason).
     """
+<<<<<<< Updated upstream
 
     # Step 2: Normalize inputs
     pattern_str = pattern.strip() if pattern else ""
@@ -638,14 +730,132 @@ def match_patterns_in_headers_and_body(
                 val_dict = ast.literal_eval(val) if val.strip() else {}
             except Exception:
                 val_dict = val
+=======
+    # Check for enhanced pattern matches if sheet_name and row_idx are provided
+    enhanced_pattern = None
+    if sheet_name is not None and row_idx is not None:
+        # increment row index by 1 to match the row number in the JSON file
+        row_idx += 1  # Adjust for 0-based index in Python
+        enhanced_pattern = load_enhanced_pattern_matches(sheet_name, row_idx)
+        if enhanced_pattern:
+            logger.debug(f"Found enhanced pattern match for sheet '{sheet_name}' row {row_idx}")
+            
+            # Process based on pattern_type
+            if enhanced_pattern.get("pattern_type") == "json_extracted":
+                pattern_data = enhanced_pattern.get("data", {})
+                body_str = str(body or "")
+                try:
+                    body_json = json.loads(body_str) if body_str else {}
+                    
+                    # Check if the response contains multiple items
+                    if isinstance(body_json, list):
+                        logger.info(f"Response contains a list of {len(body_json)} items")
+                        # Process each item in the list against the pattern
+                        for i, item in enumerate(body_json):
+                            logger.debug(f"Checking pattern against item {i+1} of {len(body_json)}")
+                            match, reason = _validate_pattern_data_in_body_json(pattern_data, item, logger)
+                            if match:
+                                logger.info(f"Pattern matched with item {i+1} in the list")
+                                return ValidationResult(True)
+                        # If we get here, no items matched
+                        return ValidationResult(False, fail_reason="No items in the list matched the pattern")
+                    elif isinstance(body_json, dict):
+                        # Check if any top-level keys contain lists that might need to be checked
+                        for key, value in body_json.items():
+                            if isinstance(value, list) and len(value) > 0:
+                                logger.info(f"Response contains a list of {len(value)} items in key '{key}'")
+                        
+                        # Proceed with normal validation
+                        match, reason = _validate_pattern_data_in_body_json(pattern_data, body_json, logger)
+                    else:
+                        logger.warning(f"Response is neither a list nor a dictionary: {type(body_json)}")
+                        match, reason = False, f"Unexpected response type: {type(body_json)}"
+                        
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON format in response body")
+                    return ValidationResult(False, fail_reason="Invalid JSON format in response body")
+                
+                return ValidationResult(match, fail_reason=reason if not match else None)
+            elif enhanced_pattern.get("pattern_type") == "http_header":
+                # fetch header name
+                pattern_data = enhanced_pattern.get("data", "")
+                if pattern_data:
+                    # fetch the header name from pattern_data
+                    header_name = pattern_data.get("header_name", "")
+                    if header_name and headers:
+                        # Check if the header exists in headers
+                        if header_name in headers:
+                            logger.debug(f"Enhanced pattern '{header_name}' found in headers")
+                            return ValidationResult(True)
+                        else:
+                            logger.debug(f"Enhanced pattern '{header_name}' not found in headers")
+                            return ValidationResult(False, fail_reason=f"Pattern '{header_name}' not found in headers")
+                #TODO; we have to handle header value information if available in pattern_data
+            elif enhanced_pattern.get("pattern_type") == "json_object":
+                # Check if the pattern exists in the response body as a JSON object
+                pattern_data = enhanced_pattern.get("data", {})
+                # check if pattern_data is a dict or str
+                if isinstance(pattern_data, str):
+                    try:
+                        pattern_data = json.loads(pattern_data)
+                    except json.JSONDecodeError:
+                        logger.debug("Invalid JSON format in pattern data")
+                        pattern_data = parse_pattern_match.parse_pattern_match_string(pattern_data)
+                        logger.debug(f"Pattern data parsed as string: {pattern_data}")
 
-        # check the type of val_dict before calling compare_dicts_ignore_timestamp
-        # if its other than dict dont pass it to compare_dicts_ignore_timestamp
-        if not isinstance(val_dict, dict):
-            # checking the length of patterns
-            if len(patterns) == 1:
-                result = compare_dicts_ignore_timestamp(patterns, headers_val)
+                body_str = str(body or "")
+                try:
+                    body_json = json.loads(body_str) if body_str else {}
+                except json.JSONDecodeError:
+                    logger.error("Invalid JSON format in response body")
+                    return ValidationResult(False, fail_reason="Invalid JSON format in response body")
+                
+                match, reason = _validate_pattern_data_in_body_json(pattern_data, body_json, logger)
+                # if there is no match in response body fall back to headers
+                if not match and headers:
+                    for key, value in pattern_data.items():
+                        if key in headers and headers[key] == value:
+                            logger.debug(f"Pattern '{key}' matched in headers")
+                            return ValidationResult(True)
+                    logger.debug(f"Pattern '{pattern_data}' not found in response body or headers")
+                    return ValidationResult(False, fail_reason=f"Pattern '{pattern_data}' not found in response body or headers")
+
+>>>>>>> Stashed changes
+
+def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):
+    """
+    Helper to check if all keys and values in pattern_data exist in body_json, supporting dot notation for nested keys.
+    Returns ValidationResult.
+    """
+    match_found = True
+    missing_keys = []
+    value_mismatches = []
+
+    for key, expected_value in pattern_data.items():
+        # Handle nested keys with dot notation (e.g., "config.autoCreate")
+        if '.' in key:
+            parts = key.split('.')
+            current = body_json
+            for part in parts[:-1]:
+                if part in current:
+                    current = current[part]
+                else:
+                    match_found = False
+                    missing_keys.append(key)
+                    break
+            if key not in missing_keys and parts[-1] in current:
+                actual_value = current[parts[-1]]
+                if actual_value != expected_value:
+                    match_found = False
+                    value_mismatches.append(f"{key}: expected '{expected_value}', got '{actual_value}'")
+        else:
+            if key in body_json:
+                actual_value = body_json[key]
+                if actual_value != expected_value:
+                    match_found = False
+                    value_mismatches.append(f"{key}: expected '{expected_value}', got '{actual_value}'")
             else:
+<<<<<<< Updated upstream
                 raise ValueError(
                     "Pattern value is not a dict, cannot compare with headers"
                 )
@@ -672,15 +882,37 @@ def match_patterns_in_headers_and_body(
             # If no missing patterns, extra headers, or value differences, consider it passed
             logger.info("All patterns matched in headers after comparison")
             return ValidationResult(True)
+=======
+                match_found = False
+                missing_keys.append(key)
+
+    if match_found:
+        logger.debug("Enhanced pattern matched in response payload")
+        return True, ""
+    else:
+        fail_reason = ""
+        if missing_keys:
+            fail_reason += f"Missing keys: {missing_keys}. "
+        if value_mismatches:
+            fail_reason += f"Value mismatches: {value_mismatches}."
+        return False, f"{fail_reason}"
+    
+    
+>>>>>>> Stashed changes
 
 class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.DeleteStatusOnlyValidator")
-        if context.actual_status == context.expected_status:
-            logger.debug("DELETE status only validation passed")
+        if context.expected_status is None or context.actual_status is None:
+            logger.debug("Expected status or actual status is None")
+            return ValidationResult(
+                False, fail_reason="Expected status or actual status is None"
+            )
+        if status_matches(context.expected_status, context.actual_status):
+            logger.debug("DELETE status only validation passed (range-aware)")
             return ValidationResult(True)
         logger.debug(
-            f"Status mismatch: {context.actual_status} != {context.expected_status}"
+            f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
         )
         return ValidationResult(
             False,

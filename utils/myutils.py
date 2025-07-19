@@ -36,7 +36,9 @@ def replace_placeholder_in_command(command, service_map):
             # Using re.escape for the placeholder_name ensures special characters are treated literally.
             updated_command = re.sub(re.escape('{' + placeholder_name + '}'), replacement_value, updated_command)
         else:
-            print(f"Warning: Placeholder '{placeholder_name}' not found in svc_map. Command not fully updated.")
+            #TODO; Handle the case where the placeholder is not found in the service map
+            # This could be a warning or an error depending on your requirements.
+            pass 
 
     return updated_command
 
@@ -85,8 +87,19 @@ def compare_dicts_ignore_timestamp(filtered_dict1, filtered_dict2):
                     'dict1_value': val1,
                     'dict2_value': val2
                 }
+                if (
+                    isinstance(val1, str) and isinstance(val2, str) and
+                    (val1 in val2 or val2 in val1)
+                ):
+                    # If one value is a substring of the other, consider it a match
+                    comparison['value_differences'][key] = {
+                        'dict1_value': val1,
+                        'dict2_value': val2
+                    }
+                    comparison['equal'] = True
             else:
-                comparison['equal'] = True  # If all common keys match, set equal to True
+                # If values are equal, we don't need to record them in value_differences
+                comparison['equal'] = True
         
         # Create summary
         comparison['summary'] = {

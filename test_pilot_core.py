@@ -67,10 +67,10 @@ def extract_step_data(step: TestStep) -> Dict[str, Any]:
     command = step.other_fields.get("Command")
     from_excel_response_payload = step.other_fields.get("Response_Payload")
     expected_status = step.expected_status
-    if expected_status is not None and pd.notna(expected_status):
-        expected_status = int(expected_status)
-    else:
-        expected_status = None
+    # if expected_status is not None and pd.notna(expected_status):
+    #     expected_status = int(expected_status)
+    # else:
+    #     expected_status = None
     pattern_match = step.pattern_match
     if pattern_match is None or (
         isinstance(pattern_match, float) and pd.isna(pattern_match)
@@ -180,11 +180,16 @@ def build_url_based_command(
 
 
 def build_kubectl_logs_command(command, namespace, connector, host):
+<<<<<<< Updated upstream
     """Build kubectl logs command with dynamic pod name resolution."""
+=======
+    """Build kubectl logs command with dynamic pod name resolution. Handles multiple pod matches."""
+>>>>>>> Stashed changes
     match = re.search(r"\{([^}]+)\}", command)
     if not match:
         return command
     to_search_pod_name = match.group(1)
+<<<<<<< Updated upstream
     if namespace:
         find_pod = (
             f"kubectl get pods -n {namespace} | "
@@ -194,18 +199,32 @@ def build_kubectl_logs_command(command, namespace, connector, host):
     else:
         find_pod = (
             f"kubectl get pods | grep '{to_search_pod_name}' | awk 'NR==1 {{print $1}}'"
+=======
+    # Build the kubectl get pods command (without awk)
+    if namespace:
+        find_pod = (
+            f"kubectl get pods -n {namespace} | "
+            f"grep '{to_search_pod_name}' | awk '{{print $1}}'"
         )
+    else:
+        find_pod = (
+            f"kubectl get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
+>>>>>>> Stashed changes
+        )
+    # Get all matching pod names
     if connector.use_ssh:
         result = connector.run_command(find_pod, [host])
         res = result.get(host, {"output": "", "error": ""})
-        pod_name = res["output"].strip()
+        pod_names = [line.strip() for line in res["output"].splitlines() if line.strip()]
     else:
         result = subprocess.run(find_pod, shell=True, capture_output=True, text=True)
-        pod_name = result.stdout.strip()
-    if not pod_name:
+        pod_names = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    if not pod_names:
         logger.error(f"No pod found matching '{to_search_pod_name}' on host {host}")
         return None
-    return command.replace(f"{{{to_search_pod_name}}}", pod_name)
+    
+    commands = [command.replace(f"{{{to_search_pod_name}}}", pod_name) for pod_name in pod_names]
+    return commands
 
 
 def build_command_for_step(
@@ -341,6 +360,12 @@ def validate_and_create_result(
         response_headers=response_headers,
         is_kubectl=is_kubectl,
         saved_payload=saved_payload,
+<<<<<<< Updated upstream
+=======
+        args=args,  # Pass args here
+        sheet_name=flow.sheet,  # Pass sheet name for enhanced pattern matching
+        row_idx=step.row_idx,  # Pass row index for enhanced pattern matching
+>>>>>>> Stashed changes
     )
 
     # Dispatch validation
@@ -411,6 +436,11 @@ def process_single_step(
     test_results,
     show_table,
     dashboard,
+<<<<<<< Updated upstream
+=======
+    args=None,
+    step_delay=1,
+>>>>>>> Stashed changes
 ):
     step_data = extract_step_data(step)
     if step_data["command"] is None or pd.isna(step_data["command"]):
@@ -424,9 +454,22 @@ def process_single_step(
         namespace = resolve_namespace(connector, host)
         if not show_table:
             logger.info(f"[CALLFLOW] Host: {host}")
-            logger.info(f"[CALLFLOW] Step: {getattr(step, 'step_name', 'N/A')} (Flow: {getattr(flow, 'test_name', 'N/A')})")
+            color_cyan = "\033[96m"
+            reset_code = "\033[0m"
+            logger.info(f"{color_cyan}[CALLFLOW] Step: {getattr(step, 'step_name', 'N/A')} (Flow: {getattr(flow, 'test_name', 'N/A')}){reset_code}")
             logger.info(f"[CALLFLOW] Substituting placeholders in command: {step_data['command']}")
-        command = build_command_for_step(
+        
+        # check if command is wait() if so it introduces a delay mentioned in wait(30)
+        # sleep for mentioned time in wait() and continue to next step
+        if step_data["command"].strip().lower().startswith("wait"):
+            wait_str = step_data["command"]
+            match = re.search(r"wait\((\d+)\)", wait_str, re.IGNORECASE)
+            if match:
+                number = match.group(1)
+                time.sleep(int(number))
+            continue
+        
+        commands = build_command_for_step(
             step_data,
             svc_map,
             placeholder_pattern,
@@ -435,6 +478,7 @@ def process_single_step(
             host,
             connector,
         )
+<<<<<<< Updated upstream
         if not command:
             if not show_table:
                 logger.warning(f"[CALLFLOW] Command could not be built for host {host}, step {getattr(step, 'step_name', 'N/A')}. Skipping.")
@@ -475,3 +519,124 @@ def process_single_step(
         log_test_result(test_result, flow, step)
         # introduced delay between each test
         time.sleep(1)
+=======
+        
+        if isinstance(commands, str):
+            commands = [commands]
+        elif commands is None:
+            commands = []
+            
+        # --- Aggregate logic for multiple pod logs ---
+        all_outputs = []
+        all_errors = []
+        all_parsed = []
+        all_durations = []
+        all_commands = []
+        any_passed = False
+        matched_pod = None
+        matched_result = None
+        matched_output = None
+        matched_error = None
+        matched_duration = None
+        matched_command = None
+        matched_parsed = None
+        pod_names = []
+        test_result = {}
+
+        for command in commands:
+            if not command:
+                if not show_table:
+                    logger.warning(f"[CALLFLOW] Command could not be built for host {host}, step {getattr(step, 'step_name', 'N/A')}. Skipping.")
+                continue
+            if not show_table:
+                logger.info(f"[CALLFLOW] Built command: {command}")
+                logger.info(f"[CALLFLOW] Executing command on host {host}...")
+            output, error, duration = execute_command(command, host, connector)
+            parsed_output = parse_curl_output(output, error)
+            all_outputs.append(output)
+            all_errors.append(error)
+            all_parsed.append(parsed_output)
+            all_durations.append(duration)
+            all_commands.append(command)
+            # Try to extract pod name for log file naming
+            pod_name = None
+            if command.startswith("kubectl logs") or command.startswith("oc logs"):
+                parts = command.split()
+                try:
+                    pod_name = parts[2]
+                except IndexError:
+                    pod_name = None
+            pod_names.append(pod_name)
+            if parsed_output.get("is_kubectl_logs"):
+                save_kubectl_logs(
+                    parsed_output.get("raw_output"),
+                    host,
+                    f"{step.row_idx}_{pod_name}" if pod_name else step.row_idx,
+                    getattr(flow, "test_name", "unknown")
+                )
+            
+            if not show_table:
+                logger.debug(f"[CALLFLOW] Command executed in {duration:.2f} seconds")
+                logger.info(f"[CALLFLOW] Output from server: {output}")
+                if error:
+                    logger.info(f"[CALLFLOW] HTTP Output from server: {error}")
+                
+                # Add pattern match string to CALLFLOW output
+                pattern = step.pattern_match
+                if pattern:
+                    logger.info(f"[CALLFLOW] Pattern to match: {pattern}")
+            # Validate this pod's logs
+            test_result = validate_and_create_result(
+                step, flow, step_data, parsed_output, output, error, duration, host, command, args
+            )
+            if test_result.passed and not any_passed:
+                any_passed = True
+                matched_pod = pod_name
+                matched_result = test_result
+                matched_output = output
+                matched_error = error
+                matched_duration = duration
+                matched_command = command
+                matched_parsed = parsed_output
+                
+        # After all pods: create a single TestResult for the step
+        if any_passed and matched_result:
+            # Use the result from the passing pod
+            final_result = matched_result
+            final_result.passed = True
+            final_result.fail_reason = None
+            final_result.output = matched_output if matched_output is not None else ""
+            final_result.error = matched_error if matched_error is not None else ""
+            final_result.duration = matched_duration if matched_duration is not None else 0.0
+            final_result.command = matched_command if matched_command is not None else ""
+            # Optionally, add pod info to result
+            # final_result.pattern_found = f"Matched pod: {matched_pod}"  # Removed: pattern_found expects bool or None
+        else:
+        #     # No pod matched; aggregate info
+            final_result = validate_and_create_result(
+                step, flow, step_data, all_parsed[-1] if all_parsed else {},
+                "\n---\n".join(all_outputs),
+                "\n---\n".join(all_errors),
+                sum(all_durations) if all_durations else 0,
+                host,
+                ", ".join(all_commands),
+                args
+            )
+            final_result.passed = False
+            # final_result.fail_reason = test_result.fail_reason
+            # final_result.fail_reason = "Pattern not found in any pod logs"
+            # final_result.pattern_found = f"Checked pods: {', '.join([str(p) for p in pod_names if p])}"  # Removed: pattern_found expects bool or None
+        test_results.append(final_result)
+        step.result = final_result
+        if not show_table:
+            status_str = "PASS" if final_result.passed else "FAIL"
+            color_code = "\033[92m" if final_result.passed else "\033[91m"
+            reset_code = "\033[0m"
+            logger.info(
+                f"[CALLFLOW] Result: {color_code}{status_str}{reset_code} | Expected: {step_data.get('expected_status', 'N/A')} | Actual: {getattr(final_result, 'actual_status', 'N/A')}"
+            )
+        if show_table and dashboard is not None:
+            dashboard.add_result(final_result)
+        log_test_result(final_result, flow, step)
+        time.sleep(step_delay)
+>>>>>>> Stashed changes

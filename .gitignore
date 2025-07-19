@@ -203,6 +203,8 @@ temp_*.xlsx
 *_output.xlsx
 *_results.xlsx
 Oracle*.xlsx
+*.html
+*.xlsx
 
 # SSH keys and sensitive config (keep templates but ignore actual keys)
 config/private_keys/
@@ -219,6 +221,9 @@ config/ssh_keys/
 tmp/
 temp/
 *.tmp
+*.zip
+*.json
+patterns/Oracle*.json
 
 # Local environment overrides
 config/local_hosts.json
