@@ -17,16 +17,16 @@ install-dev:
 	pre-commit install
 	@echo "✅ Development environment set up!"
 
-# Format code with Black and isort
+# Format code with Black and isort (via pre-commit)
 format:
-	python3 -m black --line-length=79 .
-	python3 -m isort --profile=black --line-length=79 .
+	pre-commit run black --all-files || true
+	pre-commit run isort --all-files || true
 	@echo "✅ Code formatted!"
 
 # Check formatting without making changes
 check:
-	python3 -m black --check --line-length=79 .
-	python3 -m isort --check-only --profile=black --line-length=79 .
+	pre-commit run black --all-files
+	pre-commit run isort --all-files
 	@echo "✅ Code formatting is correct!"
 
 # Run all pre-commit hooks
