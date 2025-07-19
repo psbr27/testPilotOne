@@ -13,8 +13,6 @@ from deepdiff import DeepDiff
 from logger import get_logger
 from utils.myutils import compare_dicts_ignore_timestamp
 import utils.parse_pattern_match as parse_pattern_match
-<<<<<<< Updated upstream
-=======
 import utils.parse_key_strings as parse_key_strings
 
 # --- Flexible Status Code Range Helper ---
@@ -34,7 +32,6 @@ def status_matches(expected, actual):
             return int(expected) == int(actual)
     except Exception:
         return False
->>>>>>> Stashed changes
 
 def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
     try:
@@ -73,12 +70,9 @@ class ValidationContext:
     response_headers: Optional[Dict[str, Any]]
     is_kubectl: bool = False
     saved_payload: Optional[Any] = None
-<<<<<<< Updated upstream
-=======
     args: Optional[Any] = None
     sheet_name: Optional[str] = None  # Sheet name for enhanced pattern matching
     row_idx: Optional[int] = None  # Row index for enhanced pattern matching
->>>>>>> Stashed changes
     # Add more as needed
 
 
@@ -219,12 +213,9 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
-<<<<<<< Updated upstream
-=======
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
->>>>>>> Stashed changes
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -373,13 +364,6 @@ class ValidationDispatcher:
                 "Selected strategy: kubectl_pattern (kubectl log validation)"
             )
             result = VALIDATION_STRATEGIES["kubectl_pattern"].validate(context)
-<<<<<<< Updated upstream
-            self.logger.debug(
-                f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
-            )
-            return result
-        self.logger.warning("No matching validation rule implemented for this context")
-=======
             if result is not None:
                 self.logger.debug(
                     f"Validation outcome: passed={result.passed}, reason={result.fail_reason}"
@@ -388,7 +372,6 @@ class ValidationDispatcher:
 
 
         #self.logger.warning("No matching validation rule implemented for this context")
->>>>>>> Stashed changes
         return ValidationResult(False, "No matching validation rule implemented yet")
 
 
@@ -424,28 +407,6 @@ class KubectlPatternValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.KubectlPatternValidator")
 
-<<<<<<< Updated upstream
-        body_str = str(context.response_body or "")
-        pattern_str = context.pattern_match.strip() if context.pattern_match else ""
-
-        if not pattern_str:
-            logger.debug("No pattern provided to validate")
-            return ValidationResult(True)
-
-        # Support comma-separated or newline-separated patterns
-        subpatterns = [p.strip() for p in re.split(r"[\n,]+", pattern_str) if p.strip()]
-        missing = []
-
-        for pattern in subpatterns:
-            if pattern not in body_str:
-                missing.append(pattern)
-
-        if missing:
-            logger.debug(f"Patterns not found: {missing}")
-            return ValidationResult(
-                False, fail_reason=f"Patterns not found in kubectl output: {missing}"
-            )
-=======
         # Check for enhanced pattern matches if sheet_name and row_idx are provided
         if context.sheet_name is not None and context.row_idx is not None:
             try:
@@ -500,7 +461,6 @@ class KubectlPatternValidator(ValidationStrategy):
         # Fall back to default pattern matching or return failure
         logger.debug("No enhanced pattern match found or pattern matching failed")
         return ValidationResult(False, fail_reason="Pattern not found in kubectl logs")
->>>>>>> Stashed changes
 
         logger.debug(f"All patterns matched in kubectl output: {subpatterns}")
         return ValidationResult(True)
@@ -528,12 +488,9 @@ class GetFullValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
-<<<<<<< Updated upstream
-=======
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
->>>>>>> Stashed changes
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -610,12 +567,9 @@ class GetStatusAndPatternValidator(ValidationStrategy):
             context.response_headers,
             context.response_body,
             logger,
-<<<<<<< Updated upstream
-=======
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
->>>>>>> Stashed changes
         )
         if result.passed is False:
             logger.debug(f"Pattern matching failed: {result.fail_reason}")
@@ -659,78 +613,14 @@ def match_patterns_in_headers_and_body(
     headers: Optional[Dict[str, Any]],
     body: Optional[Any],
     logger,
-<<<<<<< Updated upstream
-=======
     args=None,  # <-- add args parameter
     sheet_name: Optional[str] = None,  # Sheet name for enhanced pattern matching
     row_idx: Optional[int] = None,  # Row index for enhanced pattern matching
->>>>>>> Stashed changes
 ) -> ValidationResult:
     """
     Checks if the pattern exists in the response body or headers.
     Returns ValidationResult(True) if found, otherwise ValidationResult(False, reason).
     """
-<<<<<<< Updated upstream
-
-    # Step 2: Normalize inputs
-    pattern_str = pattern.strip() if pattern else ""
-    headers = headers or {}
-    body_str = str(body or "")
-
-    # Normalize headers to lowercase keys
-    headers_dict = (
-        {k.lower(): str(v) for k, v in headers.items()}
-        if isinstance(headers, dict)
-        else {}
-    )
-
-    def string_to_dict_regex(s):
-        # Pattern to match key: value pairs
-        pattern = r'([^:;]+):\s*"?([^";]+)"?'
-        matches = re.findall(pattern, s)
-        return {key.strip(): value.strip() for key, value in matches}
-
-    patterns = parse_pattern_match.parse_pattern_match_string(pattern_str)
-    # Normalize patterns to lowercase keys
-    patterns = {k.lower(): str(v) for k, v in patterns.items()} if isinstance(patterns, dict) else {}
-
-    if not patterns:
-        logger.error("No patterns provided to validate")
-        return ValidationResult(True)
-    
-    # compare patterns and headers_dict or body_str
-    # if no headers and body_str is present then pass body_str as headers_dict
-    if not headers and body_str:
-        # convert body_str to a dict-like structure
-        headers_dict = parse_pattern_match.parse_pattern_match_string(body_str)
- 
-    
-    # compare to find the differences between patterns and headers_dict
-    headers_val = {}
-    for key, val in patterns.items():
-        # if key is not found headers find in response from server
-        if headers_dict.get(key) is not None:
-            headers_val = string_to_dict_regex(headers_dict.get(key, "{}"))
-            # if headers value is {} then check actual header dict and assign 
-            if not headers_val and isinstance(headers_dict, dict):
-                headers_val = headers_dict
-        else:
-            headers_val = parse_pattern_match.parse_pattern_match_string(body_str)
-            if headers_val:
-                headers_val = (
-                        {k.lower(): str(v) for k, v in headers_val.items()}
-                        if isinstance(headers_val, dict)
-                        else {}
-                        )
-
-        # if the value itself is a dict in string format below logic 
-        # converts str to dict
-        if isinstance(val, str):
-            try:
-                val_dict = ast.literal_eval(val) if val.strip() else {}
-            except Exception:
-                val_dict = val
-=======
     # Check for enhanced pattern matches if sheet_name and row_idx are provided
     enhanced_pattern = None
     if sheet_name is not None and row_idx is not None:
@@ -820,7 +710,6 @@ def match_patterns_in_headers_and_body(
                     logger.debug(f"Pattern '{pattern_data}' not found in response body or headers")
                     return ValidationResult(False, fail_reason=f"Pattern '{pattern_data}' not found in response body or headers")
 
->>>>>>> Stashed changes
 
 def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):
     """
@@ -855,34 +744,6 @@ def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):
                     match_found = False
                     value_mismatches.append(f"{key}: expected '{expected_value}', got '{actual_value}'")
             else:
-<<<<<<< Updated upstream
-                raise ValueError(
-                    "Pattern value is not a dict, cannot compare with headers"
-                )
-        else:
-            result = compare_dicts_ignore_timestamp(val_dict, headers_val)
-            
-        if result["equal"]:
-            logger.debug("All patterns matched in headers")
-            return ValidationResult(True)
-        else:
-            # keys only in dict1
-            missing_patterns = result["only_in_dict1"]
-            # keys only in dict2
-            extra_headers = result["only_in_dict2"]
-            # if there are keys present in dict1 and dict2 along with value differences
-            # consider the validation failed
-            if missing_patterns or extra_headers or result["value_differences"]:
-                logger.debug(
-                    f"Patterns not found in headers: {missing_patterns}, "
-                    f"Extra headers: {extra_headers}, "
-                    f"Common keys with value differences: {result['value_differences']}"
-                )
-                return ValidationResult(False, fail_reason=f"Patterns not found in headers: {missing_patterns}, Extra headers: {extra_headers}, Common keys with value differences: {result['value_differences']}")
-            # If no missing patterns, extra headers, or value differences, consider it passed
-            logger.info("All patterns matched in headers after comparison")
-            return ValidationResult(True)
-=======
                 match_found = False
                 missing_keys.append(key)
 
@@ -898,7 +759,6 @@ def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):
         return False, f"{fail_reason}"
     
     
->>>>>>> Stashed changes
 
 class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:

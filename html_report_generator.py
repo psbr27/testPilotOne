@@ -194,18 +194,6 @@ class HTMLReportGenerator(TestResultsExporter):
             font-size: 13px;
             white-space: pre-wrap;
         }
-        .search-bar {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        .search-bar input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
         .filter-options {
             display: flex;
             gap: 10px;
@@ -229,6 +217,50 @@ class HTMLReportGenerator(TestResultsExporter):
             margin-top: 30px;
             color: #777;
             font-size: 12px;
+        }
+        .test-group {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .test-group-header {
+            background-color: #f5f5f5;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+        .test-group-header:hover {
+            background-color: #e8e8e8;
+        }
+        .test-group-header.passed {
+            border-left: 4px solid #27ae60;
+        }
+        .test-group-header.failed {
+            border-left: 4px solid #e74c3c;
+        }
+        .test-group-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .test-group-name.passed {
+            color: #27ae60;
+        }
+        .test-group-name.failed {
+            color: #e74c3c;
+        }
+        .test-group-content {
+            display: none;
+            padding: 0;
+        }
+        .test-steps-count {
+            color: #666;
+            font-size: 14px;
+            font-weight: normal;
         }
         """
 
@@ -265,19 +297,14 @@ class HTMLReportGenerator(TestResultsExporter):
                 });
             });
             
-            // Search functionality
-            const searchInput = document.getElementById('search-input');
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                document.querySelectorAll('.test-row').forEach(row => {
-                    const testName = row.querySelector('.test-name').textContent.toLowerCase();
-                    const method = row.querySelector('.method').textContent.toLowerCase();
-                    const host = row.querySelector('.host').textContent.toLowerCase();
-                    
-                    if (testName.includes(searchTerm) || method.includes(searchTerm) || host.includes(searchTerm)) {
-                        row.style.display = '';
+            // Toggle test group content
+            document.querySelectorAll('.test-group-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    if (content.style.display === 'block') {
+                        content.style.display = 'none';
                     } else {
-                        row.style.display = 'none';
+                        content.style.display = 'block';
                     }
                 });
             });
@@ -418,14 +445,14 @@ class HTMLReportGenerator(TestResultsExporter):
                     maintainAspectRatio: false,
                     scales: {
                         x: {
-                            stacked: false,
+                            stacked: true,
                             title: {
                                 display: true,
                                 text: 'Sheet Name'
                             }
                         },
                         y: {
-                            stacked: false,
+                            stacked: true,
                             beginAtZero: true,
                             title: {
                                 display: true,
@@ -447,6 +474,11 @@ class HTMLReportGenerator(TestResultsExporter):
         }
         """
 
+    def _extract_test_name(self, test_name: str) -> str:
+        """Extract base test name by removing _<digits> suffix"""
+        import re
+        return re.sub(r'_\d+$', '', test_name)
+
     def export_to_html(self, test_results: List[Any], filename: str = None) -> str:
         """Export test results to an interactive HTML report"""
         if not filename:
@@ -466,6 +498,9 @@ class HTMLReportGenerator(TestResultsExporter):
         failed_tests = total_tests - passed_tests
         pass_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
 
+        # Generate timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         # Generate HTML content
         html_content = f"""<!DOCTYPE html>
         <html lang="en">
@@ -481,6 +516,9 @@ class HTMLReportGenerator(TestResultsExporter):
         <body>
             <div class="container">
                 <h1>Test Results Report</h1>
+                <p style="text-align: center; color: #777; margin-top: -20px; margin-bottom: 30px; font-size: 14px;">
+                    Generated on {timestamp}
+                </p>
                 
                 <div class="summary">
                     <div class="summary-item">
@@ -510,10 +548,6 @@ class HTMLReportGenerator(TestResultsExporter):
                     <canvas id="sheet-comparison-chart"></canvas>
                 </div>
                 
-                <div class="search-bar">
-                    <input type="text" id="search-input" placeholder="Search by test name, method or host...">
-                </div>
-                
                 <div class="filter-options">
                     <button class="filter-btn active" data-filter="all">All Tests</button>
                     <button class="filter-btn" data-filter="passed">Passed Only</button>
@@ -528,6 +562,15 @@ class HTMLReportGenerator(TestResultsExporter):
             sheet_passed = sum(1 for r in sheet_results if getattr(r, "passed", False))
             sheet_failed = len(sheet_results) - sheet_passed
             sheet_pass_rate = (sheet_passed / len(sheet_results) * 100) if len(sheet_results) > 0 else 0
+            
+            # Group tests by test name (without _<digits>)
+            tests_by_name = {}
+            for result in sheet_results:
+                test_name = getattr(result, "test_name", "Unknown")
+                base_test_name = self._extract_test_name(test_name)
+                if base_test_name not in tests_by_name:
+                    tests_by_name[base_test_name] = []
+                tests_by_name[base_test_name].append(result)
             
             # Determine sheet status
             if sheet_failed == 0:
@@ -560,130 +603,152 @@ class HTMLReportGenerator(TestResultsExporter):
                                 <p><strong>Pass Rate:</strong> {sheet_pass_rate:.1f}%</p>
                             </div>
                         </div>
-                        <table class="test-table">
-                            <thead>
-                                <tr>
-                                    <th>Test Name</th>
-                                    <th>Method</th>
-                                    <th>Host</th>
-                                    <th>Status</th>
-                                    <th>Duration (s)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div class="test-groups">
             """
             
-            # Add test rows for this sheet
-            for i, result in enumerate(sheet_results):
-                test_name = getattr(result, "test_name", "Unknown")
-                method = getattr(result, "method", "GET")
-                host = getattr(result, "host", "Unknown")
-                passed = getattr(result, "passed", False)
-                duration = getattr(result, "duration", 0.0)
-                status = "PASS" if passed else "FAIL"
-                row_class = "passed" if passed else "failed"
-                details_id = f"details-{sheet_name.replace(' ', '-')}-{i}"
+            # Add test groups for this sheet
+            for test_name, test_results in tests_by_name.items():
+                # Determine if all tests in this group passed
+                all_passed = all(getattr(r, "passed", False) for r in test_results)
+                group_status = "passed" if all_passed else "failed"
+                status_text = "PASS" if all_passed else "FAIL"
                 
                 html_content += f"""
-                                <tr class="test-row {row_class}" data-details="{details_id}">
-                                    <td class="test-name">{test_name}</td>
-                                    <td class="method">{method}</td>
-                                    <td class="host">{host}</td>
-                                    <td><span class="status-badge {'status-pass' if passed else 'status-fail'}">{status}</span></td>
-                                    <td>{duration:.2f}s</td>
-                                </tr>
+                            <div class="test-group">
+                                <div class="test-group-header {group_status}">
+                                    <div class="test-group-name {group_status}">
+                                        <span>{test_name}</span>
+                                        <span class="test-steps-count">({len(test_results)} steps)</span>
+                                    </div>
+                                    <span class="status-badge {'status-pass' if all_passed else 'status-fail'}">{status_text}</span>
+                                </div>
+                                <div class="test-group-content">
+                                    <table class="test-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Step</th>
+                                                <th>Method</th>
+                                                <th>Host</th>
+                                                <th>Status</th>
+                                                <th>Duration (s)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
                 """
                 
-                # Add collapsible details section for this test
-                command = getattr(result, "command", "")
-                error = getattr(result, "error", "")
-                output = getattr(result, "output", "")
-                fail_reason = getattr(result, "fail_reason", "")
-                expected_status = getattr(result, "expected_status", "N/A")
-                actual_status = getattr(result, "actual_status", "N/A")
-                pattern_match = getattr(result, "pattern_match", "")
-                pattern_found = getattr(result, "pattern_found", "")
-                
-                html_content += f"""
-                                <tr>
-                                    <td colspan="5" class="test-details" id="{details_id}">
-                                        <div class="details-grid">
-                                            <div class="detail-item">
-                                                <h4>Command</h4>
-                                                <pre>{command}</pre>
-                                            </div>
-                """
-                
-                if error:
+                # Add test rows for this group
+                for i, result in enumerate(test_results):
+                    step_name = getattr(result, "test_name", "Unknown")
+                    method = getattr(result, "method", "GET")
+                    host = getattr(result, "host", "Unknown")
+                    passed = getattr(result, "passed", False)
+                    duration = getattr(result, "duration", 0.0)
+                    status = "PASS" if passed else "FAIL"
+                    row_class = "passed" if passed else "failed"
+                    details_id = f"details-{sheet_name.replace(' ', '-')}-{test_name.replace(' ', '-')}-{i}"
+                    
                     html_content += f"""
-                                            <div class="detail-item">
-                                                <h4>Error</h4>
-                                                <pre>{error}</pre>
-                                            </div>
+                                            <tr class="test-row {row_class}" data-details="{details_id}">
+                                                <td class="test-name">{step_name}</td>
+                                                <td class="method">{method}</td>
+                                                <td class="host">{host}</td>
+                                                <td><span class="status-badge {'status-pass' if passed else 'status-fail'}">{status}</span></td>
+                                                <td>{duration:.2f}s</td>
+                                            </tr>
                     """
-                
-                if fail_reason:
+                    
+                    # Add collapsible details section for this test
+                    command = getattr(result, "command", "")
+                    error = getattr(result, "error", "")
+                    output = getattr(result, "output", "")
+                    fail_reason = getattr(result, "fail_reason", "")
+                    expected_status = getattr(result, "expected_status", "N/A")
+                    actual_status = getattr(result, "actual_status", "N/A")
+                    pattern_match = getattr(result, "pattern_match", "")
+                    pattern_found = getattr(result, "pattern_found", "")
+                    
                     html_content += f"""
-                                            <div class="detail-item">
-                                                <h4>Failure Reason</h4>
-                                                <pre>{fail_reason}</pre>
-                                            </div>
+                                            <tr>
+                                                <td colspan="5" class="test-details" id="{details_id}">
+                                                    <div class="details-grid">
+                                                        <div class="detail-item">
+                                                            <h4>Command</h4>
+                                                            <pre>{command}</pre>
+                                                        </div>
                     """
-                
-                html_content += f"""
-                                            <div class="detail-item">
-                                                <h4>Expected Status</h4>
-                                                <pre>{expected_status}</pre>
-                                            </div>
-                                            <div class="detail-item">
-                                                <h4>Actual Status</h4>
-                                                <pre>{actual_status}</pre>
-                                            </div>
-                """
-                
-                if pattern_match:
+                    
+                    if error:
+                        html_content += f"""
+                                                        <div class="detail-item">
+                                                            <h4>Error</h4>
+                                                            <pre>{error}</pre>
+                                                        </div>
+                        """
+                    
+                    if fail_reason:
+                        html_content += f"""
+                                                        <div class="detail-item">
+                                                            <h4>Failure Reason</h4>
+                                                            <pre>{fail_reason}</pre>
+                                                        </div>
+                        """
+                    
                     html_content += f"""
-                                            <div class="detail-item">
-                                                <h4>Pattern Match</h4>
-                                                <pre>{pattern_match}</pre>
-                                            </div>
+                                                        <div class="detail-item">
+                                                            <h4>Expected Status</h4>
+                                                            <pre>{expected_status}</pre>
+                                                        </div>
+                                                        <div class="detail-item">
+                                                            <h4>Actual Status</h4>
+                                                            <pre>{actual_status}</pre>
+                                                        </div>
                     """
-                
-                if pattern_found:
-                    html_content += f"""
-                                            <div class="detail-item">
-                                                <h4>Pattern Found</h4>
-                                                <pre>{pattern_found}</pre>
-                                            </div>
-                    """
-                
-                if output:
-                    html_content += f"""
-                                            <div class="detail-item" style="grid-column: span 2;">
-                                                <h4>Output</h4>
-                                                <pre>{output}</pre>
-                                            </div>
+                    
+                    if pattern_match:
+                        html_content += f"""
+                                                        <div class="detail-item">
+                                                            <h4>Pattern Match</h4>
+                                                            <pre>{pattern_match}</pre>
+                                                        </div>
+                        """
+                    
+                    if pattern_found:
+                        html_content += f"""
+                                                        <div class="detail-item">
+                                                            <h4>Pattern Found</h4>
+                                                            <pre>{pattern_found}</pre>
+                                                        </div>
+                        """
+                    
+                    if output:
+                        html_content += f"""
+                                                        <div class="detail-item" style="grid-column: span 2;">
+                                                            <h4>Output</h4>
+                                                            <pre>{output}</pre>
+                                                        </div>
+                        """
+                    
+                    html_content += """
+                                                    </div>
+                                                </td>
+                                            </tr>
                     """
                 
                 html_content += """
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                 """
             
             html_content += """
-                            </tbody>
-                        </table>
+                        </div>
                     </div>
                 </div>
             """
         
         # Close HTML document
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         html_content += f"""
-                <div class="timestamp">
-                    Report generated on {timestamp}
-                </div>
             </div>
             <script>
             {self.js_scripts}

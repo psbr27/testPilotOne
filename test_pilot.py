@@ -211,11 +211,7 @@ def resolve_service_map_ssh(connector, target_hosts, placeholders):
 
 
 def resolve_service_map_local(
-<<<<<<< Updated upstream
-    placeholders, namespace=None, config_file="config/hosts.json"
-=======
     placeholders, target_hosts=None, namespace=None, config_file="config/hosts.json"
->>>>>>> Stashed changes
 ):
     svc_maps = {}
     # If namespace is not provided, try to fetch from config using connect_to host
@@ -355,11 +351,8 @@ def execute_flows(
     host_cli_map=None,
     show_table=True,
     display_mode="blessed",
-<<<<<<< Updated upstream
-=======
     userargs=None,
     step_delay=1,
->>>>>>> Stashed changes
 ):
     test_results = []
     dashboard = None
@@ -397,11 +390,8 @@ def execute_flows(
                 test_results,
                 show_table,
                 dashboard,
-<<<<<<< Updated upstream
-=======
                 args=userargs,
                 step_delay=step_delay,
->>>>>>> Stashed changes
             )
     # Print final summary if dashboard is present
     if dashboard:
@@ -797,12 +787,8 @@ def main():
         host_cli_map=host_cli_map,
         show_table=show_table,
         display_mode=args.display_mode,
-<<<<<<< Updated upstream
-=======
         userargs=args,
         step_delay=args.step_delay,
-
->>>>>>> Stashed changes
     )
 
 
