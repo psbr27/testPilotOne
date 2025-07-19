@@ -47,10 +47,10 @@ class TestResultsExporter:
                 "timestamp": getattr(result, "timestamp", ""),
                 "error": getattr(result, "error", ""),
                 "output": (
-                    getattr(result, "output", "")[:500]
+                    getattr(result, "output", "")
                     if hasattr(result, "output")
                     else ""
-                ),  # Limit output size
+                ),
             }
 
             # Add dry-run status if applicable
