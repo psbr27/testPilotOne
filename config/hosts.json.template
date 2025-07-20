@@ -1,5 +1,5 @@
 {
-    "use_ssh": false,
+    "use_ssh": true,
     "pod_mode": false,
     "nf_name": "YOUR_NF_NAME",
     "connect_to": "HOST_NAME_OR_ALL",

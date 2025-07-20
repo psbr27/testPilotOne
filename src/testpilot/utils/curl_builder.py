@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import re
 import shlex
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("CurlBuilder")
@@ -72,13 +74,26 @@ def build_curl_command(
             payload_arg = f"-d {shlex.quote(resolved_payload)}"
 
     # Fetch nf_name from config/hosts.json if available
-    try:
-        with open("config/hosts.json", "r", encoding="utf-8") as f:
-            config = json.load(f)
-            nf_name = config.get("nf_name", "SLF")
-    except (IOError, OSError, json.JSONDecodeError) as e:
-        logger.error(f"Failed to read or parse config/hosts.json: {e}")
-        nf_name = "SLF"
+    nf_name = "SLF"  # Default value
+    # Look for config in project root first, then fallback to package directory
+    config_paths = [
+        os.path.join(os.getcwd(), "config", "hosts.json"),  # Project root config
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "config", "hosts.json")  # Absolute path from module
+    ]
+    
+    for config_path in config_paths:
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    nf_name = config.get("nf_name", "SLF")
+                    break
+        except (IOError, OSError, json.JSONDecodeError) as e:
+            continue
+    
+    # If we couldn't find or parse any config file, log the error
+    if nf_name == "SLF":
+        logger.debug(f"Using default nf_name 'SLF'. Could not find valid config in: {config_paths}")
 
     # if resolved_payload is true, then try to search for nfInstanceId
     # in the payload, if that is found then append to safe_url

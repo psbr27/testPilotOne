@@ -21,23 +21,37 @@ from ..utils.myutils import compare_dicts_ignore_timestamp
 def status_matches(expected, actual):
     """
     Returns True if actual status matches expected.
-    - If expected is a string like '2XX', '3XX', etc., match any status in that range.
+    - If expected is a string like '2XX', '3XX', '4XX', '5XX', etc., match any status in that range.
     - If expected is a string or int like '200', 200, match exactly.
+    - Also supports specific ranges like '400-404' to match a specific range of status codes.
     """
     if expected is None or actual is None:
         return False
+    
     try:
-        if (
-            isinstance(expected, str)
-            and expected.endswith("XX")
-            and len(expected) == 3
-            and expected[0].isdigit()
-        ):
+        # Convert actual to int for all comparisons
+        actual_int = int(actual)
+        
+        # Handle range patterns like '4XX' for any 4XX status code
+        if isinstance(expected, str) and expected.endswith("XX") and len(expected) == 3 and expected[0].isdigit():
             base = int(expected[0])
-            return 100 * base <= int(actual) < 100 * (base + 1)
+            return 100 * base <= actual_int < 100 * (base + 1)
+        
+        # Handle specific range pattern like '400-404'
+        elif isinstance(expected, str) and "-" in expected:
+            range_parts = expected.split("-")
+            if len(range_parts) == 2 and range_parts[0].isdigit() and range_parts[1].isdigit():
+                min_val = int(range_parts[0])
+                max_val = int(range_parts[1])
+                return min_val <= actual_int <= max_val
+        
+        # Handle exact match (either string or int)
         else:
-            return int(expected) == int(actual)
-    except Exception:
+            return actual_int == int(expected)
+    
+    except Exception as e:
+        logger = get_logger("ValidationEngine.status_matches")
+        logger.error(f"Error comparing status codes: {e}")
         return False
 
 
@@ -46,23 +60,83 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
         # Attempt to parse if they are stringified JSON
         resp = context.response_body
         exp = context.response_payload
+        
+        # If both are strings, try direct string comparison first
+        if isinstance(resp, str) and isinstance(exp, str):
+            # Remove whitespace and normalize JSON strings
+            resp_normalized = resp.strip()
+            exp_normalized = exp.strip()
+            
+            # If the normalized strings are identical, return success immediately
+            if resp_normalized == exp_normalized:
+                return ValidationResult(True)
+        
+        # If direct comparison didn't match or they're not both strings, try JSON parsing
         if isinstance(resp, str):
-            resp = json.loads(resp)
+            try:
+                resp = json.loads(resp)
+            except json.JSONDecodeError:
+                # Not valid JSON, keep as string
+                pass
+                
         if isinstance(exp, str):
-            exp = json.loads(exp)
-    except Exception:
+            try:
+                exp = json.loads(exp)
+            except json.JSONDecodeError:
+                # Not valid JSON, keep as string
+                pass
+    except Exception as e:
+        # Log the exception but continue with original values
+        logger = get_logger("ValidationEngine.check_diff")
+        logger.error(f"Error during JSON parsing: {e}")
         resp = context.response_body
         exp = context.response_payload
 
-    diff = DeepDiff(exp, resp, ignore_order=True)
-    if diff:
-        detailed_differences = {"difference": diff.to_dict()}
+    # If we get here, either the strings didn't match exactly or we're comparing parsed objects
+    try:
+        # Add debug logging to see the actual values being compared
+        logger = get_logger("ValidationEngine.check_diff")
+        logger.debug(f"Comparing values: exp={exp} (type={type(exp)}), resp={resp} (type={type(resp)})")
+        
+        # Try string normalization again if objects were parsed
+        if not isinstance(exp, str) and not isinstance(resp, str):
+            # Convert both to JSON strings for consistent comparison
+            try:
+                exp_json = json.dumps(exp, sort_keys=True)
+                resp_json = json.dumps(resp, sort_keys=True)
+                if exp_json == resp_json:
+                    logger.debug("JSON string comparison passed after normalization")
+                    return ValidationResult(True)
+            except Exception as e:
+                logger.debug(f"JSON string normalization failed: {e}")
+        
+        # Proceed with DeepDiff comparison
+        diff = DeepDiff(exp, resp, ignore_order=True)
+        if diff:
+            detailed_differences = {
+                "difference": diff.to_dict(),
+                "expected": exp,
+                "actual": resp,
+                "expected_type": str(type(exp)),
+                "actual_type": str(type(resp))
+            }
+            logger.debug(f"DeepDiff found differences: {diff}")
+            return ValidationResult(
+                False,
+                f"Response payload does not match expected payload.",
+                details=detailed_differences,
+            )
+        return ValidationResult(True)
+    except Exception as e:
+        # If DeepDiff fails, fall back to direct equality check
+        logger = get_logger("ValidationEngine.check_diff")
+        logger.error(f"DeepDiff comparison failed: {e}")
+        if resp == exp:
+            return ValidationResult(True)
         return ValidationResult(
             False,
-            f"Response payload does not match expected payload.",
-            details=detailed_differences,
+            f"Response payload does not match expected payload and comparison failed.",
         )
-    return ValidationResult(True)
 
 
 # --- Context and Result Data Classes ---
@@ -686,14 +760,30 @@ def load_enhanced_pattern_matches(
     """
     try:
         # Find all pattern files in the patterns directory
-        pattern_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "patterns"
-        )
-        pattern_files = [
-            f
-            for f in os.listdir(pattern_dir)
-            if f.endswith("enhanced_pattern_matches.json")
+        # Try multiple possible locations for patterns directory
+        pattern_dirs = [
+            os.path.join(os.getcwd(), "examples", "patterns"),  # Project root patterns
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "examples", "patterns"),  # Absolute path from module
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "patterns")  # Legacy path
         ]
+        
+        pattern_files = []
+        pattern_dir = None
+        
+        # Try each possible pattern directory
+        for dir_path in pattern_dirs:
+            if os.path.exists(dir_path) and os.path.isdir(dir_path):
+                pattern_dir = dir_path
+                try:
+                    pattern_files = [
+                        f
+                        for f in os.listdir(pattern_dir)
+                        if f.endswith("enhanced_pattern_matches.json")
+                    ]
+                    if pattern_files:  # If we found pattern files, break the loop
+                        break
+                except Exception:
+                    continue
 
         for file_name in pattern_files:
             file_path = os.path.join(pattern_dir, file_name)
@@ -888,21 +978,61 @@ def match_patterns_in_headers_and_body(
     # Normal pattern matching logic
     body_str = str(body or "")
     headers_str = str(headers or "")
-
+    
+    # Try direct string matching first
     if pattern in body_str:
         logger.debug(f"Pattern '{pattern}' found in response body")
         return ValidationResult(True)
     elif pattern in headers_str:
         logger.debug(f"Pattern '{pattern}' found in response headers")
         return ValidationResult(True)
-    else:
-        logger.debug(
-            f"Pattern '{pattern}' not found in response body or headers"
-        )
-        return ValidationResult(
-            False,
-            fail_reason=f"Pattern '{pattern}' not found in response body or headers",
-        )
+    
+    # If direct matching failed, try to parse the body as JSON and look for pattern in JSON values
+    try:
+        if body_str:
+            # Try to parse body as JSON
+            try:
+                body_json = json.loads(body_str) if isinstance(body_str, str) else body
+                # Convert to string with pretty formatting to make pattern matching more likely to succeed
+                formatted_json = json.dumps(body_json, indent=2, sort_keys=False)
+                if pattern in formatted_json:
+                    logger.debug(f"Pattern '{pattern}' found in formatted JSON response")
+                    return ValidationResult(True)
+                
+                # Try recursive search through JSON values
+                def search_json_values(obj, pattern):
+                    if isinstance(obj, dict):
+                        for key, value in obj.items():
+                            # Check if pattern is in the key:value pair as a string
+                            pair_str = f'"{key}": {json.dumps(value)}'
+                            if pattern in pair_str:
+                                return True
+                            # Recursively search in value
+                            if search_json_values(value, pattern):
+                                return True
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            if search_json_values(item, pattern):
+                                return True
+                    elif isinstance(obj, str):
+                        return pattern in obj
+                    return False
+                
+                if search_json_values(body_json, pattern):
+                    logger.debug(f"Pattern '{pattern}' found in JSON values")
+                    return ValidationResult(True)
+            except json.JSONDecodeError:
+                # Not JSON, already tried direct string matching above
+                pass
+    except Exception as e:
+        logger.debug(f"Error during advanced pattern matching: {e}")
+    
+    # If we get here, pattern was not found
+    logger.debug(f"Pattern '{pattern}' not found in response body or headers")
+    return ValidationResult(
+        False,
+        fail_reason=f"Pattern '{pattern}' not found in response body or headers",
+    )
 
 
 def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):

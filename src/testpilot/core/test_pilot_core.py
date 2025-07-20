@@ -144,7 +144,13 @@ def resolve_namespace(connector, host: str) -> Optional[str]:
         return getattr(host_cfg, "namespace", None) if host_cfg else None
     else:
         try:
-            with open("config/hosts.json", "r") as f:
+            # Look for config in project root first, then fallback to package directory
+            config_path = os.path.join(os.getcwd(), "config", "hosts.json")
+            if not os.path.exists(config_path):
+                # Try absolute path from module location
+                config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "config", "hosts.json")
+            
+            with open(config_path, "r") as f:
                 data = json.load(f)
             connect_to = data.get("connect_to")
             hosts = data.get("hosts")
@@ -292,15 +298,26 @@ def build_command_for_step(
 
     # Check for pod_mode in config/hosts.json
     pod_mode = False
-    config_path = os.path.join(
-        os.path.dirname(__file__), "config", "hosts.json"
-    )
-    try:
-        with open(config_path, "r") as f:
-            config = json.load(f)
-            pod_mode = config.get("pod_mode", False)
-    except Exception as e:
-        logger.warning(f"Could not read pod_mode from config: {e}")
+    # Look for config in project root first, then fallback to package directory
+    config_paths = [
+        os.path.join(os.getcwd(), "config", "hosts.json"),  # Project root config
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "config", "hosts.json")  # Absolute path from module
+    ]
+    
+    config_found = False
+    for config_path in config_paths:
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+                    pod_mode = config.get("pod_mode", False)
+                    config_found = True
+                    break
+        except Exception as e:
+            continue
+    
+    if not config_found:
+        logger.warning(f"Could not read pod_mode from config: No valid config file found in {config_paths}")
 
     if pod_mode and url:
         # Use build_pod_mode to construct the command
