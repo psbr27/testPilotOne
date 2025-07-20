@@ -487,6 +487,7 @@ def validate_and_create_result(
         test_name=flow.test_name,
         duration=duration,
         method=method,
+        details=result.details,
     )
     return test_result
 

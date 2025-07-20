@@ -64,25 +64,55 @@ class GenericMockServer:
             print(f"📊 Found {len(data.get('results', []))} real test results")
 
             # Index responses by endpoint + method for fast lookup
-            for result in data.get("results", []):
+            # Process in two passes: first non-error sheets, then error sheets
+            results = data.get("results", [])
+
+            # Sort to prioritize certain sheets (oAuthValidation-igw, etc.)
+            priority_sheets = {
+                "oAuthValidation-igw",
+                "SLFGroups",
+                "AutoCreateSubs",
+            }
+
+            sorted_results = sorted(
+                results,
+                key=lambda r: (
+                    r.get("sheet", "")
+                    not in priority_sheets,  # Priority sheets first
+                    r.get("sheet", "")
+                    == "ErrorRespEnhancement",  # Error sheets last
+                    r.get("status", "")
+                    == "FAIL",  # PASS status preferred over FAIL
+                ),
+            )
+
+            for result in sorted_results:
                 endpoint, method, payload = self.extract_request_info(
                     result.get("command", "")
                 )
                 if endpoint and method:
                     key = f"{method}:{endpoint}"
-                    self.real_responses[key] = {
-                        "output": result.get("output", ""),
-                        "error": result.get("error", ""),
-                        "status": result.get("status", "PASS"),
-                        "method": method,
-                        "endpoint": endpoint,
-                        "test_name": result.get("test_name", ""),
-                        "sheet": result.get("sheet", ""),
-                    }
 
-                    # Store endpoint patterns for fuzzy matching
-                    pattern = self.create_endpoint_pattern(endpoint)
-                    self.endpoint_patterns[pattern] = key
+                    # Only overwrite if this is a higher priority response
+                    if (
+                        key not in self.real_responses
+                        or self.should_replace_response(
+                            self.real_responses[key], result
+                        )
+                    ):
+                        self.real_responses[key] = {
+                            "output": result.get("output", ""),
+                            "error": result.get("error", ""),
+                            "status": result.get("status", "PASS"),
+                            "method": method,
+                            "endpoint": endpoint,
+                            "test_name": result.get("test_name", ""),
+                            "sheet": result.get("sheet", ""),
+                        }
+
+                        # Store endpoint patterns for fuzzy matching
+                        pattern = self.create_endpoint_pattern(endpoint)
+                        self.endpoint_patterns[pattern] = key
 
             print(
                 f"🎯 Indexed {len(self.real_responses)} unique endpoint-method combinations"
@@ -98,6 +128,42 @@ class GenericMockServer:
             # Continue with empty responses - will generate generic ones
             self.real_responses = {}
 
+    def should_replace_response(
+        self, existing: Dict, new_result: Dict
+    ) -> bool:
+        """Determine if a new response should replace an existing one."""
+        existing_sheet = existing.get("sheet", "")
+        new_sheet = new_result.get("sheet", "")
+
+        # Priority sheets should replace others
+        priority_sheets = {
+            "oAuthValidation-igw",
+            "SLFGroups",
+            "AutoCreateSubs",
+        }
+
+        if (
+            new_sheet in priority_sheets
+            and existing_sheet not in priority_sheets
+        ):
+            return True
+
+        # Error sheets should not replace non-error sheets
+        if (
+            existing_sheet != "ErrorRespEnhancement"
+            and new_sheet == "ErrorRespEnhancement"
+        ):
+            return False
+
+        # PASS status should replace FAIL status
+        if (
+            existing.get("status") == "FAIL"
+            and new_result.get("status") == "PASS"
+        ):
+            return True
+
+        return False
+
     def extract_request_info(
         self, command: str
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -110,8 +176,8 @@ class GenericMockServer:
             method_match = re.search(r"-X\s+(\w+)", command)
             method = method_match.group(1) if method_match else "GET"
 
-            # Extract URL
-            url_match = re.search(r"http://[^\s]+", command)
+            # Extract URL (stop at quotes or whitespace)
+            url_match = re.search(r"http://[^\s'\"]+", command)
             if not url_match:
                 return None, None, None
 

@@ -709,6 +709,63 @@ class HTMLReportGenerator(TestResultsExporter):
                                                         </div>
                         """
 
+                    # Add detailed comparison information if available
+                    details = getattr(result, "details", None)
+                    if details and not result.passed:
+                        # Convert details to JSON-serializable format
+                        def make_json_serializable(obj):
+                            """Convert DeepDiff objects to JSON-serializable format"""
+                            if hasattr(obj, "__dict__"):
+                                # For objects with __dict__, convert to dict
+                                return {
+                                    k: make_json_serializable(v)
+                                    for k, v in obj.__dict__.items()
+                                }
+                            elif hasattr(obj, "__iter__") and not isinstance(
+                                obj, (str, bytes)
+                            ):
+                                # For iterables (including SetOrdered), convert to list
+                                try:
+                                    return [
+                                        make_json_serializable(item)
+                                        for item in obj
+                                    ]
+                                except (TypeError, RuntimeError):
+                                    # If iteration fails, convert to string
+                                    return str(obj)
+                            elif isinstance(obj, dict):
+                                return {
+                                    k: make_json_serializable(v)
+                                    for k, v in obj.items()
+                                }
+                            else:
+                                # For basic types, return as-is
+                                try:
+                                    json.dumps(
+                                        obj
+                                    )  # Test if it's JSON serializable
+                                    return obj
+                                except (TypeError, ValueError):
+                                    return str(obj)
+
+                        try:
+                            serializable_details = make_json_serializable(
+                                details
+                            )
+                            details_json = json.dumps(
+                                serializable_details, indent=2
+                            )
+                        except Exception as e:
+                            # Fallback to string representation if JSON serialization fails
+                            details_json = f"Error serializing details: {str(e)}\n\nDetails (string representation):\n{str(details)}"
+
+                        html_content += f"""
+                                                        <div class="detail-item" style="grid-column: span 2;">
+                                                            <h4>Detailed Comparison</h4>
+                                                            <pre>{details_json}</pre>
+                                                        </div>
+                        """
+
                     html_content += f"""
                                                         <div class="detail-item">
                                                             <h4>Expected Status</h4>

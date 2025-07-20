@@ -60,9 +60,11 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
 
     diff = DeepDiff(exp, resp, ignore_order=True)
     if diff:
+        detailed_differences = {"difference": diff.to_dict()}
         return ValidationResult(
             False,
-            f"Response payload does not match expected payload. Difference: {diff}",
+            f"Response payload does not match expected payload.",
+            details=detailed_differences,
         )
     return ValidationResult(True)
 
@@ -116,6 +118,31 @@ class GetCompareWithPutValidator(ValidationStrategy):
             logger.debug("GET response matches saved PUT payload")
             return ValidationResult(True)
         logger.debug("GET response does not match saved PUT payload")
+
+        # Create detailed comparison using DeepDiff
+        try:
+            resp = context.response_body
+            saved = context.saved_payload
+            if isinstance(resp, str) and resp.strip():
+                resp = json.loads(resp)
+            if isinstance(saved, str) and saved.strip():
+                saved = json.loads(saved)
+
+            diff = DeepDiff(saved, resp, ignore_order=True)
+            if diff:
+                detailed_differences = {
+                    "expected": saved,
+                    "actual": resp,
+                    "difference": diff.to_dict(),
+                }
+                return ValidationResult(
+                    False,
+                    fail_reason="GET response does not match saved PUT payload",
+                    details=detailed_differences,
+                )
+        except Exception as e:
+            logger.debug(f"Error creating detailed comparison: {e}")
+
         return ValidationResult(
             False, fail_reason="GET response does not match saved PUT payload"
         )
@@ -787,6 +814,12 @@ def match_patterns_in_headers_and_body(
                                 fail_reason=f"Pattern '{header_name}' not found in headers",
                             )
                 # TODO; we have to handle header value information if available in pattern_data
+                else:
+                    logger.debug("No pattern data found for http_header type")
+                    return ValidationResult(
+                        False,
+                        fail_reason="No pattern data found for http_header type",
+                    )
             elif enhanced_pattern.get("pattern_type") == "json_object":
                 # Check if the pattern exists in the response body as a JSON object
                 pattern_data = enhanced_pattern.get("data", {})
@@ -831,6 +864,33 @@ def match_patterns_in_headers_and_body(
                         False,
                         fail_reason=f"Pattern '{pattern_data}' not found in response body or headers",
                     )
+                return ValidationResult(
+                    match, fail_reason=reason if not match else None
+                )
+
+    # If no enhanced pattern or enhanced pattern doesn't apply, fall back to normal pattern matching
+    if pattern is None or pattern == "":
+        logger.debug("No pattern to match against")
+        return ValidationResult(True)  # No pattern means validation passes
+
+    # Normal pattern matching logic
+    body_str = str(body or "")
+    headers_str = str(headers or "")
+
+    if pattern in body_str:
+        logger.debug(f"Pattern '{pattern}' found in response body")
+        return ValidationResult(True)
+    elif pattern in headers_str:
+        logger.debug(f"Pattern '{pattern}' found in response headers")
+        return ValidationResult(True)
+    else:
+        logger.debug(
+            f"Pattern '{pattern}' not found in response body or headers"
+        )
+        return ValidationResult(
+            False,
+            fail_reason=f"Pattern '{pattern}' not found in response body or headers",
+        )
 
 
 def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):

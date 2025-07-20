@@ -761,6 +761,7 @@ def create_pattern_summary(enhanced_data):
 
 
 def main():
+
     # Early version check: allow -v/--version without requiring -i/-m
     if "-v" in sys.argv or "--version" in sys.argv:
         print(f"TestPilot Version: {APP_VERSION}")
@@ -818,6 +819,7 @@ def main():
 
     # Only parse Excel and extract placeholders before dry-run
     excel_parser, valid_sheets = load_excel_and_sheets(args.input)
+
     if args.sheet:
         if args.sheet not in valid_sheets:
             logger.error(
@@ -830,17 +832,26 @@ def main():
     # Process patterns from Excel file and generate enhanced pattern matches
     # This step has to be at the beginning where it processes and creates files
     # in the patterns folder, overwriting them each time the logic runs
-    logger.info("Processing patterns from Excel file...")
-    enhanced_patterns = process_patterns(args.input)
-    if enhanced_patterns:
-        logger.info("Pattern processing completed successfully")
+
+    # Skip pattern processing in mock mode to improve performance
+    if args.execution_mode == "mock":
+        logger.info(
+            "🎭 Skipping pattern processing in mock mode for faster execution"
+        )
+        enhanced_patterns = None
     else:
-        logger.warning("Pattern processing failed or no patterns found")
+        logger.info("Processing patterns from Excel file...")
+        enhanced_patterns = process_patterns(args.input)
+        if enhanced_patterns:
+            logger.info("Pattern processing completed successfully")
+        else:
+            logger.warning("Pattern processing failed or no patterns found")
 
     placeholders, placeholder_pattern = extract_placeholders(
         excel_parser, valid_sheets
     )
     logger.info(f"Patterns found from excel: {placeholders}")
+
     # Dummy hosts list for dry-run (use names from hosts.json)
     with open(config_file, "r") as f:
         config = json.load(f)
@@ -886,8 +897,10 @@ def main():
             "pod_mode and use_ssh cannot both be enabled. Please set use_ssh to false when pod_mode is true in config/hosts.json."
         )
         sys.exit(1)
+
     _, target_hosts = load_config_and_targets(config_file)
     logger.debug(f"Target hosts: {target_hosts}")
+
     connector = SSHConnector(config_file)
 
     # Add execution mode support to connector
@@ -904,6 +917,7 @@ def main():
     else:
         logger.debug("Production mode: establishing SSH connections")
         connector.connect_all(target_hosts)
+
     host_cli_map = {}
     if pod_mode:
         svc_maps = resolve_service_map_local(placeholders, host_cli_map)

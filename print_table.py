@@ -215,6 +215,27 @@ class TestDisplayRow:
             status = "FAIL"
         fail_reason = getattr(result, "fail_reason", "") or ""
         original_test_name = getattr(result, "test_name", "")
+
+        # Enhance fail reason with details if available
+        details = getattr(result, "details", None)
+        if (
+            details
+            and not getattr(result, "passed", False)
+            and "difference" in details
+        ):
+            # Add a brief summary of the differences
+            diff = details["difference"]
+            if "values_changed" in diff:
+                fail_reason += (
+                    f" [Changed: {len(diff['values_changed'])} fields]"
+                )
+            if "iterable_item_added" in diff:
+                fail_reason += f" [+{len(diff['iterable_item_added'])} items]"
+            if "iterable_item_removed" in diff:
+                fail_reason += (
+                    f" [-{len(diff['iterable_item_removed'])} items]"
+                )
+
         return cls(
             host=getattr(result, "host", "")[:12],  # Truncate for display
             sheet=getattr(result, "sheet", ""),  # Don't truncate sheet name
@@ -222,7 +243,9 @@ class TestDisplayRow:
             method=getattr(result, "method", "GET")[:6],
             status=status,
             duration=getattr(result, "duration", 0.0),
-            fail_reason=fail_reason[:40],  # Truncate for display
+            fail_reason=fail_reason[
+                :50
+            ],  # Truncate for display (increased from 40 to 50)
             _original_test_name=original_test_name,  # Store the full test name
         )
 

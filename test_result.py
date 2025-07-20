@@ -20,6 +20,7 @@ class TestResult:
     test_name: Optional[str] = None
     duration: float = 0.0
     method: str = "GET"
+    details: Optional[Dict[str, Any]] = None
 
 
 class TestStep:

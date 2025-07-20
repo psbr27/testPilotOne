@@ -54,11 +54,11 @@ class MockCommandParser:
             method_match = re.search(r"-X\s+(\w+)", command)
             method = method_match.group(1) if method_match else "GET"
 
-            # Extract URL
-            url_match = re.search(r"http://[^\s]+", command)
+            # Extract URL (stop at quotes or whitespace)
+            url_match = re.search(r"http://[^\s'\"]+", command)
             if not url_match:
                 # Try https as well
-                url_match = re.search(r"https://[^\s]+", command)
+                url_match = re.search(r"https://[^\s'\"]+", command)
 
             if not url_match:
                 return None, None, None, None
