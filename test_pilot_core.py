@@ -176,6 +176,11 @@ def build_url_based_command(
     request_payload = step_data["request_payload"]
     pod_exec = step_data["pod_exec"]
 
+    # Get CLI type (kubectl or oc) from host_cli_map
+    cli_type = "kubectl"
+    if host_cli_map and host in host_cli_map:
+        cli_type = host_cli_map[host]
+
     try:
         # substituted_url = substitute_placeholders(
         #     safe_str(url), svc_map, placeholder_pattern
