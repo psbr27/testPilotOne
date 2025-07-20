@@ -382,7 +382,7 @@ def execute_mock_command(
 ):
     """Execute command in mock mode using mock server."""
     mock_server_url = getattr(
-        connector, "mock_server_url", "http://localhost:8081"
+        connector, "mock_server_url", "http://localhost:8082"
     )
 
     # Get mock executor

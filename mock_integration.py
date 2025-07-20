@@ -154,7 +154,7 @@ class MockResponseFormatter:
         error_lines.append(
             f"> {response.request.method} {response.request.path_url} HTTP/2\\r\\n"
         )
-        error_lines.append("> Host: localhost:8081\\r\\n")
+        error_lines.append("> Host: localhost:8082\\r\\n")
         error_lines.append("> User-Agent: curl/7.61.1\\r\\n")
         error_lines.append("> Accept: */*\\r\\n")
 
@@ -200,7 +200,7 @@ class MockExecutor:
     Provides the main interface for replacing SSH execution with mock server calls.
     """
 
-    def __init__(self, mock_server_url: str = "http://localhost:8081"):
+    def __init__(self, mock_server_url: str = "http://localhost:8082"):
         self.mock_server_url = mock_server_url.rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": "TestPilot-Mock/1.0"})
@@ -246,13 +246,27 @@ class MockExecutor:
                 else self.mock_server_url
             )
 
-            print(f"🔄 Mock request: {method} {mock_url}")
-
             # Add sheet and test context for enhanced mock servers
             if sheet_name:
                 headers["X-Test-Sheet"] = sheet_name
             if test_name:
                 headers["X-Test-Name"] = test_name
+
+            # Build enhanced URL display with sheet and test context
+            enhanced_url_display = mock_url
+            if sheet_name or test_name:
+                context_parts = []
+                if sheet_name:
+                    context_parts.append(f"sheet={sheet_name}")
+                if test_name:
+                    context_parts.append(f"test={test_name}")
+                # Use appropriate separator based on whether URL already has query params
+                separator = "&" if "?" in mock_url else "?"
+                enhanced_url_display += (
+                    f"{separator}{{{' & '.join(context_parts)}}}"
+                )
+
+            print(f"🔄 Mock request: {method} {enhanced_url_display}")
 
             # Send request to mock server
             response = self.session.request(

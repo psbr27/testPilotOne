@@ -125,8 +125,8 @@ def parse_args():
     )
     parser.add_argument(
         "--mock-server-url",
-        default="http://localhost:8081",
-        help="Mock server URL for mock execution mode (default: http://localhost:8081)",
+        default="http://localhost:8082",
+        help="Mock server URL for mock execution mode (default: http://localhost:8082)",
     )
     parser.add_argument(
         "--mock-data-file",

@@ -59,7 +59,7 @@ def test_mock_server():
     try:
         import requests
 
-        response = requests.get("http://localhost:8081/health", timeout=5)
+        response = requests.get("http://localhost:8082/health", timeout=5)
         if response.status_code == 200:
             data = response.json()
             print(f"✅ Mock server health check passed")
@@ -114,7 +114,7 @@ def test_mock_request():
     try:
         from mock_integration import MockExecutor
 
-        executor = MockExecutor("http://localhost:8081")
+        executor = MockExecutor("http://localhost:8082")
 
         # Test command
         command = "kubectl exec test-pod -- curl -v -X GET http://localhost:5001/nudr-config/v1/udr.global.cfg/GLOBAL -H 'Content-Type: application/json'"
