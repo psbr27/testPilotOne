@@ -346,7 +346,12 @@ def execute_command(command, host, connector):
         and connector.execution_mode == "mock"
     ):
         logger.debug(f"Executing in MOCK mode on [{host}]: {command}")
-        return execute_mock_command(command, host, connector)
+        # Pass sheet context for enhanced mock servers
+        sheet_name = getattr(connector, "_current_sheet", None)
+        test_name = getattr(connector, "_current_test", None)
+        return execute_mock_command(
+            command, host, connector, sheet_name, test_name
+        )
 
     # Original production execution
     logger.debug(f"Running command on [{host}]: {command}")
@@ -372,7 +377,9 @@ def execute_command(command, host, connector):
     return output, error, duration
 
 
-def execute_mock_command(command, host, connector):
+def execute_mock_command(
+    command, host, connector, sheet_name=None, test_name=None
+):
     """Execute command in mock mode using mock server."""
     mock_server_url = getattr(
         connector, "mock_server_url", "http://localhost:8081"
@@ -394,7 +401,9 @@ def execute_mock_command(command, host, connector):
 
     # Execute mock command
     try:
-        return mock_executor.execute_mock_command(command, host)
+        return mock_executor.execute_mock_command(
+            command, host, sheet_name, test_name
+        )
     except Exception as e:
         logger.error(f"Mock execution failed: {e}")
         return "", f"Mock execution failed: {e}", 0.0
@@ -551,6 +560,14 @@ def process_single_step(
     for host in target_hosts:
         svc_map = svc_maps.get(host, {})
         namespace = resolve_namespace(connector, host)
+
+        # Set sheet and test context for mock execution
+        if (
+            hasattr(connector, "execution_mode")
+            and connector.execution_mode == "mock"
+        ):
+            connector._current_sheet = getattr(flow, "sheet_name", None)
+            connector._current_test = getattr(flow, "test_name", None)
         if not show_table:
             logger.info(f"[CALLFLOW] Host: {host}")
             color_cyan = "\033[96m"

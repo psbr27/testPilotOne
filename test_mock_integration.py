@@ -120,7 +120,7 @@ def test_mock_request():
         command = "kubectl exec test-pod -- curl -v -X GET http://localhost:5001/nudr-config/v1/udr.global.cfg/GLOBAL -H 'Content-Type: application/json'"
 
         output, error, duration = executor.execute_mock_command(
-            command, "test-host"
+            command, "test-host", "TestSheet", "test_case"
         )
 
         print(f"✅ Mock request executed")

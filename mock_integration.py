@@ -206,7 +206,11 @@ class MockExecutor:
         self.session.headers.update({"User-Agent": "TestPilot-Mock/1.0"})
 
     def execute_mock_command(
-        self, command: str, host: str
+        self,
+        command: str,
+        host: str,
+        sheet_name: str = None,
+        test_name: str = None,
     ) -> Tuple[str, str, float]:
         """
         Execute a kubectl curl command against mock server.
@@ -214,6 +218,8 @@ class MockExecutor:
         Args:
             command: kubectl exec curl command string
             host: Target host (used for logging)
+            sheet_name: Test sheet name for enhanced mock server targeting
+            test_name: Test name for enhanced mock server targeting
 
         Returns:
             Tuple of (output, error, duration) matching execute_command format
@@ -241,6 +247,12 @@ class MockExecutor:
             )
 
             print(f"🔄 Mock request: {method} {mock_url}")
+
+            # Add sheet and test context for enhanced mock servers
+            if sheet_name:
+                headers["X-Test-Sheet"] = sheet_name
+            if test_name:
+                headers["X-Test-Name"] = test_name
 
             # Send request to mock server
             response = self.session.request(
