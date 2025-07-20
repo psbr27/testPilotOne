@@ -199,20 +199,28 @@ def build_url_based_command(
         return None
 
 
-def build_kubectl_logs_command(command, namespace, connector, host):
+def build_kubectl_logs_command(
+    command, namespace, connector, host, host_cli_map=None
+):
     """Build kubectl logs command with dynamic pod name resolution. Handles multiple pod matches."""
     match = re.search(r"\{([^}]+)\}", command)
     if not match:
         return command
     to_search_pod_name = match.group(1)
-    # Build the kubectl get pods command (without awk)
+
+    # Get CLI type (kubectl or oc) from host_cli_map
+    cli_type = "kubectl"
+    if host_cli_map and host in host_cli_map:
+        cli_type = host_cli_map[host]
+
+    # Build the CLI get pods command (without awk)
     if namespace:
         find_pod = (
-            f"kubectl get pods -n {namespace} | "
+            f"{cli_type} get pods -n {namespace} | "
             f"grep '{to_search_pod_name}' | awk '{{print $1}}'"
         )
     else:
-        find_pod = f"kubectl get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
+        find_pod = f"{cli_type} get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
     # Get all matching pod names
     if connector.use_ssh:
         result = connector.run_command(find_pod, [host])
