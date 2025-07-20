@@ -12,8 +12,11 @@ from setuptools import find_packages, setup
 if sys.version_info < (3, 8):
     sys.exit("TestPilot requires Python 3.8 or higher")
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+try:
+    with open("README.md", "r", encoding="utf-8") as fh:
+        long_description = fh.read()
+except FileNotFoundError:
+    long_description = "TestPilot - Test automation framework for API testing with Excel-based test definitions"
 
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [
@@ -46,10 +49,13 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "testpilot=test_pilot:main",
+            "testpilot=testpilot.cli:main",
+            "testpilot-mock=testpilot.mock.enhanced_mock_server:main",
+            "testpilot-export=testpilot.mock.enhanced_mock_exporter:main",
         ],
     },
-    packages=find_packages(),
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     include_package_data=True,
     zip_safe=False,
 )

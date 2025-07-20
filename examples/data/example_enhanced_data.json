@@ -1,0 +1,85 @@
+{
+  "metadata": {
+    "enhanced_version": "1.0",
+    "total_tests": 2,
+    "unique_sheets": 1,
+    "unique_tests": 2,
+    "generation_timestamp": "2025-01-20T10:30:00Z"
+  },
+  "enhanced_results": {
+    "test_auto_create_subs_1": {
+      "sheet_name": "AutoCreateSubs",
+      "test_name": "test_auto_create_subs_1",
+      "step_number": 1,
+      "request": {
+        "method": "POST",
+        "endpoint": "/api/v1/subscriptions",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer token123"
+        },
+        "query_params": {},
+        "body": {
+          "subscriber_id": "12345",
+          "plan": "premium"
+        }
+      },
+      "expected_response": {
+        "status_code": 201,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "subscription_id": "sub_67890",
+          "status": "active",
+          "created_at": "2025-01-20T10:30:00Z"
+        }
+      },
+      "execution": {
+        "status": "PASS",
+        "response_body": {
+          "subscription_id": "sub_67890",
+          "status": "active",
+          "created_at": "2025-01-20T10:30:00Z"
+        },
+        "response_time_ms": 150
+      }
+    },
+    "test_auto_create_subs_2": {
+      "sheet_name": "AutoCreateSubs",
+      "test_name": "test_auto_create_subs_2",
+      "step_number": 2,
+      "request": {
+        "method": "GET",
+        "endpoint": "/api/v1/subscriptions/sub_67890",
+        "headers": {
+          "Authorization": "Bearer token123"
+        },
+        "query_params": {},
+        "body": null
+      },
+      "expected_response": {
+        "status_code": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "subscription_id": "sub_67890",
+          "status": "active",
+          "subscriber_id": "12345",
+          "plan": "premium"
+        }
+      },
+      "execution": {
+        "status": "PASS",
+        "response_body": {
+          "subscription_id": "sub_67890",
+          "status": "active",
+          "subscriber_id": "12345",
+          "plan": "premium"
+        },
+        "response_time_ms": 95
+      }
+    }
+  }
+}

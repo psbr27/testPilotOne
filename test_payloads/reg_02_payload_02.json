@@ -1,7 +1,0 @@
-{
-  "title": "Not Found",
-  "status": 404,
-  "detail": "NF instance not found or has been deregistered",
-  "timestamp": "2024-01-15T10:35:00Z",
-  "path": "/nnrf-nfm/v1/nf-instances/"
-}

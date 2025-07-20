@@ -1,0 +1,925 @@
+{
+  "summary": {
+    "total_sheets": 30,
+    "sheets_with_patterns": 18,
+    "total_pattern_entries": 52,
+    "unique_patterns": [
+      "\"detail\":\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN",
+      "\"logType\":\"OCUDR-PROV-LOGS\"",
+      "\"nfStatus\":\"REGISTERED\"",
+      "\"svcName\":\"ocslf-nudr-drservice\"",
+      "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+      "\"message\":\"is updated successfully\"",
+      "\"3gpp-sbi-correlation-info: msisdn-19195220001\"",
+      "3gpp-Sbi-Lci",
+      "{\"title\":,\"status\":,\"details\":,\"cause\":}",
+      "\"level\": \"DEBUG\"",
+      "3gpp-Sbi-Oci:Timestamp",
+      "\"message\":\"Subscriber Activity Logging:imsi-302720603940001\"",
+      "\"enabled\": true",
+      "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
+      "\"enableNFScoring\":true",
+      "\"subscriberActivityEnabled\":true",
+      "\"User-Agent:\"UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03 udr001.oracle.com\"",
+      "\"message\":\"Subscriber Activity Logging:msisdn-19195220001\"",
+      "3gpp-Sbi-Lci:Timestamp",
+      "\"enabled\":true",
+      "\"autoCreate\":true",
+      "\"provLogsEnabled\": true",
+      "\"enableControlledShutdown\":true",
+      "\"requestmethod\":\"PATCH\"",
+      "\"sbiCorrelationInfoEnable\":true",
+      "3gpp-Sbi-Oci",
+      "\"name\":\"OCDP1\""
+    ],
+    "unique_pattern_count": 27,
+    "pattern_frequency": {
+      "\"autoCreate\":true": 1,
+      "\"level\": \"DEBUG\"": 3,
+      "\"message\":\"is updated successfully\"": 2,
+      "\"nfStatus\":\"REGISTERED\"": 2,
+      "\"requestmethod\":\"PATCH\"": 1,
+      "\"sbiCorrelationInfoEnable\":true": 1,
+      "\"3gpp-sbi-correlation-info: imsi-302720603940001\"": 3,
+      "\"3gpp-sbi-correlation-info: msisdn-19195220001\"": 2,
+      "\"subscriberActivityEnabled\":true": 1,
+      "\"message\":\"Subscriber Activity Logging:imsi-302720603940001\"": 4,
+      "\"message\":\"Subscriber Activity Logging:msisdn-19195220001\"": 2,
+      "\"enabled\":true": 5,
+      "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03": 2,
+      "\"User-Agent:\"UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03 udr001.oracle.com\"": 1,
+      "\"enabled\": true": 2,
+      "3gpp-Sbi-Lci": 2,
+      "3gpp-Sbi-Oci": 2,
+      "3gpp-Sbi-Lci:Timestamp": 1,
+      "3gpp-Sbi-Oci:Timestamp": 3,
+      "\"name\":\"OCDP1\"": 1,
+      "\"svcName\":\"ocslf-nudr-drservice\"": 1,
+      "\"enableControlledShutdown\":true": 1,
+      "\"detail\":\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN": 3,
+      "\"enableNFScoring\":true": 1,
+      "\"provLogsEnabled\": true": 1,
+      "\"logType\":\"OCUDR-PROV-LOGS\"": 2,
+      "{\"title\":,\"status\":,\"details\":,\"cause\":}": 2
+    },
+    "sheets_with_pattern_data": [
+      "AutoCreateSubs",
+      "ServiceLogLevel",
+      "SLFRegistrationProfile",
+      "SLFRegistration-NRF",
+      "SBICorrelationHeader",
+      "SubscriberActivity",
+      "ServerHeader",
+      "UserAgentHeader-egw",
+      "UserAgentHeader-igw",
+      "LciOciHeader-igw",
+      "SBIOverload-igw",
+      "ErrorCodes-egw",
+      "ErrorCodes-igw",
+      "ControlledShutdown",
+      "NFScoring",
+      "podProtection-igw",
+      "ProvisioningLogs",
+      "ErrorLogsEnhancement"
+    ]
+  },
+  "enhanced_pattern_matches": {
+    "AutoCreateSubs": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"autoCreate\":true",
+        "test_name": "test_auto_create_subs_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v -X GET \"http://localhost:5001/nudr-config/v1/udr.global.cfg/GLOBAL\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "autoCreate": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ServiceLogLevel": [
+      {
+        "row_number": 4,
+        "pattern_match": "\"level\": \"DEBUG\"",
+        "test_name": "test_service_logs_level_1",
+        "pod_exec": NaN,
+        "command": "kubectl logs {ingressgateway-prov} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "level": "DEBUG"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 11,
+        "pattern_match": "\"level\": \"DEBUG\"",
+        "test_name": "test_service_logs_level_3",
+        "pod_exec": NaN,
+        "command": "kubectl logs {egressgateway} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "level": "DEBUG"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 18,
+        "pattern_match": "\"level\": \"DEBUG\"",
+        "test_name": "test_service_logs_level_5",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-dr-provservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "level": "DEBUG"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "SLFRegistrationProfile": [
+      {
+        "row_number": 5,
+        "pattern_match": "\"message\":\"is updated successfully\"",
+        "test_name": "test_registration_profile_2",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-nrf-client-nfmanagement} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "is updated successfully"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 11,
+        "pattern_match": "\"message\":\"is updated successfully\"",
+        "test_name": "test_registration_profile_4",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-nrf-client-nfmanagement} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "is updated successfully"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "SLFRegistration-NRF": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"nfStatus\":\"REGISTERED\"",
+        "test_name": "test_slf_registration_nrf_1",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{rcn.nnrf}:8081/nnrf-nfm/v1/nf-instances?nf-type=UDR\" -H 'Content-Type: application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "nfStatus": "REGISTERED"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 4,
+        "pattern_match": "\"nfStatus\":\"REGISTERED\"",
+        "test_name": "test_slf_registration_nrf_2",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{rcn.nnrf}:8081/nnrf-nfm/v1/nf-instances/5a7bd676-ceeb-44bb-95e0-f6a55a328b03\" -H 'Content-Type: application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "nfStatus": "REGISTERED"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 8,
+        "pattern_match": "\"requestmethod\":\"PATCH\"",
+        "test_name": "test_slf_registration_nrf_4",
+        "pod_exec": NaN,
+        "command": "kubectl logs {egressgateway} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "requestmethod": "PATCH"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "SBICorrelationHeader": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"sbiCorrelationInfoEnable\":true",
+        "test_name": "test_sbi_correlation_header_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v -X GET \"http://localhost:5001/nudr-config/v1/udr.global.cfg/GLOBAL\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "sbiCorrelationInfoEnable": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 4,
+        "pattern_match": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
+        "test_name": "test_sbi_correlation_header_2",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'Content-Type: application/json' -H '3gpp-sbi-correlation-info: imsi-302720603940001'",
+        "expected_status": 400,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": "3gpp-sbi-correlation-info: imsi-302720603940001",
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 6,
+        "pattern_match": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
+        "test_name": "test_sbi_correlation_header_3",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' -H '3gpp-sbi-correlation-info: imsi-302720603940001'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": "3gpp-sbi-correlation-info: imsi-302720603940001",
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 7,
+        "pattern_match": "\"3gpp-sbi-correlation-info: msisdn-19195220001\"",
+        "test_name": "test_sbi_correlation_header_3",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' -H '3gpp-sbi-correlation-info: msisdn-19195220001'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": "3gpp-sbi-correlation-info: msisdn-19195220001",
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 12,
+        "pattern_match": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
+        "test_name": "test_sbi_correlation_header_5",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF'  -H 'Content-Type: application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": "3gpp-sbi-correlation-info: imsi-302720603940001",
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 14,
+        "pattern_match": "\"3gpp-sbi-correlation-info: msisdn-19195220001\"",
+        "test_name": "test_sbi_correlation_header_6",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": "3gpp-sbi-correlation-info: msisdn-19195220001",
+          "conversion_method": "direct_json_parse"
+        }
+      }
+    ],
+    "SubscriberActivity": [
+      {
+        "row_number": 3,
+        "pattern_match": "\"subscriberActivityEnabled\":true",
+        "test_name": "test_subscriber_activity_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/nudr-config/v1/udr.global.cfg/GLOBAL\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "subscriberActivityEnabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 6,
+        "pattern_match": "\"message\":\"Subscriber Activity Logging:imsi-302720603940001\"",
+        "test_name": "test_subscriber_activity_2",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-dr-provservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "Subscriber Activity Logging:imsi-302720603940001"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 9,
+        "pattern_match": "\"message\":\"Subscriber Activity Logging:imsi-302720603940001\"",
+        "test_name": "test_subscriber_activity_3",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-drservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "Subscriber Activity Logging:imsi-302720603940001"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 15,
+        "pattern_match": "\"message\":\"Subscriber Activity Logging:imsi-302720603940001\"",
+        "test_name": "test_subscriber_activity_5",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-dr-provservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "Subscriber Activity Logging:imsi-302720603940001"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 18,
+        "pattern_match": "\"message\":\"Subscriber Activity Logging:msisdn-19195220001\"",
+        "test_name": "test_subscriber_activity_6",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-dr-provservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "Subscriber Activity Logging:msisdn-19195220001"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 21,
+        "pattern_match": "\"message\":\"Subscriber Activity Logging:imsi-302720603940001\"",
+        "test_name": "test_subscriber_activity_7",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-drservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "Subscriber Activity Logging:imsi-302720603940001"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 24,
+        "pattern_match": "\"message\":\"Subscriber Activity Logging:msisdn-19195220001\"",
+        "test_name": "test_subscriber_activity_8",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-drservice} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "message": "Subscriber Activity Logging:msisdn-19195220001"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ServerHeader": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enabled\":true",
+        "test_name": "test_server_header_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-sig/serverheaderdetails\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 4,
+        "pattern_match": "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+        "test_name": "test_server_header_2",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json'",
+        "expected_status": 404.0,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "server",
+            "server_value": "UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03"
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 6,
+        "pattern_match": "server: UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03",
+        "test_name": "test_server_header_3",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' ",
+        "expected_status": 404.0,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "server",
+            "server_value": "UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03"
+          },
+          "conversion_method": "header_parse"
+        }
+      }
+    ],
+    "UserAgentHeader-egw": [
+      {
+        "row_number": 5,
+        "pattern_match": "\"User-Agent:\"UDR-5a7bd676-ceeb-44bb-95e0-f6a55a328b03 udr001.oracle.com\"",
+        "test_name": "test_user_agent_header_egw_2",
+        "pod_exec": NaN,
+        "command": "kubectl logs {egressgateway} --tail=10",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {},
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "UserAgentHeader-igw": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enabled\": true",
+        "test_name": "test_user_agent_header_igw_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-sig/useragentheadervalidation\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "LciOciHeader-igw": [
+      {
+        "row_number": 2,
+        "pattern_match": "3gpp-Sbi-Lci",
+        "test_name": "test_lcioci_header_igw_1",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Lci",
+            "header_value": null
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 4,
+        "pattern_match": "3gpp-Sbi-Oci",
+        "test_name": "test_lcioci_header_igw_1",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' ",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Oci",
+            "header_value": null
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 7,
+        "pattern_match": "3gpp-Sbi-Lci",
+        "test_name": "test_lcioci_header_igw_2",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Via:2.0 nrf.5gc.mnc012.mcc311.pub.3gppnetwork.org' -H 'Content-Type: application/json'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Lci",
+            "header_value": null
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 9,
+        "pattern_match": "3gpp-Sbi-Oci",
+        "test_name": "test_lcioci_header_igw_2",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Via:2.0 nrf.5gc.mnc012.mcc311.pub.3gppnetwork.org' -H 'Content-Type: application/json'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Oci",
+            "header_value": null
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 12,
+        "pattern_match": "3gpp-Sbi-Lci:Timestamp",
+        "test_name": "test_lcioci_header_igw_3",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IkJFYWpKOG1xMXdLNEMtdmszcDFGbmF5VzR6ZUZacGtGMmtNY3lvNnZkYW8ifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJ0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJ0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMi1zZXJ2aWNlYWNjb3VudC10b2tlbi1oZ2I3dCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJ0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMi1zZXJ2aWNlYWNjb3VudCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijg3MGViODY1LTVkNWItNDdlOC1hNWZkLWMxZmRkZjFlNGQ0NCIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDp0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMjp0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMi1zZXJ2aWNlYWNjb3VudCJ9.ibACXZ18E_2u7BXbANEmDBkycFAa_8UAJL9nTZzbAa9_EU1NGD_Cigrp1U_7hZYEaI9fBxfBd7CY_EywFJhYCFLEN2Hpi2FVoV7kELWbyIK8eLqJhVLnDaoZCfmbujCAE4rMWwTDtuQ6HLypkW6Qday3Sl8SLavJKeltKrnznW576bybm1Li7BtYqAXaD1T9crwlwlSOxnLPvSt8Pgorg5PY_UNoCBL2ikmvTY88MxTNlYBl6dF-joTmlkbeBFFo0URMQrVTVk0IBo1czRAYBFTlUwPCoIMirfQi8BKU7yBoYpy2lClBlzdlpmuDU9_iqWsXy498-cp_LrR5BCDgTw'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Lci",
+            "header_value": "Timestamp"
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 14,
+        "pattern_match": "3gpp-Sbi-Oci:Timestamp",
+        "test_name": "test_lcioci_header_igw_3",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IkJFYWpKOG1xMXdLNEMtdmszcDFGbmF5VzR6ZUZacGtGMmtNY3lvNnZkYW8ifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJ0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMiIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJ0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMi1zZXJ2aWNlYWNjb3VudC10b2tlbi1oZ2I3dCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJ0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMi1zZXJ2aWNlYWNjb3VudCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijg3MGViODY1LTVkNWItNDdlOC1hNWZkLWMxZmRkZjFlNGQ0NCIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDp0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMjp0bXRyZmxhYXZ6d2NzbGYteS1vci14LTAwMi1zZXJ2aWNlYWNjb3VudCJ9.ibACXZ18E_2u7BXbANEmDBkycFAa_8UAJL9nTZzbAa9_EU1NGD_Cigrp1U_7hZYEaI9fBxfBd7CY_EywFJhYCFLEN2Hpi2FVoV7kELWbyIK8eLqJhVLnDaoZCfmbujCAE4rMWwTDtuQ6HLypkW6Qday3Sl8SLavJKeltKrnznW576bybm1Li7BtYqAXaD1T9crwlwlSOxnLPvSt8Pgorg5PY_UNoCBL2ikmvTY88MxTNlYBl6dF-joTmlkbeBFFo0URMQrVTVk0IBo1czRAYBFTlUwPCoIMirfQi8BKU7yBoYpy2lClBlzdlpmuDU9_iqWsXy498-cp_LrR5BCDgTw'",
+        "expected_status": 404,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Oci",
+            "header_value": "Timestamp"
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 20,
+        "pattern_match": "3gpp-Sbi-Oci:Timestamp",
+        "test_name": "test_lcioci_header_igw_5",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\"  -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' ",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Oci",
+            "header_value": "Timestamp"
+          },
+          "conversion_method": "header_parse"
+        }
+      },
+      {
+        "row_number": 22,
+        "pattern_match": "3gpp-Sbi-Oci:Timestamp",
+        "test_name": "test_lcioci_header_igw_5",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "http_header",
+          "data": {
+            "header_type": "3gpp_sbi",
+            "header_name": "3gpp-Sbi-Oci",
+            "header_value": "Timestamp"
+          },
+          "conversion_method": "header_parse"
+        }
+      }
+    ],
+    "SBIOverload-igw": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enabled\": true",
+        "test_name": "test_sbi_overload_igw_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-sig/ocpolicymapping\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 4,
+        "pattern_match": "\"name\":\"OCDP1\"",
+        "test_name": "test_sbi_overload_igw_2",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-sig/ocdiscardpolicies\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "name": "OCDP1"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 6,
+        "pattern_match": "\"svcName\":\"ocslf-nudr-drservice\"",
+        "test_name": "test_sbi_overload_igw_3",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/perf-info/overloadLevelThreshold\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "svcName": "ocslf-nudr-drservice"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ErrorCodes-egw": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enabled\":true",
+        "test_name": "test_error_codes_egw_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/egw/configurableerrorcodes\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ErrorCodes-igw": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enabled\":true",
+        "test_name": "test_error_codes_igw_sig_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-sig/configurableerrorcodes\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 4,
+        "pattern_match": "\"enabled\":true",
+        "test_name": "test_error_codes_igw_prov_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-prov/configurableerrorcodes\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ControlledShutdown": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enableControlledShutdown\":true",
+        "test_name": "test_controlled_shutdown_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/nudr-config/v1/udr.global.cfg/GLOBAL\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enableControlledShutdown": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 7,
+        "pattern_match": "\"detail\":\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN",
+        "test_name": "test_controlled_shutdown_3",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-prov}:8081/slf-group-prov/v1/slf-group?slfGroupName=IMSGrp1\" -H 'Content-Type:application/json'",
+        "expected_status": 503.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "detail": "\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 9,
+        "pattern_match": "\"detail\":\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN",
+        "test_name": "test_controlled_shutdown_4",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=imsi-302720603940001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' ",
+        "expected_status": 503.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "detail": "\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 11,
+        "pattern_match": "\"detail\":\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN",
+        "test_name": "test_controlled_shutdown_5",
+        "pod_exec": "appinfo",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ingressgateway-sig}:8081/nudr-group-id-map/v1/nf-group-ids?subscriber-id=msisdn-19195220001&nf-type=UDM\" -H 'User-Agent:NRF-NRF' -H 'Content-Type: application/json' ",
+        "expected_status": 503.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "detail": "\" Discarding request for Control-Shutdown filter based on COMPLETE_SHUTDOWN"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "NFScoring": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enableNFScoring\":true",
+        "test_name": "test_nf_scoring_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/app-info/nfscoring\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enableNFScoring": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "podProtection-igw": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"enabled\":true",
+        "test_name": "test_pod_protection_igw_sig_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/udr/nf-common-component/v1/igw-sig/podProtection\" -H 'Content-Type:application/json'",
+        "expected_status": 200.0,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "enabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ProvisioningLogs": [
+      {
+        "row_number": 2,
+        "pattern_match": "\"provLogsEnabled\": true",
+        "test_name": "test_provisioning_logs_1",
+        "pod_exec": "nudr-config",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://localhost:5001/nudr-config/v1/udr.nudrprovservice.cfg/DR-PROV-SERVICE\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "provLogsEnabled": true
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 6,
+        "pattern_match": "\"logType\":\"OCUDR-PROV-LOGS\"",
+        "test_name": "test_provisioning_logs_2",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-dr-provservice} --tail=20",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "logType": "OCUDR-PROV-LOGS"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 10,
+        "pattern_match": "\"logType\":\"OCUDR-PROV-LOGS\"",
+        "test_name": "test_provisioning_logs_3",
+        "pod_exec": NaN,
+        "command": "kubectl logs {nudr-dr-provservice} --tail=20",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "logType": "OCUDR-PROV-LOGS"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "ErrorLogsEnhancement": [
+      {
+        "row_number": 6,
+        "pattern_match": "{\"title\":,\"status\":,\"details\":,\"cause\":}",
+        "test_name": "test_error_logs_enh_2",
+        "pod_exec": NaN,
+        "command": "kubectl logs {ingressgateway-sig} --tail=20",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "title": null,
+            "status": null,
+            "details": null,
+            "cause": null
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 9,
+        "pattern_match": "{\"title\":,\"status\":,\"details\":,\"cause\":}",
+        "test_name": "test_error_logs_enh_3",
+        "pod_exec": NaN,
+        "command": "kubectl logs {ingressgateway-sig} --tail=20",
+        "expected_status": NaN,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "title": null,
+            "status": null,
+            "details": null,
+            "cause": null
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      }
+    ]
+  },
+  "conversion_statistics": {
+    "total_processed": 52,
+    "successful_conversions": 52,
+    "failed_conversions": 0,
+    "conversion_types": {
+      "json_like": 42,
+      "http_header": 10
+    }
+  }
+}

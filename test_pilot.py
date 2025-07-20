@@ -24,22 +24,30 @@ import time
 import pandas as pd
 from tabulate import tabulate
 
-from build_info import APP_VERSION, BUILD_DATE, BUILD_EPOCH
-from console_table_fmt import LiveProgressTable
-from dry_run import dry_run_commands
-from excel_parser import ExcelParser, parse_excel_to_flows
-from logger import get_logger
-
+# Updated imports for new package structure
+try:
+    from scripts.update_build_info import APP_VERSION, BUILD_DATE, BUILD_EPOCH
+except ImportError:
+    # Fallback values if build info is not available
+    APP_VERSION = "1.0.0"
+    BUILD_DATE = "Unknown"
+    BUILD_EPOCH = "0"
 # Import pattern processing modules
-from patterns.pattern_match_parser import PatternMatchParser
-from patterns.pattern_to_dict_converter import (
+from examples.scripts.pattern_match_parser import PatternMatchParser
+from examples.scripts.pattern_to_dict_converter import (
     PatternToDictConverter,
     integrate_with_excel_parser,
 )
-from ssh_connector import SSHConnector
-from test_pilot_core import process_single_step
-from utils.config_resolver import load_config_with_env, mask_sensitive_data
-from utils.myutils import set_pdb_trace
+from src.testpilot.core.test_pilot_core import process_single_step
+from src.testpilot.ui.console_table_fmt import LiveProgressTable
+from src.testpilot.utils.config_resolver import (
+    load_config_with_env,
+    mask_sensitive_data,
+)
+from src.testpilot.utils.excel_parser import ExcelParser, parse_excel_to_flows
+from src.testpilot.utils.logger import get_logger
+from src.testpilot.utils.myutils import set_pdb_trace
+from src.testpilot.utils.ssh_connector import SSHConnector
 
 logger = get_logger("TestPilot")
 
@@ -482,7 +490,7 @@ def execute_flows(
 
     if show_table:
         try:
-            from print_table import PrintTableDashboard
+            from src.testpilot.ui.print_table import PrintTableDashboard
 
             if display_mode == "blessed" or display_mode == "full":
                 dashboard = PrintTableDashboard(mode="full")
@@ -496,7 +504,7 @@ def execute_flows(
         except ImportError as e:
             logger.warning(f"PrintTable dashboard not available: {e}")
             # Fallback to simple print-based display
-            from console_table_fmt import LiveProgressTable
+            from src.testpilot.ui.console_table_fmt import LiveProgressTable
 
             dashboard = LiveProgressTable()
 
@@ -537,7 +545,9 @@ def export_workflow_results(test_results, flows):
 
     import pandas as pd
 
-    from test_results_exporter import TestResultsExporter
+    from src.testpilot.exporters.test_results_exporter import (
+        TestResultsExporter,
+    )
 
     # Original Excel export
     df_results = pd.DataFrame([asdict(r) for r in test_results])
@@ -691,7 +701,7 @@ def process_patterns(input_path):
         # Step 3: Export results to patterns directory
         logger.debug("💾 Exporting enhanced pattern matches...")
         patterns_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "patterns"
+            os.path.dirname(os.path.abspath(__file__)), "examples", "data"
         )
         os.makedirs(patterns_dir, exist_ok=True)
 
@@ -769,8 +779,13 @@ def main():
         print(f"Build Date (UTC): {BUILD_DATE}")
         print(f"Python: {platform.python_version()} ({platform.system()})")
         print(f"Platform: {platform.platform()}")
-        print(f"pandas: {pandas.__version__}")
-        print(f"tabulate: {tabulate.__version__}")
+        print(f"pandas: {pd.__version__}")
+        try:
+            import tabulate as tab_module
+
+            print(f"tabulate: {tab_module.__version__}")
+        except AttributeError:
+            print("tabulate: version unknown")
         # Config info
         config_file = "config/hosts.json"
         resource_map_path = os.path.join(
@@ -860,115 +875,145 @@ def main():
         show_table = not args.no_table
         # Use dummy mapping for dry-run: map each placeholder to a dummy value for each host
         dummy_map = {p: f"dummy-{p}" for p in placeholders}
-        svc_maps = {
-            host["name"] if isinstance(host, dict) else host: dummy_map
-            for host in target_hosts
-        }
-        # Create a dummy host_cli_map for dry run
-        dummy_host_cli_map = {
-            host["name"] if isinstance(host, dict) else host: "kubectl"
-            for host in target_hosts
-        }
+        from src.testpilot.utils.dry_run import dry_run_commands
+
+        # Create dummy svc_maps for dry run
+        dummy_svc_maps = {"dry-run-host": dummy_map}
         dry_run_commands(
             excel_parser,
             valid_sheets,
-            None,  # connector is not needed in dry-run
-            target_hosts,
-            svc_maps,
+            None,
+            [],
+            dummy_svc_maps,
             placeholder_pattern,
-            host_cli_map=dummy_host_cli_map,
+            host_cli_map=None,
             show_table=show_table,
             display_mode=args.display_mode,
         )
-        sys.exit(0)
+        return
 
-    # Check pod_mode and use_ssh compatibility
-    pod_mode = False
-    use_ssh = False
-    try:
-        with open(config_file, "r") as f:
-            config = json.load(f)
-            pod_mode = config.get("pod_mode", False)
-            use_ssh = config.get("use_ssh", False)
-    except Exception as e:
-        logger.warning(f"Could not read pod_mode/use_ssh from config: {e}")
-    if pod_mode and use_ssh:
-        logger.error(
-            "pod_mode and use_ssh cannot both be enabled. Please set use_ssh to false when pod_mode is true in config/hosts.json."
-        )
-        sys.exit(1)
+    # Continue with actual execution
+    config, target_hosts = load_config_and_targets(config_file)
 
-    _, target_hosts = load_config_and_targets(config_file)
-    logger.debug(f"Target hosts: {target_hosts}")
-
-    connector = SSHConnector(config_file)
-
-    # Add execution mode support to connector
-    connector.execution_mode = args.execution_mode
-    connector.mock_server_url = args.mock_server_url
-    connector.mock_data_file = args.mock_data_file
-
-    if args.execution_mode == "mock":
-        logger.info(f"🎭 Mock execution mode enabled")
-        logger.info(f"🔗 Mock server URL: {args.mock_server_url}")
-        logger.info(f"📁 Mock data file: {args.mock_data_file}")
-        # Skip SSH connections in mock mode
-        logger.debug("Skipping SSH connections in mock mode")
-    else:
-        logger.debug("Production mode: establishing SSH connections")
+    # Create SSH connector for remote execution if not in mock mode
+    if args.execution_mode == "production":
+        logger.debug("Setting up SSH connections...")
+        connector = SSHConnector(config_file)
         connector.connect_all(target_hosts)
+    else:
+        logger.debug("Mock mode: no SSH connections needed")
+        connector = None
 
+    # Get CLI mapping (detect kubectl/oc on each host)
     host_cli_map = {}
-    if pod_mode:
-        svc_maps = resolve_service_map_local(placeholders, host_cli_map)
-    elif connector.use_ssh:
-        if not connector.get_all_connections():
-            logger.error(
-                "No active SSH connections for service name resolution. Aborting."
-            )
-            sys.exit(1)
-        # Detect kubectl/oc CLI per host
+    if args.execution_mode == "production" and connector:
         for host in target_hosts:
             cli = detect_remote_cli(connector, host)
             host_cli_map[host] = cli
-            logger.debug(f"Host {host} uses CLI: {cli}")
-        svc_maps = resolve_service_map_ssh(
-            connector, target_hosts, placeholders, host_cli_map
-        )
-    else:
-        if len(target_hosts) > 1:
-            logger.error(
-                "Non-SSH mode supports only one target host. Aborting."
-            )
-            sys.exit(1)
-        svc_maps = resolve_service_map_local(placeholders, target_hosts)
+            logger.debug(f"Detected CLI for {host}: {cli}")
 
-    logger.info(f"Service maps resolved: {svc_maps}")
+    # Resolve placeholders to actual service names
+    if placeholders:
+        logger.debug(f"Resolving placeholders: {placeholders}")
+        if args.execution_mode == "production":
+            if config.get("pod_mode"):
+                svc_maps = resolve_service_map_local(
+                    placeholders,
+                    target_hosts,
+                    host_cli_map,
+                    config_file=config_file,
+                )
+            else:
+                if connector:
+                    svc_maps = resolve_service_map_ssh(
+                        connector, target_hosts, placeholders, host_cli_map
+                    )
+                else:
+                    svc_maps = resolve_service_map_local(
+                        placeholders,
+                        target_hosts,
+                        host_cli_map,
+                        config_file=config_file,
+                    )
+        else:
+            # Mock mode: use dummy mappings
+            dummy_map = {p: f"dummy-{p}" for p in placeholders}
+            svc_maps = {host: dummy_map for host in target_hosts}
+            logger.info(
+                f"Mock mode: using dummy service mappings: {dummy_map}"
+            )
+    else:
+        svc_maps = {}
+
+    # Parse all test flows
+    flows = parse_excel_to_flows(excel_parser, valid_sheets)
+
+    # Filter flows by test name if specified
+    if args.test_name:
+        flows = [flow for flow in flows if flow.test_name == args.test_name]
+        logger.debug(
+            f"Filtered to {len(flows)} flows matching test name: {args.test_name}"
+        )
+    logger.debug(f"Parsed {len(flows)} test flows")
 
     show_table = not args.no_table
 
-    flows = parse_excel_to_flows(excel_parser, valid_sheets)
+    # Execute flows based on execution mode
+    if args.execution_mode == "mock":
+        # Mock execution: use mock integration
+        logger.info(
+            f"🎭 Starting mock execution mode with server: {args.mock_server_url}"
+        )
+        try:
+            from src.testpilot.mock.mock_connector import MockConnectorWrapper
+            from src.testpilot.mock.mock_integration import MockExecutor
 
-    # Filter for a specific test name if provided
-    if getattr(args, "test_name", None):
-        filtered_flows = []
-        for flow in flows:
-            if hasattr(flow, "test_name") and flow.test_name == args.test_name:
-                filtered_flows.append(flow)
-        flows = filtered_flows
+            mock_executor = MockExecutor(args.mock_server_url)
 
-    execute_flows(
-        flows,
-        connector,
-        target_hosts,
-        svc_maps,
-        placeholder_pattern,
-        host_cli_map=host_cli_map,
-        show_table=show_table,
-        display_mode=args.display_mode,
-        userargs=args,
-        step_delay=args.step_delay,
-    )
+            # Check if mock server is available
+            if not mock_executor.health_check():
+                logger.error(
+                    f"Mock server at {args.mock_server_url} is not responding. Please start the mock server first."
+                )
+                sys.exit(1)
+
+            # Wrap mock executor to provide SSH connector interface
+            mock_connector = MockConnectorWrapper(mock_executor)
+            mock_connector.connect_all(target_hosts)
+
+            # Execute flows using standard execution but with mock connector
+            execute_flows(
+                flows,
+                mock_connector,  # Use mock connector wrapper
+                target_hosts,
+                svc_maps,
+                placeholder_pattern,
+                host_cli_map,
+                show_table,
+                args.display_mode,
+                args,
+                args.step_delay,
+            )
+
+        except ImportError:
+            logger.error(
+                "Mock integration not available. Please ensure mock modules are properly installed."
+            )
+            sys.exit(1)
+    else:
+        # Production execution: use SSH connector
+        execute_flows(
+            flows,
+            connector,
+            target_hosts,
+            svc_maps,
+            placeholder_pattern,
+            host_cli_map,
+            show_table,
+            args.display_mode,
+            args,
+            args.step_delay,
+        )
 
 
 if __name__ == "__main__":

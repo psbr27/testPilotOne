@@ -22,7 +22,7 @@
     {
       "host": "tailgate",
       "sheet": "SLFGroups",
-      "test_name": "test_add_slf_group",
+      "test_name": "test_add_slf_group_1",
       "method": "PUT",
       "command": "kubectl get po -n ocnrfslf | awk '{print $1}' | grep -E 'appinfo-[a-z0-9]+-[a-z0-9]+$' | head -n 1 | xargs -I{} kubectl exec -it {} -n ocnrfslf -c appinfo -- curl -v --http2-prior-knowledge -X PUT http://ocslf-ingressgateway-prov.ocnrfslf.svc.tailgate.lab.us.oracle.com:8081/slf-group-prov/v1/slf-group -H 'Content-Type: application/json' -d '{\"slfGroupType\":\"ImsHss\",\"nfGroupIDs\":{\"PCF\":\"pcfgroup-name1\",\"AUSF\":\"ausfgroup-name1\",\"NEF\":\"nefgroup-name1\",\"UDM\":\"udmgroup-name1\"},\"slfGroupName\":\"IMSGrp1\"}'",
       "passed": true,
@@ -35,7 +35,7 @@
     {
       "host": "tailgate",
       "sheet": "SLFGroups",
-      "test_name": "test_add_slf_group",
+      "test_name": "test_add_slf_group_1",
       "method": "GET",
       "command": "kubectl get po -n ocnrfslf | awk '{print $1}' | grep -E 'appinfo-[a-z0-9]+-[a-z0-9]+$' | head -n 1 | xargs -I{} kubectl exec -it {} -n ocnrfslf -c appinfo -- curl -v --http2-prior-knowledge -X GET 'http://ocslf-ingressgateway-prov.ocnrfslf.svc.tailgate.lab.us.oracle.com:8081/slf-group-prov/v1/slf-group?slfGroupName=IMSGrp1' -H 'Content-Type: application/json'",
       "passed": true,
