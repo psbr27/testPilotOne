@@ -271,3 +271,5 @@ payloads/*.json
 
 # kubectl logs that might contain sensitive information
 kubectl_logs/
+logs/
+test_results/

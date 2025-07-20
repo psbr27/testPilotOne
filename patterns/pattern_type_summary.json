@@ -33,9 +33,9 @@
       }
     ],
     "sheets": [
-      "NRFDiscovery",
       "NRFFunctionalUseCases",
-      "NRFRegistration"
+      "NRFRegistration",
+      "NRFDiscovery"
     ]
   },
   "json_object": {
@@ -56,8 +56,8 @@
       }
     ],
     "sheets": [
-      "NRFDiscovery",
-      "NRFRegistration"
+      "NRFRegistration",
+      "NRFDiscovery"
     ]
   },
   "raw": {
