@@ -119,7 +119,10 @@ class EnhancedMockExporter:
 
         # Parse response
         output = result.get("output", "")
-        expected_response = self.parse_response(output, result.get("status"))
+        error = result.get("error", "")
+        expected_response = self.parse_response(
+            output, result.get("status"), error
+        )
 
         # Build enhanced result
         enhanced = {
@@ -158,10 +161,19 @@ class EnhancedMockExporter:
 
         return enhanced
 
-    def parse_response(self, output: str, status: str) -> Dict[str, Any]:
-        """Parse response output into structured format."""
+    def parse_response(
+        self, output: str, status: str, error: str = ""
+    ) -> Dict[str, Any]:
+        """Parse response output into structured format with actual HTTP status code."""
+        # Extract actual HTTP status code from error message (like response_parser.py does)
+        actual_status_code = self.extract_http_status_from_error(error)
+
+        # Default to generic codes if no actual status found
+        if actual_status_code is None:
+            actual_status_code = 200 if status == "PASS" else 400
+
         response = {
-            "status_code": 200 if status == "PASS" else 400,
+            "status_code": actual_status_code,
             "body": None,
             "headers": {"Content-Type": "application/json"},
         }
@@ -171,10 +183,12 @@ class EnhancedMockExporter:
                 # Try to parse as JSON
                 response["body"] = json.loads(output)
 
-                # Extract status code from body if present
+                # Extract status code from JSON body if present (but prefer HTTP status)
                 if (
                     isinstance(response["body"], dict)
                     and "status" in response["body"]
+                    and actual_status_code
+                    in [200, 400]  # Only use body status for generic codes
                 ):
                     response["status_code"] = response["body"]["status"]
 
@@ -184,6 +198,25 @@ class EnhancedMockExporter:
                 response["headers"]["Content-Type"] = "text/plain"
 
         return response
+
+    def extract_http_status_from_error(self, error: str) -> Optional[int]:
+        """Extract actual HTTP status code from curl error output."""
+        if not error:
+            return None
+
+        # Find HTTP/2 or HTTP/1.1 status line (like response_parser.py does)
+        import re
+
+        match = re.search(r"< HTTP/[12](?:\.\d)? (\d{3})", error)
+        if match:
+            return int(match.group(1))
+
+        # Also try without the < prefix
+        match = re.search(r"HTTP/[12](?:\.\d)? (\d{3})", error)
+        if match:
+            return int(match.group(1))
+
+        return None
 
     def export_enhanced_mock_data(
         self, input_file: str, output_file: Optional[str] = None
