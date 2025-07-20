@@ -202,7 +202,6 @@ test_reports/
 temp_*.xlsx
 *_output.xlsx
 *_results.xlsx
-Oracle*.xlsx
 *.html
 *.xlsx
 
