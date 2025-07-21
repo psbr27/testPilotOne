@@ -1,3 +1,36 @@
+def evaluate_validation_result(dict_match, pattern_match_overall, summary):
+    """
+    Evaluate validation result based on dict_match and pattern_match_overall values.
+    Returns a ValidationResult instance.
+    """
+    logger = get_logger("ValidationEngine.evaluate_validation_result")
+    if dict_match is True and pattern_match_overall is True:
+        return ValidationResult(True)
+    elif dict_match is True and pattern_match_overall is False:
+        logger.debug(f"Pattern matching failed: {summary}")
+        return ValidationResult(False, fail_reason=summary)
+    elif dict_match is True and pattern_match_overall is None:
+        return ValidationResult(True)
+    elif dict_match is False and pattern_match_overall is True:
+        logger.debug(f"Dict comparison failed: {summary}")
+        return ValidationResult(False, fail_reason=summary)
+    elif dict_match is False and pattern_match_overall is False:
+        logger.debug(f"Both dict comparison and pattern match failed: {summary}")
+        return ValidationResult(False, fail_reason=summary)
+    elif dict_match is False and pattern_match_overall is None:
+        logger.debug(f"Dict comparison failed, no pattern match performed: {summary}")
+        return ValidationResult(False, fail_reason=summary)
+    elif dict_match is None and pattern_match_overall is True:
+        return ValidationResult(True)
+    elif dict_match is None and pattern_match_overall is False:
+        logger.debug(f"No dict comparison performed, pattern match failed: {summary}")
+        return ValidationResult(False, fail_reason=summary)
+    elif dict_match is None and pattern_match_overall is None:
+        logger.debug(f"No validation performed: {summary}")
+        return ValidationResult(False, fail_reason=summary)
+    else:
+        logger.debug(f"Unknown validation result: {summary}")
+        return ValidationResult(False, fail_reason=summary)
 # validation_engine.py
 """
 Validation Engine for TestPilot: Modular, rule-based validation for test steps.
@@ -15,6 +48,7 @@ from ..utils import parse_key_strings, parse_pattern_match
 from ..utils import pattern_match as ppm
 from ..utils.logger import get_logger
 from ..utils.myutils import compare_dicts_ignore_timestamp
+from .enhanced_response_validator import validate_response_enhanced
 
 
 # --- Flexible Status Code Range Helper ---
@@ -159,7 +193,6 @@ class ValidationContext:
         None  # Sheet name for enhanced pattern matching
     )
     row_idx: Optional[int] = None  # Row index for enhanced pattern matching
-    args: Optional[Any] = None  # <-- Add args to context
     # Add more as needed
 
 
@@ -330,19 +363,22 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
                     fail_reason="Unknown error during payload comparison",
                 )
 
-        result = match_patterns_in_headers_and_body(
+        result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
+            context.response_payload,
             logger,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
         )
-        if result.passed is False:
-            logger.debug(f"Pattern matching failed: {result.fail_reason}")
-            return result
-        return ValidationResult(True)
+        
+        return evaluate_validation_result(
+            result["dict_match"],
+            result["pattern_match_overall"],
+            result["summary"],
+        )
 
 
 class ValidationDispatcher:
@@ -540,103 +576,48 @@ class KubectlPatternValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.KubectlPatternValidator")
 
-        # Check for enhanced pattern matches if sheet_name and row_idx are provided
-        if context.sheet_name is not None and context.row_idx is not None:
+        # fetch the response body from server
+        response_body = context.response_body 
+        if isinstance(response_body, str):
             try:
-                # increment row index to match
-                row_idx_adjusted = (
-                    context.row_idx + 1
-                )  # Create a copy to avoid modifying the original
-                enhanced_pattern = load_enhanced_pattern_matches(
-                    context.sheet_name, row_idx_adjusted
-                )
-                if enhanced_pattern:
-                    logger.debug(
-                        f"Found enhanced pattern match for sheet '{context.sheet_name}' row {row_idx_adjusted}"
+                response_body = json.loads(response_body)
+                logger.debug("Parsed response_body string to dict/list for comparison.")
+            except json.JSONDecodeError:
+                response_body = response_body  # fallback to string
+
+        # now split the lines using \n
+        try:
+            if response_body is not None:
+                lines = response_body.split("\n")
+                for line in lines:
+                    result = validate_response_enhanced(
+                        context.pattern_match,
+                        context.response_headers,
+                        line,  # Use each line as the response body
+                        context.response_payload,
+                        logger,
+                        args=context.args,  # Pass args
+                        sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
+                        row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
                     )
-
-                    # Process based on pattern_type
-                    if (
-                        enhanced_pattern.get("pattern_type")
-                        == "json_extracted"
-                    ):
-                        pattern_data = enhanced_pattern.get("data", {})
-                        body_str = str(context.response_body or "")
-
-                        # Try to find JSON objects in kubectl output lines
-                        try:
-                            lines = body_str.split("\n")
-                            for line in lines:
-                                line = line.strip()
-                                if not line:
-                                    continue
-
-                                try:
-                                    line_json = json.loads(line)
-                                    # Check if all keys and values in pattern_data exist in line_json
-                                    match_found = False
-                                    expected_value = None
-                                    for (
-                                        key,
-                                        expected_value,
-                                    ) in pattern_data.items():
-                                        if key in line_json:
-                                            # exact match
-                                            if (
-                                                line_json[key]
-                                                == expected_value
-                                            ):
-                                                match_found = True
-                                                break
-                                            # substring match
-                                            elif (
-                                                expected_value
-                                                in line_json[key]
-                                            ):
-                                                logger.info(
-                                                    f"Found phrase {expected_value} in {line_json[key]}"
-                                                )
-                                                match_found = True
-                                                break
-                                    if match_found:
-                                        return ValidationResult(True)
-                                except json.JSONDecodeError:
-                                    # Not a JSON line, continue to next line
-                                    continue
-                        except Exception as e:
-                            logger.error(
-                                f"Error processing kubectl output with enhanced pattern: {e}"
-                            )
-                            # Don't return here, continue to try other validation methods
-            except Exception as e:
-                logger.error(f"Error in enhanced pattern matching: {e}")
-                # Continue to try other validation methods
-
-        # If we reach here, either there was no enhanced pattern match or it failed
-        # Fall back to basic pattern matching using check_pod_logs
-        logger.debug(
-            "No enhanced pattern match found, falling back to basic pattern matching"
-        )
-
-        # Import check_pod_logs function
-        from ..utils.response_parser import check_pod_logs
-
-        output = str(context.response_body or "")
-        pattern = str(context.pattern_match or "")
-
-        if check_pod_logs(output, pattern):
+                    if result["pattern_match_overall"] is True:
+                        logger.info(
+                            f"Pattern '{context.pattern_match}' found in line: {line}"
+                        )
+                        return ValidationResult(True)
+            # If no pattern match found, return failure
             logger.debug(
-                f"Basic pattern matching succeeded for pattern: {pattern}"
-            )
-            return ValidationResult(True)
-        else:
-            logger.debug(
-                f"Basic pattern matching failed for pattern: {pattern}"
+                f"Pattern '{context.pattern_match}' not found in any line of response body"
             )
             return ValidationResult(
-                False, fail_reason="Pattern not found in kubectl logs"
+                False,
+                fail_reason=f"Pattern '{context.pattern_match}' not found in any line of response body",
             )
-
+        except Exception as e:
+            logger.error(f"Error processing response body: {e}")
+            return ValidationResult(
+                False, fail_reason=f"Error processing response body: {e}"
+            )
 
 class GetFullValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
@@ -655,19 +636,21 @@ class GetFullValidator(ValidationStrategy):
                 fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         # No need to check the response_payload here, as we are validating against the expected payload
-        result = match_patterns_in_headers_and_body(
+        result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
+            context.response_payload,
             logger,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
         )
-        if result.passed is False:
-            logger.debug(f"Pattern matching failed: {result.fail_reason}")
-            return result
-        return ValidationResult(True)
+        return evaluate_validation_result(
+            result["dict_match"],
+            result["pattern_match_overall"],
+            result["summary"],
+        )
 
 
 class GetStatusOnlyValidator(ValidationStrategy):
@@ -696,22 +679,23 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
                 False,
                 fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
-        if context.response_body != context.response_payload:
-            logger.debug(
-                "Response body does not match response payload, running check_diff"
-            )
-            diff_result = check_diff(context)
-            if diff_result is not None:
-                logger.debug(f"Diff result: {diff_result.fail_reason}")
-                return diff_result
-            else:
-                logger.debug("Unknown error during payload comparison")
-                return ValidationResult(
-                    False,
-                    fail_reason="Unknown error during payload comparison",
-                )
-        logger.debug("GET status and payload validation passed")
-        return ValidationResult(True)
+
+        results = validate_response_enhanced(
+            context.pattern_match,
+            context.response_headers,
+            context.response_body,
+            context.response_payload,
+            logger,
+            args=context.args,  # Pass args
+            sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
+            row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+        )
+        dict_match = results["dict_match"]
+        pattern_match_overall = results["pattern_match_overall"]
+        summary = results["summary"]
+
+        # Use reusable function for result evaluation
+        return evaluate_validation_result(dict_match, pattern_match_overall, summary)
 
 
 class GetStatusAndPatternValidator(ValidationStrategy):
@@ -735,20 +719,22 @@ class GetStatusAndPatternValidator(ValidationStrategy):
 
         # Step 2: Normalize inputs
         # Use the reusable pattern matching function
-        result = match_patterns_in_headers_and_body(
+        result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
+            context.response_payload,
             logger,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
         )
-        if result.passed is False:
-            logger.debug(f"Pattern matching failed: {result.fail_reason}")
-            return result
 
-        return ValidationResult(True)
+        return evaluate_validation_result(
+            result["dict_match"],
+            result["pattern_match_overall"],
+            result["summary"],
+        )
 
 
 def load_enhanced_pattern_matches(
@@ -786,17 +772,18 @@ def load_enhanced_pattern_matches(
                     continue
 
         for file_name in pattern_files:
-            file_path = os.path.join(pattern_dir, file_name)
-            with open(file_path, "r") as f:
-                pattern_data = json.load(f)
+            if pattern_dir is not None:
+                file_path = os.path.join(pattern_dir, file_name)
+                with open(file_path, "r") as f:
+                    pattern_data = json.load(f)
 
-            if "enhanced_patterns" in pattern_data:
-                # Check if the sheet exists in the enhanced pattern matches
-                if sheet_name in pattern_data["enhanced_patterns"]:
-                    # Find the entry with matching row_number
-                    for entry in pattern_data["enhanced_patterns"][sheet_name]:
-                        if entry.get("row_number") == row_idx:
-                            return entry.get("converted_pattern")
+                if "enhanced_patterns" in pattern_data:
+                    # Check if the sheet exists in the enhanced pattern matches
+                    if sheet_name in pattern_data["enhanced_patterns"]:
+                        # Find the entry with matching row_number
+                        for entry in pattern_data["enhanced_patterns"][sheet_name]:
+                            if entry.get("row_number") == row_idx:
+                                return entry.get("converted_pattern")
     except Exception as e:
         # Log error but continue with normal pattern matching
         logger = get_logger("ValidationEngine.EnhancedPatternMatcher")
@@ -805,287 +792,24 @@ def load_enhanced_pattern_matches(
     return None
 
 
-def match_patterns_in_headers_and_body(
-    pattern: Optional[str],
-    headers: Optional[Dict[str, Any]],
-    body: Optional[Any],
-    logger,
-    args=None,  # <-- add args parameter
-    sheet_name: Optional[
-        str
-    ] = None,  # Sheet name for enhanced pattern matching
-    row_idx: Optional[int] = None,  # Row index for enhanced pattern matching
-) -> ValidationResult:
-    """
-    Checks if the pattern exists in the response body or headers.
-    Returns ValidationResult(True) if found, otherwise ValidationResult(False, reason).
-    """
-    # Check for enhanced pattern matches if sheet_name and row_idx are provided
-    enhanced_pattern = None
-    if sheet_name is not None and row_idx is not None:
-        # increment row index by 1 to match the row number in the JSON file
-        row_idx += 1  # Adjust for 0-based index in Python
-        enhanced_pattern = load_enhanced_pattern_matches(sheet_name, row_idx)
-        if enhanced_pattern:
-            logger.debug(
-                f"Found enhanced pattern match for sheet '{sheet_name}' row {row_idx}"
-            )
+# --- Pattern Matching Logic ---
+# The following function is now replaced by validate_response_enhanced for migration.
+# def match_patterns_in_headers_and_body(
+#     pattern: Optional[str],
+#     headers: Optional[Dict[str, Any]],
+#     body: Optional[Any],
+#     logger,
+#     args=None,  # <-- add args parameter
+#     sheet_name: Optional[str] = None,  # Sheet name for enhanced pattern matching
+#     row_idx: Optional[int] = None,  # Row index for enhanced pattern matching
+# ) -> ValidationResult:
+#     ...
 
-            # Process based on pattern_type
-            if enhanced_pattern.get("pattern_type") == "json_extracted":
-                pattern_data = enhanced_pattern.get("data", {})
-                body_str = str(body or "")
-                try:
-                    body_json = json.loads(body_str) if body_str else {}
-
-                    # Check if the response contains multiple items
-                    if isinstance(body_json, list):
-                        logger.info(
-                            f"Response contains a list of {len(body_json)} items"
-                        )
-                        # Process each item in the list against the pattern
-                        for i, item in enumerate(body_json):
-                            logger.debug(
-                                f"Checking pattern against item {i+1} of {len(body_json)}"
-                            )
-                            match, reason = (
-                                _validate_pattern_data_in_body_json(
-                                    pattern_data, item, logger
-                                )
-                            )
-                            if match:
-                                logger.info(
-                                    f"Pattern matched with item {i+1} in the list"
-                                )
-                                return ValidationResult(True)
-                        # If we get here, no items matched
-                        return ValidationResult(
-                            False,
-                            fail_reason="No items in the list matched the pattern",
-                        )
-                    elif isinstance(body_json, dict):
-                        # Check if any top-level keys contain lists that might need to be checked
-                        for key, value in body_json.items():
-                            if isinstance(value, list) and len(value) > 0:
-                                logger.info(
-                                    f"Response contains a list of {len(value)} items in key '{key}'"
-                                )
-
-                        # Proceed with normal validation
-                        match, reason = _validate_pattern_data_in_body_json(
-                            pattern_data, body_json, logger
-                        )
-                    else:
-                        logger.warning(
-                            f"Response is neither a list nor a dictionary: {type(body_json)}"
-                        )
-                        match, reason = (
-                            False,
-                            f"Unexpected response type: {type(body_json)}",
-                        )
-
-                except json.JSONDecodeError:
-                    logger.error("Invalid JSON format in response body")
-                    return ValidationResult(
-                        False,
-                        fail_reason="Invalid JSON format in response body",
-                    )
-
-                return ValidationResult(
-                    match, fail_reason=reason if not match else None
-                )
-            elif enhanced_pattern.get("pattern_type") == "http_header":
-                # fetch header name
-                pattern_data = enhanced_pattern.get("data", "")
-                if pattern_data:
-                    # fetch the header name from pattern_data
-                    header_name = pattern_data.get("header_name", "")
-                    if header_name and headers:
-                        # Check if the header exists in headers
-                        if header_name in headers:
-                            logger.debug(
-                                f"Enhanced pattern '{header_name}' found in headers"
-                            )
-                            return ValidationResult(True)
-                        else:
-                            logger.debug(
-                                f"Enhanced pattern '{header_name}' not found in headers"
-                            )
-                            return ValidationResult(
-                                False,
-                                fail_reason=f"Pattern '{header_name}' not found in headers",
-                            )
-                # TODO; we have to handle header value information if available in pattern_data
-                else:
-                    logger.debug("No pattern data found for http_header type")
-                    return ValidationResult(
-                        False,
-                        fail_reason="No pattern data found for http_header type",
-                    )
-            elif enhanced_pattern.get("pattern_type") == "json_object":
-                # Check if the pattern exists in the response body as a JSON object
-                pattern_data = enhanced_pattern.get("data", {})
-                # check if pattern_data is a dict or str
-                if isinstance(pattern_data, str):
-                    try:
-                        pattern_data = json.loads(pattern_data)
-                    except json.JSONDecodeError:
-                        logger.debug("Invalid JSON format in pattern data")
-                        pattern_data = (
-                            parse_pattern_match.parse_pattern_match_string(
-                                pattern_data
-                            )
-                        )
-                        logger.debug(
-                            f"Pattern data parsed as string: {pattern_data}"
-                        )
-
-                body_str = str(body or "")
-                try:
-                    body_json = json.loads(body_str) if body_str else {}
-                except json.JSONDecodeError:
-                    logger.error("Invalid JSON format in response body")
-                    return ValidationResult(
-                        False,
-                        fail_reason="Invalid JSON format in response body",
-                    )
-
-                match, reason = _validate_pattern_data_in_body_json(
-                    pattern_data, body_json, logger
-                )
-                # if there is no match in response body fall back to headers
-                if not match and headers:
-                    for key, value in pattern_data.items():
-                        if key in headers and headers[key] == value:
-                            logger.debug(f"Pattern '{key}' matched in headers")
-                            return ValidationResult(True)
-                    logger.debug(
-                        f"Pattern '{pattern_data}' not found in response body or headers"
-                    )
-                    return ValidationResult(
-                        False,
-                        fail_reason=f"Pattern '{pattern_data}' not found in response body or headers",
-                    )
-                return ValidationResult(
-                    match, fail_reason=reason if not match else None
-                )
-
-    # If no enhanced pattern or enhanced pattern doesn't apply, fall back to normal pattern matching
-    if pattern is None or pattern == "":
-        logger.debug("No pattern to match against")
-        return ValidationResult(True)  # No pattern means validation passes
-
-    # Normal pattern matching logic
-    body_str = str(body or "")
-    headers_str = str(headers or "")
-    
-    # Try direct string matching first
-    if pattern in body_str:
-        logger.debug(f"Pattern '{pattern}' found in response body")
-        return ValidationResult(True)
-    elif pattern in headers_str:
-        logger.debug(f"Pattern '{pattern}' found in response headers")
-        return ValidationResult(True)
-    
-    # If direct matching failed, try to parse the body as JSON and look for pattern in JSON values
-    try:
-        if body_str:
-            # Try to parse body as JSON
-            try:
-                body_json = json.loads(body_str) if isinstance(body_str, str) else body
-                # Convert to string with pretty formatting to make pattern matching more likely to succeed
-                formatted_json = json.dumps(body_json, indent=2, sort_keys=False)
-                if pattern in formatted_json:
-                    logger.debug(f"Pattern '{pattern}' found in formatted JSON response")
-                    return ValidationResult(True)
-                
-                # Try recursive search through JSON values
-                def search_json_values(obj, pattern):
-                    if isinstance(obj, dict):
-                        for key, value in obj.items():
-                            # Check if pattern is in the key:value pair as a string
-                            pair_str = f'"{key}": {json.dumps(value)}'
-                            if pattern in pair_str:
-                                return True
-                            # Recursively search in value
-                            if search_json_values(value, pattern):
-                                return True
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            if search_json_values(item, pattern):
-                                return True
-                    elif isinstance(obj, str):
-                        return pattern in obj
-                    return False
-                
-                if search_json_values(body_json, pattern):
-                    logger.debug(f"Pattern '{pattern}' found in JSON values")
-                    return ValidationResult(True)
-            except json.JSONDecodeError:
-                # Not JSON, already tried direct string matching above
-                pass
-    except Exception as e:
-        logger.debug(f"Error during advanced pattern matching: {e}")
-    
-    # If we get here, pattern was not found
-    logger.debug(f"Pattern '{pattern}' not found in response body or headers")
-    return ValidationResult(
-        False,
-        fail_reason=f"Pattern '{pattern}' not found in response body or headers",
-    )
-
-
-def _validate_pattern_data_in_body_json(pattern_data, body_json, logger):
-    """
-    Helper to check if all keys and values in pattern_data exist in body_json, supporting dot notation for nested keys.
-    Returns ValidationResult.
-    """
-    match_found = True
-    missing_keys = []
-    value_mismatches = []
-
-    for key, expected_value in pattern_data.items():
-        # Handle nested keys with dot notation (e.g., "config.autoCreate")
-        if "." in key:
-            parts = key.split(".")
-            current = body_json
-            for part in parts[:-1]:
-                if part in current:
-                    current = current[part]
-                else:
-                    match_found = False
-                    missing_keys.append(key)
-                    break
-            if key not in missing_keys and parts[-1] in current:
-                actual_value = current[parts[-1]]
-                if actual_value != expected_value:
-                    match_found = False
-                    value_mismatches.append(
-                        f"{key}: expected '{expected_value}', got '{actual_value}'"
-                    )
-        else:
-            if key in body_json:
-                actual_value = body_json[key]
-                if actual_value != expected_value:
-                    match_found = False
-                    value_mismatches.append(
-                        f"{key}: expected '{expected_value}', got '{actual_value}'"
-                    )
-            else:
-                match_found = False
-                missing_keys.append(key)
-
-    if match_found:
-        logger.debug("Enhanced pattern matched in response payload")
-        return True, ""
-    else:
-        fail_reason = ""
-        if missing_keys:
-            fail_reason += f"Missing keys: {missing_keys}. "
-        if value_mismatches:
-            fail_reason += f"Value mismatches: {value_mismatches}."
-        return False, f"{fail_reason}"
-
+# Replace all usages of match_patterns_in_headers_and_body with validate_response_enhanced
+# Example usage in validators:
+# result = match_patterns_in_headers_and_body(...)
+# becomes:
+# result = validate_response_enhanced(pattern, headers, body, logger, config, args, sheet_name, row_idx)
 
 class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:

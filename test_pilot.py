@@ -373,7 +373,7 @@ def resolve_service_map_local(
                     if host_cli_map
                     else "kubectl"
                 )
-                kubectl_cmd = [cli_type, "get", "svc", "-A", "-o", "json"]
+                kubectl_cmd = [cli_type, "get", "svc","-o", "json"]
             logger.debug(
                 f"Running local kubectl command: {' '.join(kubectl_cmd)}"
             )
@@ -403,6 +403,8 @@ def resolve_service_map_local(
                         host_map[p] = f"{svc_host}"
             svc_maps[connect_to] = host_map
 
+        if target_hosts is None:
+            target_hosts = []
         for host in target_hosts:
             if not len(svc_maps[host]):
                 # In pod_mode, check for resource_map.json in config/
@@ -895,18 +897,20 @@ def main():
     # Continue with actual execution
     config, target_hosts = load_config_and_targets(config_file)
 
-    # Create SSH connector for remote execution if not in mock mode
-    if args.execution_mode == "production":
+    # Create SSH connector for remote execution if not in mock mode and use_ssh is True
+    connector = None
+    use_ssh = config.get("use_ssh", False)
+    if args.execution_mode == "production" and use_ssh:
         logger.debug("Setting up SSH connections...")
         connector = SSHConnector(config_file)
         connector.connect_all(target_hosts)
     else:
-        logger.debug("Mock mode: no SSH connections needed")
+        logger.debug("SSH connections are disabled (use_ssh is False or not production mode)")
         connector = None
 
     # Get CLI mapping (detect kubectl/oc on each host)
     host_cli_map = {}
-    if args.execution_mode == "production" and connector:
+    if args.execution_mode == "production" and connector and use_ssh:
         for host in target_hosts:
             cli = detect_remote_cli(connector, host)
             host_cli_map[host] = cli
@@ -924,7 +928,7 @@ def main():
                     config_file=config_file,
                 )
             else:
-                if connector:
+                if connector and use_ssh:
                     svc_maps = resolve_service_map_ssh(
                         connector, target_hosts, placeholders, host_cli_map
                     )

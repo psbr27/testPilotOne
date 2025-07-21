@@ -10,7 +10,7 @@ isort==5.13.2
 jsondiff==2.2.1
 markdown-it-py==3.0.0
 mdurl==0.1.2
-numpy==2.3.1
+numpy==2.2.6
 openpyxl==3.1.5
 orderly-set==5.5.0
 pandas==2.3.1

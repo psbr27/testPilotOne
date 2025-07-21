@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import time
+import copy
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -139,7 +140,7 @@ def manage_workflow_context(flow: TestFlow, step_data: Dict[str, Any]) -> None:
 
 def resolve_namespace(connector, host: str) -> Optional[str]:
     """Resolve namespace for a given host."""
-    if connector.use_ssh:
+    if connector is not None and getattr(connector, "use_ssh", False):
         host_cfg = connector.get_host_config(host)
         return getattr(host_cfg, "namespace", None) if host_cfg else None
     else:
@@ -252,7 +253,7 @@ def build_kubectl_logs_command(
     else:
         find_pod = f"{cli_type} get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
     # Get all matching pod names
-    if connector.use_ssh:
+    if connector is not None and getattr(connector, "use_ssh", False):
         result = connector.run_command(find_pod, [host])
         res = result.get(host, {"output": "", "error": ""})
         pod_names = [
@@ -389,7 +390,7 @@ def execute_command(command, host, connector):
     # Original production execution
     logger.debug(f"Running command on [{host}]: {command}")
     start_time = time.time()
-    if connector.use_ssh:
+    if connector is not None and getattr(connector, "use_ssh", False):
         # print *f"Executing command via SSH on {command} for host {host}")
         logger.debug(f"Executing command via SSH on {command}")
         result = connector.run_command(command, [host])
@@ -590,6 +591,8 @@ def process_single_step(
     step_data["save_key"] = step.other_fields.get("Save_As")
     manage_workflow_context(flow, step_data)
 
+    pod_names = []
+
     for host in target_hosts:
         svc_map = svc_maps.get(host, {})
         namespace = resolve_namespace(connector, host)
@@ -637,23 +640,8 @@ def process_single_step(
         elif commands is None:
             commands = []
 
-        # --- Aggregate logic for multiple pod logs ---
-        all_outputs = []
-        all_errors = []
-        all_parsed = []
-        all_durations = []
-        all_commands = []
-        any_passed = False
-        matched_pod = None
-        matched_result = None
-        matched_output = None
-        matched_error = None
-        matched_duration = None
-        matched_command = None
-        matched_parsed = None
-        pod_names = []
-        test_result = {}
-
+        all_raw_outputs = []
+        accumulated_raw_output = ""
         for command in commands:
             if not command:
                 if not show_table:
@@ -666,11 +654,11 @@ def process_single_step(
                 logger.info(f"[CALLFLOW] Executing command on host {host}...")
             output, error, duration = execute_command(command, host, connector)
             parsed_output = parse_curl_output(output, error)
-            all_outputs.append(output)
-            all_errors.append(error)
-            all_parsed.append(parsed_output)
-            all_durations.append(duration)
-            all_commands.append(command)
+
+            # Get the raw_output and append to accumulated string
+            raw_output = parsed_output.get("raw_output", "")
+            accumulated_raw_output += raw_output
+            
             # Try to extract pod name for log file naming
             pod_name = None
             if command.startswith("kubectl logs") or command.startswith(
@@ -702,65 +690,24 @@ def process_single_step(
                 pattern = step.pattern_match
                 if pattern:
                     logger.info(f"[CALLFLOW] Pattern to match: {pattern}")
-            # Validate this pod's logs
-            test_result = validate_and_create_result(
-                step,
-                flow,
-                step_data,
-                parsed_output,
-                output,
-                error,
-                duration,
-                host,
-                command,
-                args,
-            )
-            if test_result.passed and not any_passed:
-                any_passed = True
-                matched_result = test_result
-                matched_output = output
-                matched_error = error
-                matched_duration = duration
-                matched_command = command
-
-        # After all pods: create a single TestResult for the step
-        if any_passed and matched_result:
-            # Use the result from the passing pod
-            final_result = matched_result
-            final_result.passed = True
-            final_result.fail_reason = None
-            final_result.output = (
-                matched_output if matched_output is not None else ""
-            )
-            final_result.error = (
-                matched_error if matched_error is not None else ""
-            )
-            final_result.duration = (
-                matched_duration if matched_duration is not None else 0.0
-            )
-            final_result.command = (
-                matched_command if matched_command is not None else ""
-            )
-            # Optionally, add pod info to result
-            # final_result.pattern_found = f"Matched pod: {matched_pod}"  # Removed: pattern_found expects bool or None
-        else:
-            #     # No pod matched; aggregate info
-            final_result = validate_and_create_result(
-                step,
-                flow,
-                step_data,
-                all_parsed[-1] if all_parsed else {},
-                "\n---\n".join(all_outputs),
-                "\n---\n".join(all_errors),
-                sum(all_durations) if all_durations else 0,
-                host,
-                ", ".join(all_commands),
-                args,
-            )
-            final_result.passed = False
-            # final_result.fail_reason = test_result.fail_reason
-            # final_result.fail_reason = "Pattern not found in any pod logs"
-            # final_result.pattern_found = f"Checked pods: {', '.join([str(p) for p in pod_names if p])}"  # Removed: pattern_found expects bool or None
+        
+        # update parsed_output with accumulated raw output
+        parsed_output["raw_output"] = copy.copy(accumulated_raw_output)
+            
+        # Validate this pod's logs
+        final_result = validate_and_create_result(
+            step,
+            flow,
+            step_data,
+            parsed_output,
+            output,
+            error,
+            duration,
+            host,
+            command,
+            args,
+        )
+       
         test_results.append(final_result)
         step.result = final_result
         if not show_table:
