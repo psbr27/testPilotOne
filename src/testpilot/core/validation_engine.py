@@ -1,36 +1,46 @@
-def evaluate_validation_result(dict_match, pattern_match_overall, summary):
+def evaluate_validation_result(
+    response_payload_match, pattern_match_overall, summary
+):
     """
-    Evaluate validation result based on dict_match and pattern_match_overall values.
+    Evaluate validation result based on response_payload_match and pattern_match_overall values.
     Returns a ValidationResult instance.
     """
     logger = get_logger("ValidationEngine.evaluate_validation_result")
-    if dict_match is True and pattern_match_overall is True:
+    if response_payload_match is True and pattern_match_overall is True:
         return ValidationResult(True)
-    elif dict_match is True and pattern_match_overall is False:
+    elif response_payload_match is True and pattern_match_overall is False:
         logger.debug(f"Pattern matching failed: {summary}")
         return ValidationResult(False, fail_reason=summary)
-    elif dict_match is True and pattern_match_overall is None:
+    elif response_payload_match is True and pattern_match_overall is None:
         return ValidationResult(True)
-    elif dict_match is False and pattern_match_overall is True:
-        logger.debug(f"Dict comparison failed: {summary}")
+    elif response_payload_match is False and pattern_match_overall is True:
+        logger.debug(f"Server response payload comparison failed: {summary}")
         return ValidationResult(False, fail_reason=summary)
-    elif dict_match is False and pattern_match_overall is False:
-        logger.debug(f"Both dict comparison and pattern match failed: {summary}")
+    elif response_payload_match is False and pattern_match_overall is False:
+        logger.debug(
+            f"Both server response payload comparison and pattern match failed: {summary}"
+        )
         return ValidationResult(False, fail_reason=summary)
-    elif dict_match is False and pattern_match_overall is None:
-        logger.debug(f"Dict comparison failed, no pattern match performed: {summary}")
+    elif response_payload_match is False and pattern_match_overall is None:
+        logger.debug(
+            f"Server response payload comparison failed, no pattern match performed: {summary}"
+        )
         return ValidationResult(False, fail_reason=summary)
-    elif dict_match is None and pattern_match_overall is True:
+    elif response_payload_match is None and pattern_match_overall is True:
         return ValidationResult(True)
-    elif dict_match is None and pattern_match_overall is False:
-        logger.debug(f"No dict comparison performed, pattern match failed: {summary}")
+    elif response_payload_match is None and pattern_match_overall is False:
+        logger.debug(
+            f"No server response payload comparison performed, pattern match failed: {summary}"
+        )
         return ValidationResult(False, fail_reason=summary)
-    elif dict_match is None and pattern_match_overall is None:
+    elif response_payload_match is None and pattern_match_overall is None:
         logger.debug(f"No validation performed: {summary}")
         return ValidationResult(False, fail_reason=summary)
     else:
         logger.debug(f"Unknown validation result: {summary}")
         return ValidationResult(False, fail_reason=summary)
+
+
 # validation_engine.py
 """
 Validation Engine for TestPilot: Modular, rule-based validation for test steps.
@@ -61,28 +71,37 @@ def status_matches(expected, actual):
     """
     if expected is None or actual is None:
         return False
-    
+
     try:
         # Convert actual to int for all comparisons
         actual_int = int(actual)
-        
+
         # Handle range patterns like '4XX' for any 4XX status code
-        if isinstance(expected, str) and expected.endswith("XX") and len(expected) == 3 and expected[0].isdigit():
+        if (
+            isinstance(expected, str)
+            and expected.endswith("XX")
+            and len(expected) == 3
+            and expected[0].isdigit()
+        ):
             base = int(expected[0])
             return 100 * base <= actual_int < 100 * (base + 1)
-        
+
         # Handle specific range pattern like '400-404'
         elif isinstance(expected, str) and "-" in expected:
             range_parts = expected.split("-")
-            if len(range_parts) == 2 and range_parts[0].isdigit() and range_parts[1].isdigit():
+            if (
+                len(range_parts) == 2
+                and range_parts[0].isdigit()
+                and range_parts[1].isdigit()
+            ):
                 min_val = int(range_parts[0])
                 max_val = int(range_parts[1])
                 return min_val <= actual_int <= max_val
-        
+
         # Handle exact match (either string or int)
         else:
             return actual_int == int(expected)
-    
+
     except Exception as e:
         logger = get_logger("ValidationEngine.status_matches")
         logger.error(f"Error comparing status codes: {e}")
@@ -94,17 +113,17 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
         # Attempt to parse if they are stringified JSON
         resp = context.response_body
         exp = context.response_payload
-        
+
         # If both are strings, try direct string comparison first
         if isinstance(resp, str) and isinstance(exp, str):
             # Remove whitespace and normalize JSON strings
             resp_normalized = resp.strip()
             exp_normalized = exp.strip()
-            
+
             # If the normalized strings are identical, return success immediately
             if resp_normalized == exp_normalized:
                 return ValidationResult(True)
-        
+
         # If direct comparison didn't match or they're not both strings, try JSON parsing
         if isinstance(resp, str):
             try:
@@ -112,7 +131,7 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
             except json.JSONDecodeError:
                 # Not valid JSON, keep as string
                 pass
-                
+
         if isinstance(exp, str):
             try:
                 exp = json.loads(exp)
@@ -130,8 +149,10 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
     try:
         # Add debug logging to see the actual values being compared
         logger = get_logger("ValidationEngine.check_diff")
-        logger.debug(f"Comparing values: exp={exp} (type={type(exp)}), resp={resp} (type={type(resp)})")
-        
+        logger.debug(
+            f"Comparing values: exp={exp} (type={type(exp)}), resp={resp} (type={type(resp)})"
+        )
+
         # Try string normalization again if objects were parsed
         if not isinstance(exp, str) and not isinstance(resp, str):
             # Convert both to JSON strings for consistent comparison
@@ -139,11 +160,13 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
                 exp_json = json.dumps(exp, sort_keys=True)
                 resp_json = json.dumps(resp, sort_keys=True)
                 if exp_json == resp_json:
-                    logger.debug("JSON string comparison passed after normalization")
+                    logger.debug(
+                        "JSON string comparison passed after normalization"
+                    )
                     return ValidationResult(True)
             except Exception as e:
                 logger.debug(f"JSON string normalization failed: {e}")
-        
+
         # Proceed with DeepDiff comparison
         diff = DeepDiff(exp, resp, ignore_order=True)
         if diff:
@@ -152,7 +175,7 @@ def check_diff(context: "ValidationContext") -> Optional["ValidationResult"]:
                 "expected": exp,
                 "actual": resp,
                 "expected_type": str(type(exp)),
-                "actual_type": str(type(resp))
+                "actual_type": str(type(resp)),
             }
             logger.debug(f"DeepDiff found differences: {diff}")
             return ValidationResult(
@@ -373,9 +396,9 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
         )
-        
+
         return evaluate_validation_result(
-            result["dict_match"],
+            result["dict_match"],  # Response payload comparison result
             result["pattern_match_overall"],
             result["summary"],
         )
@@ -577,11 +600,13 @@ class KubectlPatternValidator(ValidationStrategy):
         logger = get_logger("ValidationEngine.KubectlPatternValidator")
 
         # fetch the response body from server
-        response_body = context.response_body 
+        response_body = context.response_body
         if isinstance(response_body, str):
             try:
                 response_body = json.loads(response_body)
-                logger.debug("Parsed response_body string to dict/list for comparison.")
+                logger.debug(
+                    "Parsed response_body string to dict/list for comparison."
+                )
             except json.JSONDecodeError:
                 response_body = response_body  # fallback to string
 
@@ -619,6 +644,7 @@ class KubectlPatternValidator(ValidationStrategy):
                 False, fail_reason=f"Error processing response body: {e}"
             )
 
+
 class GetFullValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetFullValidator")
@@ -647,7 +673,7 @@ class GetFullValidator(ValidationStrategy):
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
         )
         return evaluate_validation_result(
-            result["dict_match"],
+            result["dict_match"],  # Response payload comparison result
             result["pattern_match_overall"],
             result["summary"],
         )
@@ -690,12 +716,16 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
         )
-        dict_match = results["dict_match"]
+        response_payload_match = results[
+            "dict_match"
+        ]  # Response payload comparison result
         pattern_match_overall = results["pattern_match_overall"]
         summary = results["summary"]
 
         # Use reusable function for result evaluation
-        return evaluate_validation_result(dict_match, pattern_match_overall, summary)
+        return evaluate_validation_result(
+            response_payload_match, pattern_match_overall, summary
+        )
 
 
 class GetStatusAndPatternValidator(ValidationStrategy):
@@ -731,7 +761,7 @@ class GetStatusAndPatternValidator(ValidationStrategy):
         )
 
         return evaluate_validation_result(
-            result["dict_match"],
+            result["dict_match"],  # Response payload comparison result
             result["pattern_match_overall"],
             result["summary"],
         )
@@ -748,14 +778,24 @@ def load_enhanced_pattern_matches(
         # Find all pattern files in the patterns directory
         # Try multiple possible locations for patterns directory
         pattern_dirs = [
-            os.path.join(os.getcwd(), "examples", "patterns"),  # Project root patterns
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "examples", "patterns"),  # Absolute path from module
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "patterns")  # Legacy path
+            os.path.join(
+                os.getcwd(), "examples", "patterns"
+            ),  # Project root patterns
+            os.path.join(
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                ),
+                "examples",
+                "patterns",
+            ),  # Absolute path from module
+            os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "patterns"
+            ),  # Legacy path
         ]
-        
+
         pattern_files = []
         pattern_dir = None
-        
+
         # Try each possible pattern directory
         for dir_path in pattern_dirs:
             if os.path.exists(dir_path) and os.path.isdir(dir_path):
@@ -766,7 +806,9 @@ def load_enhanced_pattern_matches(
                         for f in os.listdir(pattern_dir)
                         if f.endswith("enhanced_pattern_matches.json")
                     ]
-                    if pattern_files:  # If we found pattern files, break the loop
+                    if (
+                        pattern_files
+                    ):  # If we found pattern files, break the loop
                         break
                 except Exception:
                     continue
@@ -781,7 +823,9 @@ def load_enhanced_pattern_matches(
                     # Check if the sheet exists in the enhanced pattern matches
                     if sheet_name in pattern_data["enhanced_patterns"]:
                         # Find the entry with matching row_number
-                        for entry in pattern_data["enhanced_patterns"][sheet_name]:
+                        for entry in pattern_data["enhanced_patterns"][
+                            sheet_name
+                        ]:
                             if entry.get("row_number") == row_idx:
                                 return entry.get("converted_pattern")
     except Exception as e:
@@ -810,6 +854,7 @@ def load_enhanced_pattern_matches(
 # result = match_patterns_in_headers_and_body(...)
 # becomes:
 # result = validate_response_enhanced(pattern, headers, body, logger, config, args, sheet_name, row_idx)
+
 
 class DeleteStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
