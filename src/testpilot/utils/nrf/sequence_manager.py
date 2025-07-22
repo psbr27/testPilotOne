@@ -44,6 +44,13 @@ def handle_nrf_operation(
     """
     logger.debug(f"Handling NRF operation: {method} for {nf_name}")
 
+    # Validate URL pattern - only apply nfInstanceId logic to nnrf-nfm/v1/nf-instances/ URLs without query parameters
+    if not _should_apply_nf_instance_id(url):
+        logger.debug(
+            f"URL pattern doesn't match nfInstanceId requirements: {url}"
+        )
+        return None
+
     # If no test context, fall back to legacy behavior
     if not test_context:
         logger.debug("No test context provided, using legacy NRF handling")
@@ -114,6 +121,13 @@ def _legacy_nrf_handling(
     This is the original logic from curl_builder.py.
     """
     if not payload:
+        return None
+
+    # Validate URL pattern - only apply nfInstanceId logic to nnrf-nfm/v1/nf-instances/ URLs without query parameters
+    if not _should_apply_nf_instance_id(url):
+        logger.debug(
+            f"URL pattern doesn't match nfInstanceId requirements: {url}"
+        )
         return None
 
     try:
@@ -267,3 +281,38 @@ def update_from_response(
         )
         # Note: This would require enhancing the tracker to support updates
         # For now, we log it for diagnostic purposes
+
+
+def _should_apply_nf_instance_id(url: str) -> bool:
+    """
+    Validate if URL should have nfInstanceId appended.
+
+    Rules:
+    1. nfInstanceId shall be used only when the URL is nnrf-nfm/v1/nf-instances/
+    2. nnrf-nfm/v1/nf-instances? don't add nfInstanceId when URL has '?'
+
+    Args:
+        url: The URL to validate
+
+    Returns:
+        True if nfInstanceId should be applied, False otherwise
+    """
+    # Check if URL contains the required NRF pattern
+    if "nnrf-nfm/v1/nf-instances" not in url:
+        return False
+
+    # Rule 1a: Don't add nfInstanceId when URL has query parameters (?)
+    if "?" in url:
+        logger.debug(
+            f"URL contains query parameters, skipping nfInstanceId: {url}"
+        )
+        return False
+
+    # Rule 1: Only apply to nnrf-nfm/v1/nf-instances/ URLs (must end with / or be exact match)
+    if (
+        url.endswith("nnrf-nfm/v1/nf-instances")
+        or "nnrf-nfm/v1/nf-instances/" in url
+    ):
+        return True
+
+    return False

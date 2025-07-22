@@ -107,12 +107,31 @@ def _search_nested_key_value(d, key_path, expected_value):
     """
     Search for a key-value pair in a nested structure.
     Supports dot notation for nested keys and searches recursively.
+    Uses flexible matching: exact match first, then substring match for strings.
     """
     keys = key_path.split(".")
 
+    def flexible_match(actual_value, expected_value):
+        """Check if expected value matches actual value (exact or substring)"""
+        # Exact match first
+        if actual_value == expected_value:
+            return True
+
+        # For strings, check if expected is a substring of actual
+        if isinstance(actual_value, str) and isinstance(expected_value, str):
+            return expected_value in actual_value
+
+        # For numbers, try string representation substring match
+        if isinstance(actual_value, (int, float)) and isinstance(
+            expected_value, str
+        ):
+            return expected_value in str(actual_value)
+
+        return False
+
     def search_in_dict_or_list(obj, keys_remaining):
         if not keys_remaining:
-            return obj == expected_value
+            return flexible_match(obj, expected_value)
 
         current_key = keys_remaining[0]
         remaining_keys = keys_remaining[1:]
@@ -125,7 +144,7 @@ def _search_nested_key_value(d, key_path, expected_value):
                         obj[current_key], remaining_keys
                     )
                 else:
-                    return obj[current_key] == expected_value
+                    return flexible_match(obj[current_key], expected_value)
 
             # If direct path not found, search recursively in all values
             for value in obj.values():
@@ -349,11 +368,42 @@ def validate_response_enhanced(
         else str(response_headers)
     )
 
-    if not pattern_match:
-        # no pattern match provided
+    if not pattern_match or (
+        isinstance(pattern_match, str) and pattern_match.strip() == ""
+    ):
+        # no pattern match provided or empty pattern
         pattern_match_overall = None
+        logger.debug("No pattern matching criteria provided (empty or None)")
     elif pattern_match and isinstance(pattern_match, str):
         logger.debug(f"Starting pattern matching for pattern: {pattern_match}")
+        # Check if actual_str contains multiple JSON log lines (kubectl logs format)
+        if isinstance(actual_str, str) and actual_str.startswith('{"'):
+            # Try to parse as multiple JSON lines (common in kubectl logs)
+            log_lines = []
+            for line in actual_str.split("\n"):
+                line = line.strip()
+                if line.startswith("{") and line.endswith("}"):
+                    try:
+                        log_entry = json.loads(line)
+                        log_lines.append(log_entry)
+                    except json.JSONDecodeError:
+                        continue
+
+            # If we found JSON log entries, search within them
+            if log_lines:
+                logger.debug(
+                    f"Found {len(log_lines)} JSON log entries to search"
+                )
+                for log_entry in log_lines:
+                    log_str = json.dumps(
+                        log_entry, separators=(",", ":"), ensure_ascii=False
+                    )
+                    if pattern_match in log_str:
+                        logger.debug(
+                            f"Pattern found in log entry: {log_str[:200]}..."
+                        )
+                        break
+
         # check if actual_str is a list
         if isinstance(actual_str, list):
             for item in actual_str:
@@ -367,9 +417,18 @@ def validate_response_enhanced(
                         actual_str = item
                         break
 
-        # 2.1 Substring search
+        # 2.1 Substring search (with flexible matching for trailing spaces)
         found_body = pattern_match in actual_str
         found_headers = pattern_match in headers_str
+
+        # If exact match fails, try without trailing/leading spaces for log patterns
+        if not found_body and not found_headers:
+            pattern_trimmed = pattern_match.strip()
+            if pattern_trimmed != pattern_match:
+                found_body = pattern_trimmed in actual_str
+                found_headers = pattern_trimmed in headers_str
+                if found_body or found_headers:
+                    logger.debug(f"Pattern found after trimming whitespace")
         found = found_body or found_headers
         details = f"Pattern found in: "
         if found_body:

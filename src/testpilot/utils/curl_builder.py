@@ -135,7 +135,7 @@ def build_curl_command(
             logger.warning(
                 f"NRF module not available, using legacy handling: {e}"
             )
-            if resolved_payload:
+            if resolved_payload and _should_apply_nf_instance_id_legacy(url):
                 try:
                     parsed = json.loads(resolved_payload)
                     nfInstanceId = None
@@ -251,3 +251,38 @@ def build_pod_mode(
         test_context=test_context,
     )
     return curl_cmd, resolved_payload
+
+
+def _should_apply_nf_instance_id_legacy(url: str) -> bool:
+    """
+    Legacy validation for URL pattern to apply nfInstanceId.
+
+    Rules:
+    1. nfInstanceId shall be used only when the URL is nnrf-nfm/v1/nf-instances/
+    2. nnrf-nfm/v1/nf-instances? don't add nfInstanceId when URL has '?'
+
+    Args:
+        url: The URL to validate
+
+    Returns:
+        True if nfInstanceId should be applied, False otherwise
+    """
+    # Check if URL contains the required NRF pattern
+    if "nnrf-nfm/v1/nf-instances" not in url:
+        return False
+
+    # Rule 1a: Don't add nfInstanceId when URL has query parameters (?)
+    if "?" in url:
+        logger.debug(
+            f"Legacy: URL contains query parameters, skipping nfInstanceId: {url}"
+        )
+        return False
+
+    # Rule 1: Only apply to nnrf-nfm/v1/nf-instances/ URLs (must end with / or be exact match)
+    if (
+        url.endswith("nnrf-nfm/v1/nf-instances")
+        or "nnrf-nfm/v1/nf-instances/" in url
+    ):
+        return True
+
+    return False

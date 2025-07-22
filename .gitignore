@@ -274,3 +274,4 @@ kubectl_logs/
 logs/
 test_results/
 mock_data/enhanced_test_results_*.json
+todos.txt
