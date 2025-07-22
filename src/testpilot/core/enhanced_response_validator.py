@@ -35,24 +35,58 @@ def _is_subset_dict(expected, actual, partial=True):
     """
     If partial=True, checks if expected is a subset of actual.
     If partial=False, checks for strict equality (recursively).
+    Handles arrays by checking if all expected elements have matches in actual.
     """
-    if not isinstance(expected, dict) or not isinstance(actual, dict):
-        return expected == actual
-    if partial:
-        for k, v in expected.items():
-            if k not in actual:
+    # Handle None cases
+    if expected is None:
+        return actual is None
+    if actual is None:
+        return False
+
+    # Handle dict comparison
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        if partial:
+            for k, v in expected.items():
+                if k not in actual:
+                    return False
+                if not _is_subset_dict(v, actual[k], partial):
+                    return False
+            return True
+        else:
+            # Strict: keys and values must match exactly
+            if set(expected.keys()) != set(actual.keys()):
                 return False
-            if not _is_subset_dict(v, actual[k], partial):
+            for k, v in expected.items():
+                if not _is_subset_dict(v, actual[k], partial):
+                    return False
+            return True
+
+    # Handle list/array comparison
+    elif isinstance(expected, list) and isinstance(actual, list):
+        if partial:
+            # For partial match, check if all expected items have a matching item in actual
+            for exp_item in expected:
+                found_match = False
+                for act_item in actual:
+                    if _is_subset_dict(exp_item, act_item, partial):
+                        found_match = True
+                        break
+                if not found_match:
+                    return False
+            return True
+        else:
+            # Strict equality for lists
+            if len(expected) != len(actual):
                 return False
-        return True
+            # Note: This assumes order matters for strict comparison
+            for i, exp_item in enumerate(expected):
+                if not _is_subset_dict(exp_item, actual[i], partial):
+                    return False
+            return True
+
+    # Handle primitive types
     else:
-        # Strict: keys and values must match exactly
-        if set(expected.keys()) != set(actual.keys()):
-            return False
-        for k, v in expected.items():
-            if not _is_subset_dict(v, actual[k], partial):
-                return False
-        return True
+        return expected == actual
 
 
 def _dict_diff(expected, actual):
@@ -70,17 +104,44 @@ def _dict_diff(expected, actual):
 
 
 def _search_nested_key_value(d, key_path, expected_value):
+    """
+    Search for a key-value pair in a nested structure.
+    Supports dot notation for nested keys and searches recursively.
+    """
     keys = key_path.split(".")
-    current = d
-    for k in keys[:-1]:
-        if isinstance(current, dict) and k in current:
-            current = current[k]
-        else:
-            return False
-    last_key = keys[-1]
-    if isinstance(current, dict) and last_key in current:
-        return current[last_key] == expected_value
-    return False
+
+    def search_in_dict_or_list(obj, keys_remaining):
+        if not keys_remaining:
+            return obj == expected_value
+
+        current_key = keys_remaining[0]
+        remaining_keys = keys_remaining[1:]
+
+        if isinstance(obj, dict):
+            # Direct path search
+            if current_key in obj:
+                if remaining_keys:
+                    return search_in_dict_or_list(
+                        obj[current_key], remaining_keys
+                    )
+                else:
+                    return obj[current_key] == expected_value
+
+            # If direct path not found, search recursively in all values
+            for value in obj.values():
+                if isinstance(value, (dict, list)):
+                    if search_in_dict_or_list(value, keys_remaining):
+                        return True
+
+        elif isinstance(obj, list):
+            # Search in each item of the list
+            for item in obj:
+                if search_in_dict_or_list(item, keys_remaining):
+                    return True
+
+        return False
+
+    return search_in_dict_or_list(d, keys)
 
 
 def _list_dict_match(expected, actual_list, ignore_fields):
@@ -103,6 +164,36 @@ def _list_dicts_match(expected_list, actual_list, ignore_fields):
     return True
 
 
+def _deep_array_search(obj, pattern_array):
+    """
+    Search for pattern array elements deeply within a nested structure.
+    Returns True if all elements in pattern_array are found somewhere in obj.
+    """
+
+    def find_value_in_structure(obj, target_value):
+        """Recursively search for a value in a nested structure"""
+        if obj == target_value:
+            return True
+
+        if isinstance(obj, dict):
+            for value in obj.values():
+                if find_value_in_structure(value, target_value):
+                    return True
+        elif isinstance(obj, list):
+            for item in obj:
+                if find_value_in_structure(item, target_value):
+                    return True
+
+        return False
+
+    # Check if all pattern elements exist somewhere in the structure
+    for pattern_element in pattern_array:
+        if not find_value_in_structure(obj, pattern_element):
+            return False
+
+    return True
+
+
 def validate_response_enhanced(
     pattern_match: Optional[str],
     response_headers: Optional[dict],
@@ -113,6 +204,7 @@ def validate_response_enhanced(
     args=None,
     sheet_name: Optional[str] = None,
     row_idx: Optional[int] = None,
+    raw_output: Optional[str] = None,
 ) -> dict:
     logger.debug("Starting enhanced response validation.")
     dict_match = None
@@ -241,13 +333,18 @@ def validate_response_enhanced(
     pattern_matches = []
     pattern_match_overall = False
     # Preserve original string format for substring matching, use compact format for consistency
-    actual_str = (
-        json.dumps(actual, separators=(",", ":"))
-        if isinstance(actual, (dict, list))
-        else str(actual)
-    )
+    # Prefer raw_output if available, otherwise use compact JSON format
+    if raw_output:
+        actual_str = raw_output
+        logger.debug("Using raw_output for pattern matching")
+    else:
+        actual_str = (
+            json.dumps(actual, separators=(",", ":"), ensure_ascii=False)
+            if isinstance(actual, (dict, list))
+            else str(actual)
+        )
     headers_str = (
-        json.dumps(response_headers, separators=(",", ":"))
+        json.dumps(response_headers, separators=(",", ":"), ensure_ascii=False)
         if isinstance(response_headers, dict)
         else str(response_headers)
     )
@@ -261,7 +358,7 @@ def validate_response_enhanced(
         if isinstance(actual_str, list):
             for item in actual_str:
                 if isinstance(item, dict):
-                    item_str = json.dumps(item)
+                    item_str = json.dumps(item, ensure_ascii=False)
                     if pattern_match in item_str:
                         actual_str = item_str
                         break
@@ -294,59 +391,109 @@ def validate_response_enhanced(
             found_kv_body = False
             found_kv_headers = False
             if ":" in pattern_match or "=" in pattern_match:
-                sep = ":" if ":" in pattern_match else "="
-                key, val = pattern_match.split(sep, 1)
-                key = key.strip().strip('"')
-                val = val.strip().strip('"')
-                try:
-                    val_json = json.loads(val)
-                except Exception:
-                    val_json = val
-                # For body: check all dicts in list, or just dict
-                if isinstance(actual, dict):
-                    found_kv_body = _search_nested_key_value(
-                        actual, key, val_json
+                # Skip key-value parsing for JSON string patterns
+                if pattern_match.strip().startswith(
+                    "{"
+                ) and pattern_match.strip().endswith("}"):
+                    logger.debug(
+                        "Skipping key-value parsing for JSON string pattern"
                     )
-                    if found_kv_body is False:
-                        # check if a key is a substring in the body
-                        if key in actual:
-                            found_kv_body = val_json in str(actual[key])
-                elif isinstance(actual, list):
-                    found_kv_body = any(
-                        _search_nested_key_value(item, key, val_json)
-                        for item in actual
-                        if isinstance(item, dict)
+                elif pattern_match.strip().startswith(
+                    "["
+                ) and pattern_match.strip().endswith("]"):
+                    logger.debug(
+                        "Skipping key-value parsing for JSON array pattern"
                     )
-                if isinstance(response_headers, dict):
-                    found_kv_headers = (
-                        response_headers.get(key) == val_json
-                    )  # entire string
-                    # check substring
-                    if found_kv_headers is False:
-                        if key in response_headers:
-                            found_kv_headers = val_json in str(
-                                response_headers[key]
+                else:
+                    sep = ":" if ":" in pattern_match else "="
+                    key, val = pattern_match.split(sep, 1)
+                    key = key.strip().strip('"')
+                    val = val.strip().strip('"')
+                    # Try to parse as JSON, but also keep original string for comparison
+                    val_original = val
+                    try:
+                        val_json = json.loads(val)
+                    except Exception:
+                        val_json = val
+
+                    # For body: check all dicts in list, or just dict
+                    if isinstance(actual, dict):
+                        # Try with parsed value first
+                        found_kv_body = _search_nested_key_value(
+                            actual, key, val_json
+                        )
+                        # If not found and value was parsed differently, try with original string
+                        if not found_kv_body and val_json != val_original:
+                            found_kv_body = _search_nested_key_value(
+                                actual, key, val_original
                             )
-                found_kv = found_kv_body or found_kv_headers
-                details = f"Key-value found in: "
-                if found_kv_body:
-                    details += "body "
-                if found_kv_headers:
-                    details += "headers"
-                if not found_kv:
-                    details = "Key-value not found in body or headers"
-                logger.debug(
-                    f"Key-value search: key={key}, value={val_json}, found_body={found_kv_body}, found_headers={found_kv_headers}"
-                )
-                pattern_matches.append(
-                    {
-                        "type": "key-value",
-                        "result": found_kv,
-                        "details": details.strip(),
-                    }
-                )
-                if found_kv:
-                    pattern_match_overall = True
+
+                        # Also search in all nested arrays within the dict
+                        if not found_kv_body:
+                            for k, v in actual.items():
+                                if isinstance(v, list):
+                                    for item in v:
+                                        if isinstance(
+                                            item, dict
+                                        ) and _search_nested_key_value(
+                                            item, key, val_json
+                                        ):
+                                            found_kv_body = True
+                                            break
+                                        if (
+                                            not found_kv_body
+                                            and val_json != val_original
+                                            and isinstance(item, dict)
+                                        ):
+                                            if _search_nested_key_value(
+                                                item, key, val_original
+                                            ):
+                                                found_kv_body = True
+                                                break
+                                    if found_kv_body:
+                                        break
+                    elif isinstance(actual, list):
+                        found_kv_body = any(
+                            _search_nested_key_value(item, key, val_json)
+                            or (
+                                val_json != val_original
+                                and _search_nested_key_value(
+                                    item, key, val_original
+                                )
+                            )
+                            for item in actual
+                            if isinstance(item, dict)
+                        )
+                    if isinstance(response_headers, dict):
+                        found_kv_headers = (
+                            response_headers.get(key) == val_json
+                        )  # entire string
+                        # check substring
+                        if found_kv_headers is False:
+                            if key in response_headers:
+                                found_kv_headers = val_json in str(
+                                    response_headers[key]
+                                )
+                    found_kv = found_kv_body or found_kv_headers
+                    details = f"Key-value found in: "
+                    if found_kv_body:
+                        details += "body "
+                    if found_kv_headers:
+                        details += "headers"
+                    if not found_kv:
+                        details = "Key-value not found in body or headers"
+                    logger.debug(
+                        f"Key-value search: key={key}, value={val_json}, found_body={found_kv_body}, found_headers={found_kv_headers}"
+                    )
+                    pattern_matches.append(
+                        {
+                            "type": "key-value",
+                            "result": found_kv,
+                            "details": details.strip(),
+                        }
+                    )
+                    if found_kv:
+                        pattern_match_overall = True
 
             # 2.3 Regex search
             try:
@@ -434,30 +581,102 @@ def validate_response_enhanced(
             )
             if found_jsonpath:
                 pattern_match_overall = True
-            
+
             # 2.5 if both response_body and pattern_match are dicts, check if pattern_match is a subset of response_body
-            if isinstance(actual, dict) and isinstance(pattern_match, str):
-                # move pattern_match to json
-                try:
-                    pattern_match = json.loads(pattern_match)
-                    #if _is_subset_dict(pattern_match, actual, partial=partial_dict_match):
-                    pattern_match_result = compare_json_objects(
-                            pattern_match if pattern_match is not None else "",
-                            actual,
-                            "structure_and_values",
-                            ignore_array_order=ignore_array_order,
-                    )
-                    differences = (
-                        pattern_match_result["missing_details"]
-                        if not dict_match
-                        else None
-                    )
-                    if pattern_match_result["match_percentage"] > 50:
-                        pattern_match_overall = True
-                    else:
-                        pattern_match_overall =  False
-                except Exception as e:
-                    logger.error("2.5 pattern match not found {e}")
+            if isinstance(actual, (dict, list)) and isinstance(
+                pattern_match, str
+            ):
+                # Check if pattern_match is a JSON string
+                if pattern_match.strip().startswith(
+                    "{"
+                ) or pattern_match.strip().startswith("["):
+                    try:
+                        pattern_json = json.loads(pattern_match)
+
+                        # Use raw_output if available for more accurate comparison
+                        comparison_target = actual
+                        if raw_output:
+                            try:
+                                comparison_target = json.loads(raw_output)
+                                logger.debug(
+                                    "Section 2.5: Using raw_output for JSON comparison"
+                                )
+                            except Exception as raw_parse_error:
+                                logger.debug(
+                                    f"Section 2.5: Failed to parse raw_output, using actual: {raw_parse_error}"
+                                )
+
+                        # For pattern matching, use subset logic instead of percentages
+                        # Pattern should be a subset of the response (binary check)
+                        if isinstance(pattern_json, dict) and isinstance(
+                            comparison_target, dict
+                        ):
+                            pattern_match_overall = _is_subset_dict(
+                                pattern_json, comparison_target, partial=True
+                            )
+                            logger.debug(
+                                f"Section 2.5: JSON object pattern subset check: {pattern_match_overall}"
+                            )
+                        elif isinstance(pattern_json, list) and isinstance(
+                            comparison_target, list
+                        ):
+                            # First check if it's a simple value array like ["tag1"]
+                            all_primitives = all(
+                                isinstance(
+                                    item, (str, int, float, bool, type(None))
+                                )
+                                for item in pattern_json
+                            )
+                            if all_primitives:
+                                # For primitive arrays, do deep search
+                                pattern_match_overall = _deep_array_search(
+                                    comparison_target, pattern_json
+                                )
+                                logger.debug(
+                                    f"Section 2.5: Primitive array deep search: {pattern_match_overall}"
+                                )
+                            else:
+                                # For arrays of objects, check subset relationship
+                                pattern_match_overall = _is_subset_dict(
+                                    pattern_json,
+                                    comparison_target,
+                                    partial=True,
+                                )
+                                logger.debug(
+                                    f"Section 2.5: JSON array pattern subset check: {pattern_match_overall}"
+                                )
+                        elif isinstance(pattern_json, dict) and isinstance(
+                            comparison_target, list
+                        ):
+                            # Pattern is dict, target is list - check if pattern matches any item
+                            pattern_match_overall = _list_dict_match(
+                                pattern_json, comparison_target, ignore_fields
+                            )
+                            logger.debug(
+                                f"Section 2.5: JSON dict pattern in array check: {pattern_match_overall}"
+                            )
+                        elif isinstance(pattern_json, list):
+                            # Pattern is array but target might be nested - search deeply
+                            pattern_match_overall = _deep_array_search(
+                                comparison_target, pattern_json
+                            )
+                            logger.debug(
+                                f"Section 2.5: Deep array search: {pattern_match_overall}"
+                            )
+                        else:
+                            # Direct value comparison for primitives
+                            pattern_match_overall = (
+                                (pattern_json in comparison_target)
+                                if isinstance(comparison_target, (list, str))
+                                else (pattern_json == comparison_target)
+                            )
+                            logger.debug(
+                                f"Section 2.5: Direct value comparison: {pattern_match_overall}"
+                            )
+                    except Exception as e:
+                        logger.debug(
+                            f"Section 2.5: Failed to parse pattern as JSON: {e}"
+                        )
 
     # Compose user-friendly summary
     if dict_match is True and pattern_match_overall is True:
