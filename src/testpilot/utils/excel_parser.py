@@ -20,8 +20,13 @@ class ExcelParser:
 
     def _is_valid_sheet(self, sheet_name: str) -> bool:
         """Check if sheet name is valid (not in ignore list)."""
+        import re
+
         lowered = sheet_name.strip().lower()
-        return not any(keyword in lowered for keyword in self.ignore_keywords)
+        return not any(
+            re.search(r"\b" + keyword + r"\b", lowered)
+            for keyword in self.ignore_keywords
+        )
 
     def _load_valid_sheets(self) -> Dict[str, pd.DataFrame]:
         """Load all valid sheets from Excel file."""
