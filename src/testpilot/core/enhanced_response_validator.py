@@ -189,7 +189,6 @@ def validate_response_enhanced(
                 else None
             )
             if dict_match_result["match_percentage"] > 50:
-
                 dict_match = True
             else:
                 dict_match = False
@@ -437,17 +436,28 @@ def validate_response_enhanced(
                 pattern_match_overall = True
             
             # 2.5 if both response_body and pattern_match are dicts, check if pattern_match is a subset of response_body
-            if isinstance(actual, dict) and isinstance(pattern_match, dict):
-                if _is_subset_dict(pattern_match, actual, partial=partial_dict_match):
-                    pattern_match_overall = True
-                    logger.debug(
-                        "Pattern match is a subset of response body."
+            if isinstance(actual, dict) and isinstance(pattern_match, str):
+                # move pattern_match to json
+                try:
+                    pattern_match = json.loads(pattern_match)
+                    #if _is_subset_dict(pattern_match, actual, partial=partial_dict_match):
+                    pattern_match_result = compare_json_objects(
+                            pattern_match if pattern_match is not None else "",
+                            actual,
+                            "structure_and_values",
+                            ignore_array_order=ignore_array_order,
                     )
-                else:
-                    pattern_match_overall = False
-                    logger.debug(
-                        "Pattern match is not a subset of response body."
+                    differences = (
+                        pattern_match_result["missing_details"]
+                        if not dict_match
+                        else None
                     )
+                    if pattern_match_result["match_percentage"] > 50:
+                        pattern_match_overall = True
+                    else:
+                        pattern_match_overall =  False
+                except Exception as e:
+                    logger.error("2.5 pattern match not found {e}")
 
     # Compose user-friendly summary
     if dict_match is True and pattern_match_overall is True:
