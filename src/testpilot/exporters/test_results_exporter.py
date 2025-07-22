@@ -381,7 +381,7 @@ class TestResultsExporter:
         self,
         test_results: List[Any],
         filename: str = None,
-        open_browser: bool = True,
+        open_browser: bool = False,
     ) -> str:
         """Export test results to HTML format and optionally open in browser"""
         if not filename:

@@ -22,6 +22,10 @@ class MockConnectorWrapper:
         self.mock_executor = mock_executor
         self.use_ssh = False  # Mock mode doesn't use SSH
         self.connections: Dict[str, MockExecutor] = {}
+        self.execution_mode = "mock"  # Set execution mode
+        self.mock_server_url = getattr(
+            mock_executor, "mock_server_url", "http://localhost:8082"
+        )
 
     def setup_connections(self, config):
         """Mock implementation of setup_connections."""

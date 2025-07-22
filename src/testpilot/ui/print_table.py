@@ -26,17 +26,19 @@ def display_test_results_with_fixed_and_wrapped_alignment(
     # Adjust these values based on your expected maximum content lengths
     fixed_col_widths = {
         "Index": 5,
-        "Sheet Name": 20,
-        "Test Name": 25,  # Example: increased to allow more space before wrapping
+        "Sheet Name": 25,  # Increased for longer sheet names
+        "Test Name": 40,  # Increased to show more test name details
+        "Method": 8,  # New column for HTTP method
         "Duration (s)": 12,
         "Result": 8,
-        "Fail Reason": 35,  # Example: increased to allow more space for error messages
+        "Fail Reason": 50,  # Increased for more detailed error messages
     }
 
     headers_list = [
         "Index",
         "Sheet Name",
         "Test Name",
+        "Method",
         "Duration (s)",
         "Result",
         "Fail Reason",
@@ -78,6 +80,7 @@ def display_test_results_with_fixed_and_wrapped_alignment(
         index_val = str(i)
         sheet_name_val = str(row_data.get("sheet_name", "N/A"))
         test_name_val = str(row_data.get("test_name", "N/A"))
+        method_val = str(row_data.get("method", "GET"))
 
         # Format duration with 2 decimal places if it's a number
         duration_raw = row_data.get("duration", "N/A")
@@ -99,6 +102,9 @@ def display_test_results_with_fixed_and_wrapped_alignment(
         wrapped_test_name = textwrap.wrap(
             test_name_val, width=fixed_col_widths["Test Name"]
         )
+        wrapped_method = textwrap.wrap(
+            method_val, width=fixed_col_widths["Method"]
+        )
         wrapped_duration = textwrap.wrap(
             duration_val, width=fixed_col_widths["Duration (s)"]
         )
@@ -114,6 +120,7 @@ def display_test_results_with_fixed_and_wrapped_alignment(
             len(wrapped_index),
             len(wrapped_sheet_name),
             len(wrapped_test_name),
+            len(wrapped_method),
             len(wrapped_duration),
             len(wrapped_result),
             len(wrapped_fail_reason),
@@ -131,6 +138,9 @@ def display_test_results_with_fixed_and_wrapped_alignment(
             )
             line_parts.append(
                 f" {wrapped_test_name[line_num] if line_num < len(wrapped_test_name) else '':<{fixed_col_widths['Test Name']}}"
+            )
+            line_parts.append(
+                f" {wrapped_method[line_num] if line_num < len(wrapped_method) else '':<{fixed_col_widths['Method']}}"
             )
             line_parts.append(
                 f" {wrapped_duration[line_num] if line_num < len(wrapped_duration) else '':<{fixed_col_widths['Duration (s)']}}"
@@ -237,15 +247,15 @@ class TestDisplayRow:
                 )
 
         return cls(
-            host=getattr(result, "host", "")[:12],  # Truncate for display
-            sheet=getattr(result, "sheet", ""),  # Don't truncate sheet name
-            test_name=original_test_name[:25],  # Truncate for display
-            method=getattr(result, "method", "GET")[:6],
+            host=getattr(
+                result, "host", ""
+            ),  # No truncation - let wrapping handle it
+            sheet=getattr(result, "sheet", ""),  # No truncation
+            test_name=original_test_name,  # No truncation - let wrapping handle it
+            method=getattr(result, "method", "GET"),  # No truncation
             status=status,
             duration=getattr(result, "duration", 0.0),
-            fail_reason=fail_reason[
-                :50
-            ],  # Truncate for display (increased from 40 to 50)
+            fail_reason=fail_reason,  # No truncation - let wrapping handle it
             _original_test_name=original_test_name,  # Store the full test name
         )
 
@@ -307,6 +317,7 @@ class PrintTableDashboard:
             result_dict = {
                 "sheet_name": row.sheet,
                 "test_name": row.test_name,
+                "method": row.method,
                 "duration": f"{row.duration:.2f}",  # Format with 2 decimal places
                 "result": row.status,
                 "fail_reason": row.fail_reason,
@@ -337,6 +348,7 @@ class PrintTableDashboard:
             index_val = str(len(self.results) - 1)
             sheet_name_val = str(result_dict.get("sheet_name", "N/A"))
             test_name_val = str(result_dict.get("test_name", "N/A"))
+            method_val = str(result_dict.get("method", "GET"))
 
             # Format duration with 2 decimal places if it's a number
             duration_raw = result_dict.get("duration", "N/A")
@@ -357,11 +369,12 @@ class PrintTableDashboard:
             # Define the fixed widths for each column (same as in display_test_results_with_fixed_and_wrapped_alignment)
             fixed_col_widths = {
                 "Index": 5,
-                "Sheet Name": 20,
-                "Test Name": 25,
+                "Sheet Name": 25,
+                "Test Name": 40,
+                "Method": 8,
                 "Duration (s)": 12,
                 "Result": 8,
-                "Fail Reason": 35,
+                "Fail Reason": 50,
             }
 
             # Apply wrapping to fields that might exceed fixed width
@@ -373,6 +386,9 @@ class PrintTableDashboard:
             )
             wrapped_test_name = textwrap.wrap(
                 test_name_val, width=fixed_col_widths["Test Name"]
+            )
+            wrapped_method = textwrap.wrap(
+                method_val, width=fixed_col_widths["Method"]
             )
             wrapped_duration = textwrap.wrap(
                 duration_val, width=fixed_col_widths["Duration (s)"]
@@ -389,6 +405,7 @@ class PrintTableDashboard:
                 len(wrapped_index),
                 len(wrapped_sheet_name),
                 len(wrapped_test_name),
+                len(wrapped_method),
                 len(wrapped_duration),
                 len(wrapped_result),
                 len(wrapped_fail_reason),
@@ -406,6 +423,9 @@ class PrintTableDashboard:
                 )
                 line_parts.append(
                     f" {wrapped_test_name[line_num] if line_num < len(wrapped_test_name) else '':<{fixed_col_widths['Test Name']}}"
+                )
+                line_parts.append(
+                    f" {wrapped_method[line_num] if line_num < len(wrapped_method) else '':<{fixed_col_widths['Method']}}"
                 )
                 line_parts.append(
                     f" {wrapped_duration[line_num] if line_num < len(wrapped_duration) else '':<{fixed_col_widths['Duration (s)']}}"
@@ -439,6 +459,7 @@ class PrintTableDashboard:
                 "Index",
                 "Sheet Name",
                 "Test Name",
+                "Method",
                 "Duration (s)",
                 "Result",
                 "Fail Reason",
@@ -466,7 +487,7 @@ class PrintTableDashboard:
         rate = self.total / elapsed if elapsed > 0 else 0
 
         print(
-            f"\r{status_color}{status_char}{reset_color} Test {self.total}: {row.test_name} - {status_color}{row.status}{reset_color} ({row.duration:.2f}s) | Total: {self.total} | Rate: {rate:.1f}/sec",
+            f"\r{status_color}{status_char}{reset_color} Test {self.total}: {row.test_name} [{row.method}] - {status_color}{row.status}{reset_color} ({row.duration:.2f}s) | Total: {self.total} | Rate: {rate:.1f}/sec",
             end="",
         )
 
@@ -485,7 +506,7 @@ class PrintTableDashboard:
         reset_color = "\033[0m"
 
         print(
-            f"{status_color}{row.status}{reset_color} - {row.test_name} ({row.duration:.2f}s)"
+            f"{status_color}{row.status}{reset_color} - {row.test_name} [{row.method}] ({row.duration:.2f}s)"
         )
         if row.status == "FAIL" and row.fail_reason:
             print(

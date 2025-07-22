@@ -373,7 +373,7 @@ def resolve_service_map_local(
                     if host_cli_map
                     else "kubectl"
                 )
-                kubectl_cmd = [cli_type, "get", "svc","-o", "json"]
+                kubectl_cmd = [cli_type, "get", "svc", "-o", "json"]
             logger.debug(
                 f"Running local kubectl command: {' '.join(kubectl_cmd)}"
             )
@@ -582,7 +582,7 @@ def export_workflow_results(test_results, flows):
 
     # Print HTML report path to console (more visible)
     print(f"\n📊 Interactive HTML report generated: {html_file}")
-    print("   The report will open automatically in your default browser.")
+    print("   You can open the report manually in your browser.")
 
     # Workflow-level summary
     logger.debug("\n===== WORKFLOW SUMMARY =====")
@@ -876,7 +876,7 @@ def main():
     if args.dry_run:
         show_table = not args.no_table
         # Use dummy mapping for dry-run: map each placeholder to a dummy value for each host
-        dummy_map = {p: f"dummy-{p}" for p in placeholders}
+        dummy_map = {p: f"['dummy-{p}']" for p in placeholders}
         from src.testpilot.utils.dry_run import dry_run_commands
 
         # Create dummy svc_maps for dry run
@@ -905,7 +905,9 @@ def main():
         connector = SSHConnector(config_file)
         connector.connect_all(target_hosts)
     else:
-        logger.debug("SSH connections are disabled (use_ssh is False or not production mode)")
+        logger.debug(
+            "SSH connections are disabled (use_ssh is False or not production mode)"
+        )
         connector = None
 
     # Get CLI mapping (detect kubectl/oc on each host)
@@ -940,8 +942,8 @@ def main():
                         config_file=config_file,
                     )
         else:
-            # Mock mode: use dummy mappings
-            dummy_map = {p: f"dummy-{p}" for p in placeholders}
+            # Mock mode: use dummy mappings (format as list strings for consistency)
+            dummy_map = {p: f"['dummy-{p}']" for p in placeholders}
             svc_maps = {host: dummy_map for host in target_hosts}
             logger.info(
                 f"Mock mode: using dummy service mappings: {dummy_map}"

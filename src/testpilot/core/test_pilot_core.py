@@ -2,13 +2,13 @@
 # test_pilot_core.py (FIXED VERSION)
 # =============================================================================
 
+import copy
 import json
 import os
 import re
 import subprocess
 import sys
 import time
-import copy
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -149,8 +149,16 @@ def resolve_namespace(connector, host: str) -> Optional[str]:
             config_path = os.path.join(os.getcwd(), "config", "hosts.json")
             if not os.path.exists(config_path):
                 # Try absolute path from module location
-                config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "config", "hosts.json")
-            
+                config_path = os.path.join(
+                    os.path.dirname(
+                        os.path.dirname(
+                            os.path.dirname(os.path.dirname(__file__))
+                        )
+                    ),
+                    "config",
+                    "hosts.json",
+                )
+
             with open(config_path, "r") as f:
                 data = json.load(f)
             connect_to = data.get("connect_to")
@@ -301,10 +309,18 @@ def build_command_for_step(
     pod_mode = False
     # Look for config in project root first, then fallback to package directory
     config_paths = [
-        os.path.join(os.getcwd(), "config", "hosts.json"),  # Project root config
-        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "config", "hosts.json")  # Absolute path from module
+        os.path.join(
+            os.getcwd(), "config", "hosts.json"
+        ),  # Project root config
+        os.path.join(
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            ),
+            "config",
+            "hosts.json",
+        ),  # Absolute path from module
     ]
-    
+
     config_found = False
     for config_path in config_paths:
         try:
@@ -316,9 +332,11 @@ def build_command_for_step(
                     break
         except Exception as e:
             continue
-    
+
     if not config_found:
-        logger.warning(f"Could not read pod_mode from config: No valid config file found in {config_paths}")
+        logger.warning(
+            f"Could not read pod_mode from config: No valid config file found in {config_paths}"
+        )
 
     if pod_mode and url:
         # Use build_pod_mode to construct the command
@@ -360,7 +378,7 @@ def build_command_for_step(
         command.startswith("kubectl") or command.startswith("oc")
     ):
         # update method to KUBECTL in step_data method
-        step_data["method"] = "KUBCTL"
+        step_data["method"] = "KUBECTL"
         return build_kubectl_logs_command(
             command, namespace, connector, host, host_cli_map
         )
@@ -433,10 +451,13 @@ def execute_mock_command(
             f"Mock server at {mock_server_url} not responding, attempting execution anyway"
         )
 
+    # Get row index from connector if available
+    row_idx = getattr(connector, "_current_row_idx", None)
+
     # Execute mock command
     try:
         return mock_executor.execute_mock_command(
-            command, host, sheet_name, test_name
+            command, host, sheet_name, test_name, row_idx
         )
     except Exception as e:
         logger.error(f"Mock execution failed: {e}")
@@ -602,8 +623,9 @@ def process_single_step(
             hasattr(connector, "execution_mode")
             and connector.execution_mode == "mock"
         ):
-            connector._current_sheet = getattr(flow, "sheet_name", None)
+            connector._current_sheet = getattr(flow, "sheet", None)
             connector._current_test = getattr(flow, "test_name", None)
+            connector._current_row_idx = getattr(step, "row_idx", None)
         if not show_table:
             logger.info(f"[CALLFLOW] Host: {host}")
             color_cyan = "\033[96m"
@@ -658,7 +680,7 @@ def process_single_step(
             # Get the raw_output and append to accumulated string
             raw_output = parsed_output.get("raw_output", "")
             accumulated_raw_output += raw_output
-            
+
             # Try to extract pod name for log file naming
             pod_name = None
             if command.startswith("kubectl logs") or command.startswith(
@@ -690,10 +712,10 @@ def process_single_step(
                 pattern = step.pattern_match
                 if pattern:
                     logger.info(f"[CALLFLOW] Pattern to match: {pattern}")
-        
+
         # update parsed_output with accumulated raw output
         parsed_output["raw_output"] = copy.copy(accumulated_raw_output)
-            
+
         # Validate this pod's logs
         final_result = validate_and_create_result(
             step,
@@ -707,7 +729,7 @@ def process_single_step(
             command,
             args,
         )
-       
+
         test_results.append(final_result)
         step.result = final_result
         if not show_table:

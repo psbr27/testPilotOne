@@ -14,6 +14,7 @@ Features:
 - Maintains backward compatibility with original format
 """
 
+import hashlib
 import json
 import re
 import shlex
@@ -29,10 +30,31 @@ class EnhancedMockExporter:
     def __init__(self):
         self.step_counters = {}  # Track step numbers per test
 
+    def generate_hash_key(
+        self, sheet: str, test_name: str, method: str
+    ) -> str:
+        """Generate a unique hash key based on sheet, test name, and method."""
+        # Standardize inputs
+        standardized_sheet = sheet.strip()
+        standardized_test_name = test_name.strip()
+        standardized_method = method.strip().upper()
+
+        # Combine components
+        combined_string = f"{standardized_sheet}_{standardized_test_name}_{standardized_method}"
+
+        # Generate hash and return first 16 characters
+        full_hash = hashlib.sha256(combined_string.encode("utf-8")).hexdigest()
+        return full_hash[:16]
+
     def parse_curl_command(self, command: str) -> Dict[str, Any]:
         """Parse kubectl curl command into structured data."""
-        if not command or "curl" not in command:
+        if not command:
             return {}
+
+        # Check if this is a pure kubectl command (no curl)
+        if "kubectl" in command and "curl" not in command:
+            # For kubectl logs, get, describe etc.
+            return {"method": "KUBECTL"}
 
         try:
             # Extract method
@@ -112,6 +134,7 @@ class EnhancedMockExporter:
         sheet_name = result.get("sheet", "unknown")
         test_name = result.get("test_name", "unknown")
         step_number = self.get_step_number(sheet_name, test_name)
+        row_idx = result.get("row_index", None)  # Preserve original row index
 
         # Parse command into structured data
         command = result.get("command", "")
@@ -124,9 +147,14 @@ class EnhancedMockExporter:
             output, result.get("status"), error
         )
 
+        # Generate hash key
+        method = parsed_command.get("method", result.get("method", "GET"))
+        hash_key = self.generate_hash_key(sheet_name, test_name, method)
+
         # Build enhanced result
         enhanced = {
             # Enhanced metadata
+            "hash_key": hash_key,
             "sheet_name": sheet_name,
             "test_name": test_name,
             "step_number": step_number,
@@ -260,29 +288,14 @@ class EnhancedMockExporter:
             enhanced = self.enhance_test_result(result)
             enhanced_results_list.append(enhanced)
 
-        # Choose format based on parameter
-        if use_dictionary_format:
-            # Create dictionary keyed by test names
-            enhanced_results = {}
-            for enhanced in enhanced_results_list:
-                # Use test_name as key in dictionary
-                test_name = enhanced["test_name"]
+        # Create flat hash-based structure
+        enhanced_results = {}
+        for enhanced in enhanced_results_list:
+            # Use hash_key as the unique identifier
+            hash_key = enhanced["hash_key"]
+            enhanced_results[hash_key] = enhanced
 
-                # Handle duplicate test names by appending sheet name
-                key = test_name
-                counter = 1
-                while key in enhanced_results:
-                    sheet_name = enhanced["sheet_name"]
-                    key = f"{test_name}_{sheet_name}_{counter}"
-                    counter += 1
-
-                enhanced_results[key] = enhanced
-
-            format_type = "dictionary"
-        else:
-            # Use list format for backward compatibility
-            enhanced_results = enhanced_results_list
-            format_type = "list"
+        format_type = "hash_key_dictionary"
 
         # Create enhanced data structure
         enhanced_data = {

@@ -387,6 +387,7 @@ class MockExecutor:
         host: str,
         sheet_name: str = None,
         test_name: str = None,
+        row_idx: int = None,
     ) -> Tuple[str, str, float]:
         """
         Execute any command against mock server (HTTP API or kubectl).
@@ -396,6 +397,7 @@ class MockExecutor:
             host: Target host (used for logging)
             sheet_name: Test sheet name for enhanced mock server targeting
             test_name: Test name for enhanced mock server targeting
+            row_idx: Row index for precise test case identification
 
         Returns:
             Tuple of (output, error, duration) matching execute_command format
@@ -407,11 +409,11 @@ class MockExecutor:
 
         if command_type == "http":
             return self._execute_http_mock(
-                parsed_data, host, sheet_name, test_name, start_time
+                parsed_data, host, sheet_name, test_name, row_idx, start_time
             )
         elif command_type == "kubectl":
             return self._execute_kubectl_mock(
-                parsed_data, host, sheet_name, test_name, start_time
+                parsed_data, host, sheet_name, test_name, row_idx, start_time
             )
         else:
             duration = time.time() - start_time
@@ -425,6 +427,7 @@ class MockExecutor:
         host: str,
         sheet_name: str,
         test_name: str,
+        row_idx: int,
         start_time: float,
     ) -> Tuple[str, str, float]:
         """Execute HTTP API mock request."""
@@ -447,15 +450,18 @@ class MockExecutor:
                 headers["X-Test-Sheet"] = sheet_name
             if test_name:
                 headers["X-Test-Name"] = test_name
+            # Note: row_idx is no longer sent as the server uses hash keys
 
             # Build enhanced URL display with sheet and test context
             enhanced_url_display = mock_url
-            if sheet_name or test_name:
+            if sheet_name or test_name or row_idx is not None:
                 context_parts = []
                 if sheet_name:
                     context_parts.append(f"sheet={sheet_name}")
                 if test_name:
                     context_parts.append(f"test={test_name}")
+                if row_idx is not None:
+                    context_parts.append(f"row={row_idx}")
                 # Use appropriate separator based on whether URL already has query params
                 separator = "&" if "?" in mock_url else "?"
                 enhanced_url_display += (
@@ -505,6 +511,7 @@ class MockExecutor:
         host: str,
         sheet_name: str,
         test_name: str,
+        row_idx: int,
         start_time: float,
     ) -> Tuple[str, str, float]:
         """Execute kubectl command mock request."""
@@ -516,6 +523,7 @@ class MockExecutor:
 
             # Prepare parameters
             params = {"sheet": sheet_name, "test": test_name, "host": host}
+            # Note: row_idx is no longer sent as the server uses hash keys
 
             # Add kubectl-specific parameters
             if kubectl_type == "logs":

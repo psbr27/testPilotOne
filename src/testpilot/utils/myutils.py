@@ -23,20 +23,46 @@ def replace_placeholder_in_command(command, service_map):
             # The value in svc_map is a string representation of a list, e.g., "['host.com']"
             # We need to convert it to an actual Python list to get the first element.
             try:
-                # ast.literal_eval is safer than eval() for converting string literals
-                service_list = ast.literal_eval(service_map[placeholder_name])
-                if service_list:  # Ensure the list is not empty
-                    replacement_value = service_list[0]
+                service_value = service_map[placeholder_name]
+
+                # Check if the value is already a string (not a list representation)
+                if isinstance(service_value, str) and not (
+                    service_value.startswith("[")
+                    or service_value.startswith("(")
+                ):
+                    # It's a plain string, use it directly
+                    replacement_value = service_value
+                elif isinstance(service_value, (list, tuple)):
+                    # It's already a list/tuple, use first element
+                    if service_value:
+                        replacement_value = service_value[0]
+                    else:
+                        print(
+                            f"Warning: Service map value for '{placeholder_name}' is an empty list. Skipping replacement."
+                        )
+                        continue
                 else:
-                    print(
-                        f"Warning: Service map value for '{placeholder_name}' is an empty list. Skipping replacement."
-                    )
-                    continue
-            except (ValueError, SyntaxError) as e:
+                    # Try to parse as string representation of list
+                    service_list = ast.literal_eval(str(service_value))
+                    if service_list:  # Ensure the list is not empty
+                        replacement_value = service_list[0]
+                    else:
+                        print(
+                            f"Warning: Service map value for '{placeholder_name}' is an empty list. Skipping replacement."
+                        )
+                        continue
+            except (ValueError, SyntaxError, TypeError) as e:
                 print(
                     f"Error: Could not parse service map value for '{placeholder_name}': {service_map[placeholder_name]}. Error: {e}"
                 )
-                continue  # Skip this replacement if parsing fails
+                print(f"Value type: {type(service_map[placeholder_name])}")
+                # Try to use the value as-is if it's a string-like object
+                try:
+                    replacement_value = str(service_map[placeholder_name])
+                    print(f"Using string representation: {replacement_value}")
+                except Exception as fallback_e:
+                    print(f"Fallback conversion failed: {fallback_e}")
+                    continue  # Skip this replacement if all parsing fails
 
             # Replace the {placeholder} with the actual service host
             # Use re.sub to replace based on the captured group, ensuring we replace

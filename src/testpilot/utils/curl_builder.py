@@ -77,10 +77,18 @@ def build_curl_command(
     nf_name = "SLF"  # Default value
     # Look for config in project root first, then fallback to package directory
     config_paths = [
-        os.path.join(os.getcwd(), "config", "hosts.json"),  # Project root config
-        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "config", "hosts.json")  # Absolute path from module
+        os.path.join(
+            os.getcwd(), "config", "hosts.json"
+        ),  # Project root config
+        os.path.join(
+            os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            ),
+            "config",
+            "hosts.json",
+        ),  # Absolute path from module
     ]
-    
+
     for config_path in config_paths:
         try:
             if os.path.exists(config_path):
@@ -90,14 +98,18 @@ def build_curl_command(
                     break
         except (IOError, OSError, json.JSONDecodeError) as e:
             continue
-    
+
     # If we couldn't find or parse any config file, log the error
     if nf_name == "SLF":
-        logger.debug(f"Using default nf_name 'SLF'. Could not find valid config in: {config_paths}")
+        logger.debug(
+            f"Using default nf_name 'SLF'. Could not find valid config in: {config_paths}"
+        )
 
-    # if resolved_payload is true, then try to search for nfInstanceId
-    # in the payload, if that is found then append to safe_url
-    if nf_name.lower() != "slf" and resolved_payload:
+    # If resolved_payload exists and nf_name is NRF variant, append nfInstanceId to URL
+    # Only NRF variants (OCNRF, NRF, nrf, ocnrf) require nfInstanceId appending
+    # Other NF types (SLF, SMF, UDM, etc.) should not modify the URL
+    nrf_variants = {"ocnrf", "nrf"}
+    if nf_name.lower() in nrf_variants and resolved_payload:
         parsed = json.loads(resolved_payload)
         nfInstanceId = None
         if isinstance(parsed, dict):

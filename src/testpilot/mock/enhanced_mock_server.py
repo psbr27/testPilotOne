@@ -16,6 +16,7 @@ Features:
 - Enhanced debugging and introspection
 """
 
+import hashlib
 import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -48,6 +49,9 @@ class EnhancedMockServer:
         # Primary mapping: sheet_name::test_name -> test data
         self.primary_mappings = {}
 
+        # Hash key mapping for direct lookups
+        self.hash_mappings = {}
+
         # Secondary mappings for fallback
         self.response_mappings = {}
         self.sheet_mappings = {}
@@ -61,6 +65,22 @@ class EnhancedMockServer:
 
         # Setup routes
         self.setup_routes()
+
+    def generate_hash_key(
+        self, sheet: str, test_name: str, method: str
+    ) -> str:
+        """Generate a unique hash key based on sheet, test name, and method."""
+        # Standardize inputs
+        standardized_sheet = sheet.strip()
+        standardized_test_name = test_name.strip()
+        standardized_method = method.strip().upper()
+
+        # Combine components
+        combined_string = f"{standardized_sheet}_{standardized_test_name}_{standardized_method}"
+
+        # Generate hash and return first 16 characters
+        full_hash = hashlib.sha256(combined_string.encode("utf-8")).hexdigest()
+        return full_hash[:16]
 
     def load_enhanced_data(self, file_path: str):
         """Load structured enhanced mock data."""
@@ -80,20 +100,19 @@ class EnhancedMockServer:
             print(f"📊 Unique sheets: {metadata.get('unique_sheets', 0)}")
             print(f"📊 Unique tests: {metadata.get('unique_tests', 0)}")
 
-            # Handle both list and dictionary formats for enhanced_results
-            enhanced_results = data.get("enhanced_results", [])
+            # Handle hash-based dictionary format for enhanced_results
+            enhanced_results = data.get("enhanced_results", {})
             if isinstance(enhanced_results, dict):
-                # Convert dictionary format to list for processing
-                results_list = []
-                for test_name, test_data in enhanced_results.items():
-                    # Ensure test_name is set in the data
-                    if isinstance(test_data, dict):
-                        test_data["test_name"] = test_name
-                        results_list.append(test_data)
-                enhanced_results = results_list
+                # New hash-based format
+                for hash_key, test_data in enhanced_results.items():
+                    if isinstance(test_data, dict) and "hash_key" in test_data:
+                        # Store in hash mappings for direct lookup
+                        self.hash_mappings[hash_key] = test_data
                 print(
-                    f"📋 Converted dictionary format with {len(enhanced_results)} tests"
+                    f"📋 Loaded hash-based format with {len(self.hash_mappings)} entries"
                 )
+                # Convert to list for backward compatibility with indexing
+                enhanced_results = list(enhanced_results.values())
 
             # Index responses for fast lookup
             self.index_responses(enhanced_results)
@@ -230,16 +249,31 @@ class EnhancedMockServer:
         headers: Dict = None,
         target_sheet: str = None,
         target_test: str = None,
+        target_row_idx: str = None,
     ) -> Optional[Dict]:
         """Find the best matching response prioritizing sheet+test mapping."""
 
         query_params = query_params or {}
         headers = headers or {}
 
-        # PRIMARY STRATEGY: Use sheet_name + test_name if available
+        # PRIMARY STRATEGY: Use hash key lookup if available
+        if target_sheet and target_test and method:
+            # Generate hash key for direct lookup
+            hash_key = self.generate_hash_key(
+                target_sheet, target_test, method
+            )
+
+            if hash_key in self.hash_mappings:
+                print(
+                    f"✨ Found exact match using hash key: {hash_key} ({target_sheet}::{target_test}::{method})"
+                )
+                return self.hash_mappings[hash_key]
+
+        # FALLBACK: Use sheet_name + test_name if hash lookup fails
         if target_sheet and target_test:
             test_details = self.get_test_details(target_sheet, target_test)
             if test_details:
+
                 # Look for matching endpoint within this test
                 endpoint_key = f"{method}::{endpoint}"
                 endpoint_responses = test_details["endpoints"].get(
@@ -563,6 +597,7 @@ class EnhancedMockServer:
         # Try to determine target sheet/test from headers or other context
         target_sheet = headers.get("X-Test-Sheet")
         target_test = headers.get("X-Test-Name")
+        target_row_idx = headers.get("X-Test-Row-Index")
 
         print(
             f"🔄 Enhanced Request #{self.request_count}: {method} {endpoint}"
@@ -573,6 +608,8 @@ class EnhancedMockServer:
             print(f"   📄 Target Sheet: {target_sheet}")
         if target_test:
             print(f"   🧪 Target Test: {target_test}")
+        if target_row_idx:
+            print(f"   📍 Target Row: {target_row_idx}")
 
         # Find best matching response using primary mapping strategy
         matching_response = self.find_best_response(
@@ -582,6 +619,7 @@ class EnhancedMockServer:
             headers=headers,
             target_sheet=target_sheet,
             target_test=target_test,
+            target_row_idx=target_row_idx,
         )
 
         if matching_response:
@@ -644,6 +682,7 @@ class EnhancedMockServer:
         # Extract parameters
         sheet = request.args.get("sheet")
         test = request.args.get("test")
+        row_idx = request.args.get("row_idx")
         pod_pattern = request.args.get("pod_pattern")
         namespace = request.args.get("namespace")
         resource_type = request.args.get("resource_type")
@@ -656,6 +695,8 @@ class EnhancedMockServer:
             print(f"   📄 Sheet: {sheet}")
         if test:
             print(f"   🧪 Test: {test}")
+        if row_idx:
+            print(f"   📍 Row Index: {row_idx}")
         if pod_pattern:
             print(f"   🐳 Pod Pattern: {pod_pattern}")
         if namespace:
@@ -670,6 +711,7 @@ class EnhancedMockServer:
             kubectl_type=kubectl_type,
             sheet=sheet,
             test=test,
+            row_idx=row_idx,
             pod_pattern=pod_pattern,
             namespace=namespace,
             resource_type=resource_type,
@@ -694,6 +736,7 @@ class EnhancedMockServer:
         kubectl_type: str,
         sheet: str = None,
         test: str = None,
+        row_idx: str = None,
         pod_pattern: str = None,
         namespace: str = None,
         resource_type: str = None,
@@ -708,31 +751,84 @@ class EnhancedMockServer:
         if not test_details:
             return None
 
+        # Try hash key lookup first for kubectl commands
+        # Try both KUBECTL and KUBCTL (for backward compatibility with typo)
+        for method in ["KUBECTL", "KUBCTL"]:
+            hash_key = self.generate_hash_key(sheet, test, method)
+            if hash_key in self.hash_mappings:
+                step = self.hash_mappings[hash_key]
+                request_data = step.get("request", {})
+                execution = step.get("execution", {})
+
+                # Check if this is a kubectl command
+                original_data = step.get("original", {})
+                if (
+                    request_data.get("method") == "KUBECTL"
+                    or original_data.get("method") == "KUBECTL"
+                    or "kubectl"
+                    in str(request_data.get("command", "")).lower()
+                    or "kubectl"
+                    in str(original_data.get("command", "")).lower()
+                ):
+                    # Get the actual output from the original execution
+                    actual_output = step.get("original", {}).get("output", "")
+                    if not actual_output:
+                        # Try to get from expected_response.body for kubectl logs
+                        actual_output = step.get("expected_response", {}).get(
+                            "body", ""
+                        )
+
+                    if actual_output:
+                        print(
+                            f"✨ Found exact kubectl match using hash key: {hash_key}"
+                        )
+                        return {
+                            "sheet_name": sheet,
+                            "test_name": test,
+                            "kubectl_type": kubectl_type,
+                            "kubectl_response": actual_output,
+                            "step_number": step.get("step_number"),
+                            "original_command": original_data.get("command")
+                            or request_data.get("command"),
+                            "from_enhanced_data": True,
+                            "hash_key": hash_key,
+                        }
+
         # Look for kubectl responses in test steps
         for step in test_details["steps"]:
             request_data = step.get("request", {})
             execution = step.get("execution", {})
 
             # Check if this is a kubectl command
+            original_data = step.get("original", {})
             if (
                 request_data.get("method") == "KUBECTL"
+                or original_data.get("method") == "KUBECTL"
                 or "kubectl" in str(request_data.get("command", "")).lower()
+                or "kubectl" in str(original_data.get("command", "")).lower()
             ):
 
-                # Get the actual kubectl response from enhanced data
-                kubectl_response = execution.get("response_body", "")
-
-                if kubectl_response:
-                    print(
-                        "✅ Found actual kubectl response from enhanced data"
+                # Try to get the actual output from original execution first
+                actual_output = step.get("original", {}).get("output", "")
+                if not actual_output:
+                    # Try to get from expected_response.body for kubectl logs
+                    actual_output = step.get("expected_response", {}).get(
+                        "body", ""
                     )
+                if not actual_output:
+                    # Fallback to response_body if available
+                    actual_output = execution.get("response_body", "")
+
+                if actual_output:
+                    print("✅ Found actual kubectl output from enhanced data")
                     return {
                         "sheet_name": sheet,
                         "test_name": test,
                         "kubectl_type": kubectl_type,
-                        "kubectl_response": kubectl_response,
+                        "kubectl_response": actual_output,
                         "step_number": step.get("step_number"),
-                        "original_command": request_data.get("command"),
+                        "original_command": original_data.get("command")
+                        or request_data.get("command"),
                         "from_enhanced_data": True,
                     }
 
