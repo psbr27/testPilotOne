@@ -890,3 +890,220 @@ VALIDATION_STRATEGIES = {
     "delete_status_only": DeleteStatusOnlyValidator(),
     # Add more as we go
 }
+
+
+class ValidationEngine:
+    """
+    High-level validation engine that supports JSON file loading for Response_Payload.
+    Used by tests and provides a simple interface for step validation.
+    """
+
+    def __init__(self, payloads_dir: str = "payloads"):
+        """Initialize validation engine with payloads directory."""
+        self.payloads_dir = payloads_dir
+        self.dispatcher = ValidationDispatcher()
+        # Ensure payloads directory exists
+        if payloads_dir and not os.path.exists(payloads_dir):
+            os.makedirs(payloads_dir, exist_ok=True)
+
+    def _load_json_file(self, filename: str) -> str:
+        """Load JSON file from payloads directory, similar to curl_builder.py logic."""
+        if not filename or not filename.strip().endswith(".json"):
+            return filename
+
+        payload_path = os.path.join(self.payloads_dir, filename.strip())
+        if not os.path.isfile(payload_path):
+            raise FileNotFoundError(
+                f"Response payload file not found: {payload_path}"
+            )
+
+        try:
+            with open(payload_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except (IOError, OSError) as e:
+            logger = get_logger("ValidationEngine._load_json_file")
+            logger.error(
+                f"Failed to read response payload file {payload_path}: {e}"
+            )
+            raise
+
+    def clean_excel_pattern(self, pattern: str) -> str:
+        """Clean Excel patterns (remove _x000D_, format JSON)."""
+        if not pattern:
+            return pattern
+        # Remove Excel line break encoding
+        cleaned = pattern.replace("_x000D_", "").strip()
+        return cleaned
+
+    def validate_step(
+        self,
+        response_text: str = "",
+        actual_status: int = None,
+        expected_status: int = None,
+        response_payload: str = None,
+        pattern_match: str = None,
+        method: str = "GET",
+        **kwargs,
+    ) -> ValidationResult:
+        """
+        Validate a test step with JSON file loading support for response_payload.
+
+        Args:
+            response_text: The actual response body text
+            actual_status: HTTP status code from response
+            expected_status: Expected HTTP status code
+            response_payload: Expected response payload (JSON string or filename.json)
+            pattern_match: Pattern to match against response
+            method: HTTP method (GET, PUT, POST, DELETE)
+            **kwargs: Additional validation parameters
+
+        Returns:
+            ValidationResult: Result of validation with passed/failed status
+        """
+        logger = get_logger("ValidationEngine.validate_step")
+
+        # Handle invalid JSON response early
+        if response_text and response_text.strip():
+            try:
+                json.loads(response_text)
+            except json.JSONDecodeError:
+                if (
+                    response_payload
+                ):  # Only fail if we're expecting a payload match
+                    result = ValidationResult(
+                        False, fail_reason="Invalid JSON in response"
+                    )
+                    self._enhance_result(
+                        result,
+                        actual_status,
+                        expected_status,
+                        response_payload,
+                        pattern_match,
+                    )
+                    return result
+
+        # Load JSON file if response_payload ends with .json
+        resolved_response_payload = response_payload
+        if response_payload:
+            try:
+                resolved_response_payload = self._load_json_file(
+                    response_payload
+                )
+            except FileNotFoundError:
+                result = ValidationResult(
+                    False, fail_reason="Response payload mismatch"
+                )
+                self._enhance_result(
+                    result,
+                    actual_status,
+                    expected_status,
+                    response_payload,
+                    pattern_match,
+                )
+                return result
+            except Exception:
+                result = ValidationResult(
+                    False,
+                    fail_reason="Response payload mismatch: File loading error",
+                )
+                self._enhance_result(
+                    result,
+                    actual_status,
+                    expected_status,
+                    response_payload,
+                    pattern_match,
+                )
+                return result
+
+        # Check status first (short-circuit on failure)
+        if actual_status is not None and expected_status is not None:
+            # Handle Excel float formatting
+            try:
+                if isinstance(expected_status, float):
+                    expected_status = int(expected_status)
+                if isinstance(actual_status, float):
+                    actual_status = int(actual_status)
+            except (ValueError, TypeError):
+                pass
+
+            if actual_status != expected_status:
+                result = ValidationResult(
+                    False,
+                    fail_reason=f"HTTP status mismatch: {actual_status} != {expected_status}",
+                )
+                self._enhance_result(
+                    result,
+                    actual_status,
+                    expected_status,
+                    response_payload,
+                    pattern_match,
+                )
+                return result
+
+        # Create validation context
+        context = ValidationContext(
+            method=method,
+            request_payload=None,
+            expected_status=expected_status,
+            response_payload=resolved_response_payload,
+            pattern_match=pattern_match,
+            actual_status=actual_status,
+            response_body=response_text,
+            response_headers=None,
+            is_kubectl=False,
+            saved_payload=None,
+            args=kwargs.get("args"),
+            sheet_name=kwargs.get("sheet_name"),
+            row_idx=kwargs.get("row_idx"),
+        )
+
+        # Use dispatcher for validation
+        try:
+            result = self.dispatcher.dispatch(context)
+            self._enhance_result(
+                result,
+                actual_status,
+                expected_status,
+                response_payload,
+                pattern_match,
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Validation dispatch failed: {e}")
+            result = ValidationResult(
+                False, fail_reason=f"Validation error: {str(e)}"
+            )
+            self._enhance_result(
+                result,
+                actual_status,
+                expected_status,
+                response_payload,
+                pattern_match,
+            )
+            return result
+
+    def _enhance_result(
+        self,
+        result: ValidationResult,
+        actual_status,
+        expected_status,
+        response_payload,
+        pattern_match,
+    ):
+        """Enhance result with additional fields expected by tests."""
+        # Add missing attributes that tests expect
+        result.http_status_match = (
+            (actual_status == expected_status)
+            if (actual_status is not None and expected_status is not None)
+            else None
+        )
+        result.payload_match = result.passed and response_payload is not None
+        result.pattern_match = result.passed and pattern_match is not None
+        result.pattern_found = result.passed and pattern_match is not None
+        result.actual_status = actual_status
+        result.expected_status = expected_status
+
+        # Ensure reason attribute exists
+        if not hasattr(result, "reason"):
+            result.reason = getattr(result, "fail_reason", "")

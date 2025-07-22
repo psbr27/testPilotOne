@@ -1,5 +1,5 @@
 # =============================================================================
-# test_pilot_core.py (FIXED VERSION)
+# test_pilot_core.py
 # =============================================================================
 
 import copy
@@ -28,6 +28,37 @@ from .validation_engine import ValidationContext, ValidationDispatcher
 
 # Mock integration imports (lazy loaded to avoid issues if not available)
 _mock_executor = None
+
+
+def _load_response_payload_file(
+    filename: str, payloads_dir: str = "payloads"
+) -> str:
+    """
+    Load JSON file content for Response_Payload, similar to curl_builder.py logic.
+    Used for NRF testing where Response_Payload references JSON files like 'reg_02_payload_01.json'.
+    """
+    logger = get_logger("TestPilotCore._load_response_payload_file")
+
+    if not filename or not filename.strip().endswith(".json"):
+        return filename
+
+    payload_path = os.path.join(payloads_dir, filename.strip())
+    if not os.path.isfile(payload_path):
+        logger.warning(
+            f"Response payload file not found: {payload_path}, using filename as-is"
+        )
+        return filename
+
+    try:
+        with open(payload_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            logger.debug(f"Loaded response payload from file: {payload_path}")
+            return content
+    except (IOError, OSError) as e:
+        logger.warning(
+            f"Failed to read response payload file {payload_path}: {e}, using filename as-is"
+        )
+        return filename
 
 
 def get_mock_executor(mock_server_url: str):
@@ -519,6 +550,16 @@ def validate_and_create_result(
     )
     if isinstance(response_payload, float) and pd.isna(response_payload):
         response_payload = None
+
+    # Handle JSON file loading for Response_Payload (NRF scenario)
+    if (
+        response_payload
+        and isinstance(response_payload, str)
+        and response_payload.strip().endswith(".json")
+    ):
+        response_payload = _load_response_payload_file(
+            response_payload.strip()
+        )
 
     # Use actual_status and response_body from parsed_output
     actual_status = parsed_output.get("http_status") or parsed_output.get(
