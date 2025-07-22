@@ -186,6 +186,7 @@ def build_url_based_command(
     namespace: Optional[str],
     host_cli_map: Optional[Dict[str, str]],
     host: str,
+    test_context: Optional[Dict[str, Any]] = None,
 ) -> Optional[str]:
     """Build curl command for URL-based API calls."""
     url = step_data["url"]
@@ -215,6 +216,7 @@ def build_url_based_command(
             payload=safe_str(request_payload),
             payloads_folder="payloads",
             cli_type=cli_type,
+            test_context=test_context,
         )
         return ssh_cmd
     except Exception as e:
@@ -295,6 +297,8 @@ def build_command_for_step(
     host_cli_map,
     host,
     connector,
+    flow=None,
+    step=None,
 ):  # host_cli_map now required
     """Build the appropriate command for a test step, with pod_mode support."""
     import json
@@ -338,6 +342,17 @@ def build_command_for_step(
             f"Could not read pod_mode from config: No valid config file found in {config_paths}"
         )
 
+    # Create test context for NRF tracking
+    test_context = None
+    if flow and step:
+        test_context = {
+            "test_name": getattr(flow, "test_name", None),
+            "sheet": getattr(flow, "sheet", None),
+            "row_idx": getattr(step, "row_idx", None),
+            "session_id": f"{getattr(flow, 'sheet', 'default')}_{getattr(flow, 'test_name', 'default')}",
+        }
+        logger.debug(f"Created test context: {test_context}")
+
     if pod_mode and url:
         # Use build_pod_mode to construct the command
         method = step_data.get("method", "KUBECTL")
@@ -363,6 +378,7 @@ def build_command_for_step(
             payload=payload,
             payloads_folder=payloads_folder,
             extra_curl_args=extra_curl_args,
+            test_context=test_context,
         )
         return curl_cmd
     elif url:
@@ -373,6 +389,7 @@ def build_command_for_step(
             namespace,
             host_cli_map,
             host,
+            test_context=test_context,
         )  # host_cli_map passed
     elif command and (
         command.startswith("kubectl") or command.startswith("oc")
@@ -655,6 +672,8 @@ def process_single_step(
             host_cli_map,
             host,
             connector,
+            flow=flow,
+            step=step,
         )
 
         if isinstance(commands, str):

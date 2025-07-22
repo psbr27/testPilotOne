@@ -4,7 +4,7 @@ import os
 import re
 import shlex
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger("CurlBuilder")
 
@@ -17,11 +17,16 @@ def build_curl_command(
     payloads_folder: str = "payloads",
     extra_curl_args: Optional[List[str]] = None,
     direct_json_allowed: bool = True,
+    test_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Returns a tuple (curl_command_str, resolved_payload_str) for local execution.
     If payload is a filename (endswith .json), loads from payloads_folder.
     Otherwise, treats as direct JSON string (if allowed).
+
+    Args:
+        test_context: Optional test execution context for NRF tracking.
+                     Should contain: test_name, sheet, row_idx, session_id
     """
     headers = headers or {}
     extra_curl_args = extra_curl_args or []
@@ -105,24 +110,52 @@ def build_curl_command(
             f"Using default nf_name 'SLF'. Could not find valid config in: {config_paths}"
         )
 
-    # If resolved_payload exists and nf_name is NRF variant, append nfInstanceId to URL
-    # Only NRF variants (OCNRF, NRF, nrf, ocnrf) require nfInstanceId appending
-    # Other NF types (SLF, SMF, UDM, etc.) should not modify the URL
+    # Handle NRF-specific operations
     nrf_variants = {"ocnrf", "nrf"}
-    if nf_name.lower() in nrf_variants and resolved_payload:
-        parsed = json.loads(resolved_payload)
-        nfInstanceId = None
-        if isinstance(parsed, dict):
-            nfInstanceId = parsed.get("nfInstanceId", None)
-        elif isinstance(parsed, list):
-            for item in parsed:
-                if isinstance(item, dict) and "nfInstanceId" in item:
-                    nfInstanceId = item["nfInstanceId"]
-                    break
-        # For other types, nfInstanceId remains None
-        if nfInstanceId:
-            url = f"{url}{nfInstanceId}"
-            logger.debug(f"Appending nfInstanceId to URL: {nfInstanceId}")
+    if nf_name.lower() in nrf_variants:
+        try:
+            # Import NRF handler only when needed (lazy import)
+            from testpilot.utils.nrf import handle_nrf_operation
+
+            # Delegate to NRF-specific handler
+            modified_url = handle_nrf_operation(
+                url=url,
+                method=method,
+                payload=resolved_payload,
+                test_context=test_context,
+                nf_name=nf_name,
+            )
+
+            if modified_url:
+                url = modified_url
+                logger.debug(f"NRF handler modified URL to: {url}")
+
+        except ImportError as e:
+            # Fallback to legacy behavior if NRF module not available
+            logger.warning(
+                f"NRF module not available, using legacy handling: {e}"
+            )
+            if resolved_payload:
+                try:
+                    parsed = json.loads(resolved_payload)
+                    nfInstanceId = None
+                    if isinstance(parsed, dict):
+                        nfInstanceId = parsed.get("nfInstanceId", None)
+                    elif isinstance(parsed, list):
+                        for item in parsed:
+                            if (
+                                isinstance(item, dict)
+                                and "nfInstanceId" in item
+                            ):
+                                nfInstanceId = item["nfInstanceId"]
+                                break
+                    if nfInstanceId:
+                        url = f"{url}{nfInstanceId}"
+                        logger.debug(
+                            f"Legacy: Appending nfInstanceId to URL: {nfInstanceId}"
+                        )
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
     # Handle headers - escape each header value to prevent injection
     header_args = []
@@ -159,12 +192,14 @@ def build_ssh_k8s_curl_command(
     pod_pattern: str = "-[a-z0-9]+-[a-z0-9]+$",
     extra_curl_args: Optional[List[str]] = None,
     cli_type: str = "kubectl",
+    test_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Returns a kubectl/oc exec command that runs curl inside a pod via SSH.
 
     Args:
         cli_type: The CLI tool to use ('kubectl' or 'oc'). Defaults to 'kubectl'.
+        test_context: Optional test execution context for NRF tracking.
     """
     curl_cmd, resolved_payload = build_curl_command(
         url,
@@ -173,6 +208,7 @@ def build_ssh_k8s_curl_command(
         payload=payload,
         payloads_folder=payloads_folder,
         extra_curl_args=extra_curl_args,
+        test_context=test_context,
     )
     # Find pod and exec curl inside - escape all user inputs
     safe_container = shlex.quote(container)
@@ -197,6 +233,7 @@ def build_pod_mode(
     payload: Optional[Union[str, Dict, List]] = None,
     payloads_folder: str = "payloads",
     extra_curl_args: Optional[List[str]] = None,
+    test_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     This function is used to build curl command for pod mode
@@ -211,5 +248,6 @@ def build_pod_mode(
         payload=payload,
         payloads_folder=payloads_folder,
         extra_curl_args=extra_curl_args,
+        test_context=test_context,
     )
     return curl_cmd, resolved_payload
