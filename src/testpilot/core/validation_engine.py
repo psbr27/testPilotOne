@@ -76,10 +76,10 @@ def status_matches(expected, actual):
         # Convert actual to int for all comparisons
         actual_int = int(actual)
 
-        # Handle range patterns like '4XX' for any 4XX status code
+        # Handle range patterns like '4XX' or '4xx' for any 4XX status code (case-insensitive)
         if (
             isinstance(expected, str)
-            and expected.endswith("XX")
+            and expected.upper().endswith("XX")
             and len(expected) == 3
             and expected[0].isdigit()
         ):
