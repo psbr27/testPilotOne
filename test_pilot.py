@@ -531,7 +531,8 @@ def execute_flows(
         dashboard.print_final_summary()
 
     # Always print/export results summary, even if show_table is False
-    connector.close_all()
+    if connector is not None:
+        connector.close_all()
     if test_results:
         # print_results_table(test_results)
         export_workflow_results(test_results, flows)

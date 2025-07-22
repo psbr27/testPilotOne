@@ -435,6 +435,19 @@ def validate_response_enhanced(
             )
             if found_jsonpath:
                 pattern_match_overall = True
+            
+            # 2.5 if both response_body and pattern_match are dicts, check if pattern_match is a subset of response_body
+            if isinstance(actual, dict) and isinstance(pattern_match, dict):
+                if _is_subset_dict(pattern_match, actual, partial=partial_dict_match):
+                    pattern_match_overall = True
+                    logger.debug(
+                        "Pattern match is a subset of response body."
+                    )
+                else:
+                    pattern_match_overall = False
+                    logger.debug(
+                        "Pattern match is not a subset of response body."
+                    )
 
     # Compose user-friendly summary
     if dict_match is True and pattern_match_overall is True:
