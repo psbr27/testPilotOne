@@ -669,7 +669,9 @@ def process_single_step(
 
     step_data["save_key"] = step.other_fields.get("Save_As")
     manage_workflow_context(flow, step_data)
-
+    parsed_output = {}
+    output = None
+    error = None
     pod_names = []
 
     for host in target_hosts:
