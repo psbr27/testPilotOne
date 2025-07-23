@@ -692,6 +692,10 @@ class HTMLReportGenerator(TestResultsExporter):
             gap: 20px;
             margin-bottom: 20px;
         }
+        .test-step .test-details-grid {
+            padding: 15px;
+            margin-bottom: 0;
+        }
         .detail-box {
             background-color: #fff;
             border: 1px solid #ddd;
@@ -755,6 +759,24 @@ class HTMLReportGenerator(TestResultsExporter):
             display: none;
             padding: 20px;
             background-color: #fafafa;
+        }
+        .test-step {
+            margin-bottom: 25px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .test-step:last-child {
+            margin-bottom: 0;
+        }
+        .step-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            margin: 0;
+            padding: 12px 15px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
         }
         """
 
@@ -1412,49 +1434,54 @@ class HTMLReportGenerator(TestResultsExporter):
                             <div class="test-group-content">
                 """
 
-                # Show details for first test step as example
-                if test_results:
-                    result = test_results[0]  # Show first test step
+                # Show details for all test steps
+                for step_index, result in enumerate(test_results, 1):
                     command = getattr(result, "command", "")
                     output = getattr(result, "output", "")
                     pattern_match = getattr(result, "pattern_match", "")
                     expected_status = getattr(result, "expected_status", "N/A")
                     actual_status = getattr(result, "actual_status", "N/A")
                     passed = getattr(result, "passed", False)
+                    step_name = getattr(
+                        result, "test_name", f"Step {step_index}"
+                    )
 
                     validation_result_class = (
                         "validation-result" if passed else ""
                     )
 
                     html_content += f"""
-                                <div class="test-details-grid">
-                                    <div class="detail-box">
-                                        <h4>Command</h4>
-                                        <pre>{command}</pre>
-                                    </div>
-                                    <div class="detail-box">
-                                        <h4>HTTP Response From Server</h4>
-                                        <div class="detail-content">{output}</div>
-                                    </div>
-                                    <div class="detail-box">
-                                        <h4>Pattern to match</h4>
-                                        <pre>{pattern_match}</pre>
-                                    </div>
-                                    <div class="detail-box">
-                                        <h4>Expected HTTP status</h4>
-                                        <pre>{expected_status}</pre>
-                                    </div>
-                                    <div class="detail-box">
-                                        <h4>HTTP status from server</h4>
-                                        <pre>{actual_status}</pre>
-                                    </div>
-                                    <div class="detail-box">
-                                        <h4>HTTP status Validation result</h4>
-                                        <div class="detail-content {validation_result_class}">{'PASS' if passed else 'FAIL'}</div>
-                                    </div>
-                                    <div class="detail-box output-section">
-                                        <h4>Output from server</h4>
-                                        <div class="detail-content">{output}</div>
+                                <div class="test-step">
+                                    <h4 class="step-header">Step {step_index}: {step_name}</h4>
+                                    <div class="test-details-grid">
+                                        <div class="detail-box">
+                                            <h4>Command</h4>
+                                            <pre>{command}</pre>
+                                        </div>
+                                        <div class="detail-box">
+                                            <h4>HTTP Response From Server</h4>
+                                            <div class="detail-content">{output}</div>
+                                        </div>
+                                        <div class="detail-box">
+                                            <h4>Pattern to match</h4>
+                                            <pre>{pattern_match}</pre>
+                                        </div>
+                                        <div class="detail-box">
+                                            <h4>Expected HTTP status</h4>
+                                            <pre>{expected_status}</pre>
+                                        </div>
+                                        <div class="detail-box">
+                                            <h4>HTTP status from server</h4>
+                                            <pre>{actual_status}</pre>
+                                        </div>
+                                        <div class="detail-box">
+                                            <h4>HTTP status Validation result</h4>
+                                            <div class="detail-content {validation_result_class}">{'PASS' if passed else 'FAIL'}</div>
+                                        </div>
+                                        <div class="detail-box output-section">
+                                            <h4>Output from server</h4>
+                                            <div class="detail-content">{output}</div>
+                                        </div>
                                     </div>
                                 </div>
                     """
