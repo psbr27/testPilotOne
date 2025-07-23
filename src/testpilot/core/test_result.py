@@ -21,6 +21,11 @@ class TestResult:
     duration: float = 0.0
     method: str = "GET"
     details: Optional[Dict[str, Any]] = None
+    response_headers: Optional[Dict[str, Any]] = (
+        None  # Headers from HTTP response
+    )
+    request_payload: Optional[Any] = None  # Request payload for reference
+    response_payload: Optional[Any] = None  # Response payload from server
 
 
 class TestStep:

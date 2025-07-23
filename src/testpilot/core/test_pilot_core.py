@@ -616,6 +616,9 @@ def validate_and_create_result(
         duration=duration,
         method=method,
         details=result.details,
+        response_headers=response_headers,  # Add headers from HTTP response
+        request_payload=request_payload,  # Add request payload for reference
+        response_payload=response_payload,  # Add response payload from server
     )
     return test_result
 

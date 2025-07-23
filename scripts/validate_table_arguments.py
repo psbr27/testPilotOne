@@ -9,11 +9,12 @@ import sys
 from dataclasses import fields
 from typing import Any, Dict, List
 
-# Add current directory to path to import modules
+# Add src directory to path to import modules
 sys.path.insert(0, ".")
+sys.path.insert(0, "src")
 
-from console_table_fmt import LiveProgressTable
-from test_result import TestFlow, TestResult, TestStep
+from testpilot.core.test_result import TestFlow, TestResult, TestStep
+from testpilot.ui.console_table_fmt import LiveProgressTable
 
 
 def validate_test_result_fields(test_result: Any) -> Dict[str, Any]:
@@ -88,6 +89,12 @@ def create_sample_test_results() -> List[Any]:
         test_name="User API Test",
         duration=1.25,
         method="GET",
+        response_headers={
+            "content-type": "application/json",
+            "x-request-id": "test-123",
+        },
+        request_payload=None,
+        response_payload='{"users": []}',
     )
 
     # Sample 2: Failed test result
@@ -107,6 +114,9 @@ def create_sample_test_results() -> List[Any]:
         test_name="Login API Test",
         duration=0.5,
         method="POST",
+        response_headers=None,
+        request_payload={"username": "test", "password": "secret"},
+        response_payload=None,
     )
 
     # Sample 3: Object with missing method (simulating the bug)
