@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def debug_test(test_name, row_index):
     # Load test data
     with open(
-        "/Users/sarathp/Documents/incubator/testPilotOne/test_results/test_results_slf_registration.json",
+        "/Users/sarathp/Documents/incubator/testPilotOne/test_results_UserAgentHeader-egw.json",
         "r",
     ) as f:
         data = json.load(f)

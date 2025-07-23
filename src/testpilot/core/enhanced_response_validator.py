@@ -429,6 +429,19 @@ def validate_response_enhanced(
                 found_headers = pattern_trimmed in headers_str
                 if found_body or found_headers:
                     logger.debug(f"Pattern found after trimming whitespace")
+
+        # If still not found, try removing surrounding quotes from pattern
+        if not found_body and not found_headers:
+            if (
+                pattern_match.startswith('"') and pattern_match.endswith('"')
+            ) or (
+                pattern_match.startswith("'") and pattern_match.endswith("'")
+            ):
+                pattern_no_quotes = pattern_match[1:-1]
+                found_body = pattern_no_quotes in actual_str
+                found_headers = pattern_no_quotes in headers_str
+                if found_body or found_headers:
+                    logger.debug(f"Pattern found after removing quotes")
         found = found_body or found_headers
         details = f"Pattern found in: "
         if found_body:
