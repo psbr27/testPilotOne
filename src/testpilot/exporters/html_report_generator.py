@@ -878,6 +878,25 @@ class HTMLReportGenerator(TestResultsExporter):
         .step-content.active {
             display: block;
         }
+        .fail-reason-section {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+        }
+        .fail-reason-section h4 {
+            color: #721c24;
+            background-color: #f5c6cb;
+            margin: 0;
+            padding: 8px 12px;
+            border-radius: 4px 4px 0 0;
+            font-weight: 600;
+        }
+        .fail-reason {
+            color: #721c24;
+            font-weight: 500;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
         """
 
     def _get_nf_js_scripts(self):
@@ -1686,6 +1705,9 @@ class HTMLReportGenerator(TestResultsExporter):
                     else:
                         request_display = None
 
+                    # Extract fail reason if available
+                    fail_reason = getattr(result, "fail_reason", None) or ""
+
                     validation_result_class = (
                         "validation-result"
                         if passed
@@ -1733,6 +1755,15 @@ class HTMLReportGenerator(TestResultsExporter):
                                                     <div class="detail-content">{headers_display}</div>
                                                 </div>
                     """
+
+                    # Add fail reason if test failed and fail reason is available
+                    if not passed and fail_reason:
+                        html_content += f"""
+                                                <div class="detail-box fail-reason-section" style="grid-column: span 3;">
+                                                    <h4>Failure Reason</h4>
+                                                    <div class="detail-content fail-reason">{fail_reason}</div>
+                                                </div>
+                        """
 
                     # Add request payload if available
                     if request_display:
