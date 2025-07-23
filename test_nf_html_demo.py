@@ -3,6 +3,7 @@
 Demo script to test the new NF-style HTML report generator
 """
 
+import argparse
 import os
 import sys
 from datetime import datetime
@@ -31,6 +32,9 @@ class MockTestResult:
         actual_status=200,
         fail_reason="",
         error="",
+        response_payload=None,
+        response_headers=None,
+        request_payload=None,
     ):
         self.test_name = test_name
         self.sheet = sheet
@@ -45,6 +49,12 @@ class MockTestResult:
         self.actual_status = actual_status
         self.fail_reason = fail_reason
         self.error = error
+        self.response_payload = response_payload
+        self.Response_Payload = (
+            response_payload  # Both forms for compatibility
+        )
+        self.response_headers = response_headers or {}
+        self.request_payload = request_payload
 
 
 def create_sample_test_results():
@@ -61,7 +71,15 @@ def create_sample_test_results():
                 host="amf.5g-core.com",
                 passed=True,
                 command="curl -X POST https://amf.5g-core.com/namf-comm/v1/ue-registration",
-                output='{"result": "success", "ue_id": "123456789", "amf_id": "amf-001"}',
+                output="SSH execution output - command completed successfully",
+                response_payload='{"result": "success", "ue_id": "123456789", "amf_id": "amf-001", "registration_status": "registered", "timestamp": "2024-01-15T10:30:45Z"}',
+                response_headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": "156",
+                    "Server": "AMF/1.0",
+                    "X-Request-ID": "req-12345",
+                    "Date": "Mon, 15 Jan 2024 10:30:45 GMT",
+                },
                 pattern_match='"result": "success"',
                 expected_status=201,
                 actual_status=201,
@@ -73,7 +91,16 @@ def create_sample_test_results():
                 host="amf.5g-core.com",
                 passed=True,
                 command="curl -X GET https://amf.5g-core.com/namf-comm/v1/ue-context/123456789",
-                output='{"ue_id": "123456789", "state": "registered", "amf_id": "amf-001"}',
+                output="SSH execution output - command completed successfully",
+                response_payload='{"ue_id": "123456789", "state": "registered", "amf_id": "amf-001", "location": {"cell_id": "cell-789", "tracking_area": "ta-456"}}',
+                response_headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": "148",
+                    "Server": "AMF/1.0",
+                    "Cache-Control": "no-cache",
+                    "X-Request-ID": "req-12346",
+                    "Date": "Mon, 15 Jan 2024 10:30:46 GMT",
+                },
                 pattern_match='"state": "registered"',
                 expected_status=200,
                 actual_status=200,
@@ -90,8 +117,30 @@ def create_sample_test_results():
                 method="PUT",
                 host="amf.5g-core.com",
                 passed=False,
-                command="curl -X PUT https://amf.5g-core.com/namf-comm/v1/handover/123456789",
-                output='{"error": "handover_failed", "reason": "target_cell_unavailable"}',
+                command="curl -X PUT https://amf.5g-core.com/namf-comm/v1/handover/123456789 -d @request.json",
+                output="SSH execution error - HTTP 400 Bad Request",
+                request_payload={
+                    "ueId": "123456789",
+                    "targetCell": {
+                        "cellId": "cell-999",
+                        "trackingArea": "ta-789",
+                        "plmnId": "310-260",
+                    },
+                    "handoverType": "5G_TO_5G",
+                    "sourceCell": {
+                        "cellId": "cell-789",
+                        "trackingArea": "ta-456",
+                    },
+                    "cause": "radioNetwork",
+                },
+                response_payload='{"error": "handover_failed", "reason": "target_cell_unavailable", "error_code": "AMF-ERR-002", "timestamp": "2024-01-15T10:30:47Z"}',
+                response_headers={
+                    "Content-Type": "application/problem+json",
+                    "Content-Length": "132",
+                    "Server": "AMF/1.0",
+                    "X-Error-Code": "AMF-ERR-002",
+                    "Date": "Mon, 15 Jan 2024 10:30:47 GMT",
+                },
                 pattern_match='"result": "success"',
                 expected_status=200,
                 actual_status=400,
@@ -135,7 +184,23 @@ def create_sample_test_results():
 
 def main():
     """Main function to demonstrate NF-style HTML generation"""
-    print("🎯 NF-Style HTML Report Generator Demo")
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="NF-Style HTML Report Generator Demo"
+    )
+    parser.add_argument(
+        "-m",
+        "--mode",
+        choices=["otp", "audit", "config", "OTP", "AUDIT", "CONFIG"],
+        default="OTP",
+        help="Test mode: otp, audit, or config (default: otp)",
+    )
+    args = parser.parse_args()
+
+    # Normalize test mode to uppercase
+    test_mode = args.mode.upper()
+
+    print(f"🎯 NF-Style HTML Report Generator Demo - {test_mode} Mode")
     print("=" * 50)
 
     # Create sample test results
@@ -164,9 +229,13 @@ def main():
     print("\n📄 Generating HTML reports...")
 
     # Generate NF-style report
-    nf_filename = f"test_results/nf_style_report_{timestamp}.html"
-    html_generator.export_to_nf_html(test_results, nf_filename, config)
-    print(f"   ✅ NF-style report: {nf_filename}")
+    nf_filename = (
+        f"test_results/nf_style_{test_mode.lower()}_report_{timestamp}.html"
+    )
+    html_generator.export_to_nf_html(
+        test_results, nf_filename, config, test_mode=test_mode
+    )
+    print(f"   ✅ NF-style {test_mode} report: {nf_filename}")
 
     # Generate standard report for comparison
     standard_filename = f"test_results/standard_report_{timestamp}.html"

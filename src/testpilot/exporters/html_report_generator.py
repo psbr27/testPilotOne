@@ -513,7 +513,7 @@ class HTMLReportGenerator(TestResultsExporter):
         """Return CSS styles for the NF-style HTML report"""
         return """
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
             color: #333;
             margin: 0;
@@ -527,7 +527,6 @@ class HTMLReportGenerator(TestResultsExporter):
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border: 2px solid #ddd;
         }
         .report-header {
             text-align: center;
@@ -548,10 +547,11 @@ class HTMLReportGenerator(TestResultsExporter):
         }
         .system-under-test {
             background-color: #f8f9fa;
-            padding: 15px;
+            padding: 20px;
             border-radius: 5px;
-            margin-bottom: 30px;
+            border: 1px solid #dee2e6;
             border-left: 4px solid #007bff;
+            height: 100%;
         }
         .system-under-test h3 {
             margin: 0 0 10px 0;
@@ -570,12 +570,29 @@ class HTMLReportGenerator(TestResultsExporter):
         .system-detail strong {
             color: #34495e;
         }
+        .info-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        @media (max-width: 768px) {
+            .info-container {
+                grid-template-columns: 1fr;
+            }
+        }
         .overall-summary {
             background-color: #f8f9fa;
             padding: 20px;
             border-radius: 5px;
-            margin-bottom: 30px;
             text-align: center;
+            border: 1px solid #dee2e6;
+            height: 100%;
+        }
+        .overall-summary > h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 18px;
         }
         .summary-stats {
             display: flex;
@@ -601,32 +618,33 @@ class HTMLReportGenerator(TestResultsExporter):
         .failed { color: #e74c3c; }
         .pass-rate { color: #2c3e50; }
         .main-chart {
-            margin: 20px auto;
-            max-width: 800px;
+            margin-bottom: 30px;
             height: 400px;
-            background-color: white;
-            border: 1px solid #ddd;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
             border-radius: 5px;
             padding: 20px;
         }
         .sheet-results {
-            margin-top: 30px;
+            margin-top: 0;
         }
         .sheet-results h2 {
             margin-bottom: 25px;
             color: #2c3e50;
             font-size: 22px;
+            text-align: left;
         }
         .sheet-bars-container {
             background-color: #f8f9fa;
             padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
         }
         .sheet-bar {
             margin-bottom: 15px;
             cursor: pointer;
-            transition: transform 0.2s ease;
+            transition: all 0.2s ease;
+            position: relative;
         }
         .sheet-bar:hover {
             transform: translateX(5px);
@@ -634,34 +652,54 @@ class HTMLReportGenerator(TestResultsExporter):
         .sheet-bar:last-child {
             margin-bottom: 0;
         }
+        .sheet-bar.active {
+            transform: translateX(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
         .sheet-bar-content {
             position: relative;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 25px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
             padding: 15px 20px;
-            color: white;
+            color: #333;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
             min-height: 20px;
+            border: 1px solid #ddd;
         }
         .sheet-bar.passed .sheet-bar-content {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
         }
         .sheet-bar.failed .sheet-bar-content {
-            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-            box-shadow: 0 4px 15px rgba(255, 65, 108, 0.3);
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
         }
         .sheet-bar.mixed .sheet-bar-content {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
+            background-color: #fff3cd;
+            color: #856404;
+            border-color: #ffeaa7;
         }
         .sheet-name {
             font-size: 16px;
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .sheet-name::before {
+            content: '▶';
+            font-size: 12px;
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+        .sheet-bar.active .sheet-name::before {
+            transform: rotate(90deg);
         }
         .sheet-counts {
             display: flex;
@@ -688,7 +726,7 @@ class HTMLReportGenerator(TestResultsExporter):
         }
         .test-details-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 20px;
             margin-bottom: 20px;
         }
@@ -713,7 +751,7 @@ class HTMLReportGenerator(TestResultsExporter):
             padding: 10px;
             background-color: #f8f9fa;
             border-radius: 4px;
-            font-family: monospace;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
             font-size: 13px;
             white-space: pre-wrap;
             overflow: auto;
@@ -722,6 +760,11 @@ class HTMLReportGenerator(TestResultsExporter):
         .validation-result {
             background-color: #d4edda !important;
             color: #155724;
+            font-weight: bold;
+        }
+        .validation-result-fail {
+            background-color: #f8d7da !important;
+            color: #721c24;
             font-weight: bold;
         }
         .output-section {
@@ -787,16 +830,32 @@ class HTMLReportGenerator(TestResultsExporter):
             // Create main bar chart
             createMainBarChart();
 
-            // Toggle sheet content
+            // Toggle sheet content with auto-collapse
             document.querySelectorAll('.sheet-bar').forEach(bar => {
                 bar.addEventListener('click', function() {
                     const sheetName = this.getAttribute('data-sheet');
                     const content = document.getElementById('sheet-content-' + sheetName);
+
                     if (content) {
-                        if (content.style.display === 'block') {
-                            content.style.display = 'none';
-                        } else {
+                        // Check if this sheet is currently open
+                        const isCurrentlyOpen = content.style.display === 'block';
+
+                        // First, close all open sheets and remove active class
+                        document.querySelectorAll('.sheet-content').forEach(sheetContent => {
+                            sheetContent.style.display = 'none';
+                        });
+                        document.querySelectorAll('.sheet-bar').forEach(bar => {
+                            bar.classList.remove('active');
+                        });
+
+                        // If the clicked sheet was closed, open it
+                        // If it was open, it stays closed (toggle behavior)
+                        if (!isCurrentlyOpen) {
                             content.style.display = 'block';
+                            this.classList.add('active');
+
+                            // Optionally scroll to the opened section
+                            content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                         }
                     }
                 });
@@ -1271,13 +1330,26 @@ class HTMLReportGenerator(TestResultsExporter):
         test_results: List[Any],
         filename: str = None,
         config: Dict[str, Any] = None,
+        test_mode: str = "OTP",
     ) -> str:
-        """Export test results to NF-style HTML report"""
+        """Export test results to NF-style HTML report
+
+        Args:
+            test_results: List of test results
+            filename: Output filename
+            config: Configuration dictionary
+            test_mode: Test mode - 'OTP', 'AUDIT', or 'CONFIG'
+        """
         if not filename:
             filename = self._generate_filename("html")
 
         if not config:
             config = self._load_config()
+
+        # Validate and normalize test mode
+        test_mode = test_mode.upper() if test_mode else "OTP"
+        if test_mode not in ["OTP", "AUDIT", "CONFIG"]:
+            test_mode = "OTP"
 
         # Get system under test details
         system_info = config.get("system_under_test", {})
@@ -1303,13 +1375,31 @@ class HTMLReportGenerator(TestResultsExporter):
         # Generate timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # Get NF name from config for proper header
+        nf_name = config.get("nf_name", "NF")
+        if "AMF" in nf_name.upper():
+            report_title = f"AMF {test_mode} Test Report"
+        elif "SMF" in nf_name.upper():
+            report_title = f"SMF {test_mode} Test Report"
+        elif "NRF" in nf_name.upper():
+            report_title = f"NRF {test_mode} Test Report"
+        elif "SLF" in nf_name.upper():
+            report_title = f"SLF {test_mode} Test Report"
+        else:
+            # Extract prefix from nf_name if available
+            if "_" in nf_name:
+                nf_prefix = nf_name.split("_")[0]
+                report_title = f"{nf_prefix} {test_mode} Test Report"
+            else:
+                report_title = f"{nf_name} {test_mode} Test Report"
+
         # Generate HTML content
         html_content = f"""<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>&lt;NF&gt; Test Report</title>
+            <title>{report_title}</title>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <style>
             {self.nf_css_styles}
@@ -1318,37 +1408,39 @@ class HTMLReportGenerator(TestResultsExporter):
         <body>
             <div class="container">
                 <div class="report-header">
-                    <div class="report-title">&lt;NF&gt; Test Report</div>
+                    <div class="report-title">{report_title}</div>
                     <div class="timestamp">Timestamp: {timestamp}</div>
                 </div>
 
-                <div class="system-under-test">
-                    <h3>System Under Test:</h3>
-                    <div class="system-details">
-                        <div class="system-detail"><strong>NF Type:</strong> {system_info.get('nf_type', 'Network Function')}</div>
-                        <div class="system-detail"><strong>Version:</strong> {system_info.get('version', 'v1.0.0')}</div>
-                        <div class="system-detail"><strong>Environment:</strong> {system_info.get('environment', 'Test Environment')}</div>
-                        <div class="system-detail"><strong>Deployment:</strong> {system_info.get('deployment', 'Test Deployment')}</div>
+                <div class="info-container">
+                    <div class="system-under-test">
+                        <h3>System Under Test</h3>
+                        <div class="system-details">
+                            <div class="system-detail"><strong>NF Type:</strong> {system_info.get('nf_type', 'Network Function')}</div>
+                            <div class="system-detail"><strong>Version:</strong> {system_info.get('version', 'v1.0.0')}</div>
+                            <div class="system-detail"><strong>Environment:</strong> {system_info.get('environment', 'Test Environment')}</div>
+                            <div class="system-detail"><strong>Deployment:</strong> {system_info.get('deployment', 'Test Deployment')}</div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <div class="system-detail"><strong>Description:</strong> {system_info.get('description', 'Network Function Under Test')}</div>
+                        </div>
                     </div>
-                    <div style="margin-top: 10px;">
-                        <div class="system-detail"><strong>Description:</strong> {system_info.get('description', 'Network Function Under Test')}</div>
-                    </div>
-                </div>
 
-                <div class="overall-summary">
-                    <h2>Overall Test Summary</h2>
-                    <div class="summary-stats">
-                        <div class="summary-item">
-                            <h3>Pass</h3>
-                            <p class="passed">{passed_tests}</p>
-                        </div>
-                        <div class="summary-item">
-                            <h3>Fail</h3>
-                            <p class="failed">{failed_tests}</p>
-                        </div>
-                        <div class="summary-item">
-                            <h3>Pass Rate</h3>
-                            <p class="pass-rate">{pass_rate:.1f}%</p>
+                    <div class="overall-summary">
+                        <h3>Overall Test Summary</h3>
+                        <div class="summary-stats">
+                            <div class="summary-item">
+                                <h3>Pass</h3>
+                                <p class="passed">{passed_tests}</p>
+                            </div>
+                            <div class="summary-item">
+                                <h3>Fail</h3>
+                                <p class="failed">{failed_tests}</p>
+                            </div>
+                            <div class="summary-item">
+                                <h3>Pass Rate</h3>
+                                <p class="pass-rate">{pass_rate:.1f}%</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1394,12 +1486,7 @@ class HTMLReportGenerator(TestResultsExporter):
                             </div>
             """
 
-        html_content += """
-                    </div>
-        """
-
-        # Add detailed content for each sheet
-        for sheet_name, sheet_results in results_by_sheet.items():
+            # Add detailed content immediately after each sheet bar
             safe_sheet_name = sheet_name.replace(" ", "-").replace("/", "-")
 
             # Group tests by test name (without _<digits>)
@@ -1412,8 +1499,8 @@ class HTMLReportGenerator(TestResultsExporter):
                 tests_by_name[base_test_name].append(result)
 
             html_content += f"""
-                    <div class="sheet-content" id="sheet-content-{safe_sheet_name}">
-                        <h3>{sheet_name} - Detailed Results</h3>
+                            <div class="sheet-content" id="sheet-content-{safe_sheet_name}">
+                                <h3>{sheet_name} - Detailed Results</h3>
             """
 
             # Add test groups for this sheet
@@ -1426,12 +1513,12 @@ class HTMLReportGenerator(TestResultsExporter):
                 status_text = "PASS" if all_passed else "FAIL"
 
                 html_content += f"""
-                        <div class="test-group">
-                            <div class="test-group-header {group_status}">
-                                <span>{test_name} ({len(test_results)} steps)</span>
-                                <span class="status-pass">{status_text}</span>
-                            </div>
-                            <div class="test-group-content">
+                                <div class="test-group">
+                                    <div class="test-group-header {group_status}">
+                                        <span>{test_name} ({len(test_results)} steps)</span>
+                                        <span class="status-pass">{status_text}</span>
+                                    </div>
+                                    <div class="test-group-content">
                 """
 
                 # Show details for all test steps
@@ -1446,54 +1533,105 @@ class HTMLReportGenerator(TestResultsExporter):
                         result, "test_name", f"Step {step_index}"
                     )
 
-                    validation_result_class = (
-                        "validation-result" if passed else ""
+                    # Get actual HTTP response from Response_Payload field instead of error output
+                    response_payload = getattr(
+                        result, "Response_Payload", None
+                    ) or getattr(result, "response_payload", "")
+                    actual_response = (
+                        response_payload if response_payload else output
                     )
 
+                    # Extract response headers if available
+                    response_headers = (
+                        getattr(result, "response_headers", None) or {}
+                    )
+                    if isinstance(response_headers, dict) and response_headers:
+                        headers_display = json.dumps(
+                            response_headers, indent=2
+                        )
+                    else:
+                        headers_display = "No headers available"
+
+                    # Extract request payload if available
+                    request_payload = getattr(result, "request_payload", None)
+                    if request_payload:
+                        if isinstance(request_payload, dict):
+                            request_display = json.dumps(
+                                request_payload, indent=2
+                            )
+                        else:
+                            request_display = str(request_payload)
+                    else:
+                        request_display = None
+
+                    validation_result_class = (
+                        "validation-result"
+                        if passed
+                        else "validation-result-fail"
+                    )
+
+                    # Build HTML with conditional request payload section
                     html_content += f"""
-                                <div class="test-step">
-                                    <h4 class="step-header">Step {step_index}: {step_name}</h4>
-                                    <div class="test-details-grid">
-                                        <div class="detail-box">
-                                            <h4>Command</h4>
-                                            <pre>{command}</pre>
+                                        <div class="test-step">
+                                            <h4 class="step-header">Step {step_index}: {step_name}</h4>
+                                            <div class="test-details-grid">
+                                                <div class="detail-box">
+                                                    <h4>Command</h4>
+                                                    <pre>{command}</pre>
+                                                </div>
+                                                <div class="detail-box">
+                                                    <h4>Pattern to match</h4>
+                                                    <pre>{pattern_match}</pre>
+                                                </div>
+                                                <div class="detail-box">
+                                                    <h4>HTTP status Validation result</h4>
+                                                    <div class="detail-content {validation_result_class}">{'PASS' if passed else 'FAIL'}</div>
+                                                </div>
+                                                <div class="detail-box">
+                                                    <h4>Expected HTTP status</h4>
+                                                    <pre>{expected_status}</pre>
+                                                </div>
+                                                <div class="detail-box">
+                                                    <h4>HTTP status from server</h4>
+                                                    <pre>{actual_status}</pre>
+                                                </div>
+                                                <div class="detail-box">
+                                                    <h4>Headers</h4>
+                                                    <div class="detail-content">{headers_display}</div>
+                                                </div>
+                    """
+
+                    # Add request payload if available
+                    if request_display:
+                        html_content += f"""
+                                                <div class="detail-box output-section" style="grid-column: span 3;">
+                                                    <h4>Request Payload</h4>
+                                                    <div class="detail-content">{request_display}</div>
+                                                </div>
+                        """
+
+                    # Always add response section
+                    html_content += f"""
+                                                <div class="detail-box output-section" style="grid-column: span 3;">
+                                                    <h4>HTTP Response From Server</h4>
+                                                    <div class="detail-content">{actual_response}</div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="detail-box">
-                                            <h4>HTTP Response From Server</h4>
-                                            <div class="detail-content">{output}</div>
-                                        </div>
-                                        <div class="detail-box">
-                                            <h4>Pattern to match</h4>
-                                            <pre>{pattern_match}</pre>
-                                        </div>
-                                        <div class="detail-box">
-                                            <h4>Expected HTTP status</h4>
-                                            <pre>{expected_status}</pre>
-                                        </div>
-                                        <div class="detail-box">
-                                            <h4>HTTP status from server</h4>
-                                            <pre>{actual_status}</pre>
-                                        </div>
-                                        <div class="detail-box">
-                                            <h4>HTTP status Validation result</h4>
-                                            <div class="detail-content {validation_result_class}">{'PASS' if passed else 'FAIL'}</div>
-                                        </div>
-                                        <div class="detail-box output-section">
-                                            <h4>Output from server</h4>
-                                            <div class="detail-content">{output}</div>
-                                        </div>
-                                    </div>
-                                </div>
                     """
 
                 html_content += """
-                            </div>
-                        </div>
+                                    </div>
+                                </div>
                 """
 
             html_content += """
-                    </div>
+                            </div>
             """
+
+        html_content += """
+                    </div>
+        """
 
         # Close HTML document
         html_content += f"""
