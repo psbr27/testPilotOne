@@ -580,7 +580,7 @@ class HTMLReportGenerator(TestResultsExporter):
         .summary-stats {
             display: flex;
             justify-content: center;
-            gap: 40px;
+            gap: 60px;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
@@ -599,6 +599,7 @@ class HTMLReportGenerator(TestResultsExporter):
         }
         .passed { color: #27ae60; }
         .failed { color: #e74c3c; }
+        .pass-rate { color: #2c3e50; }
         .main-chart {
             margin: 20px auto;
             max-width: 800px;
@@ -611,38 +612,67 @@ class HTMLReportGenerator(TestResultsExporter):
         .sheet-results {
             margin-top: 30px;
         }
-        .sheet-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 30px;
-        }
-        .sheet-table th, .sheet-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border: 1px solid #ddd;
-        }
-        .sheet-table th {
-            background-color: #f8f9fa;
-            font-weight: 600;
+        .sheet-results h2 {
+            margin-bottom: 25px;
             color: #2c3e50;
+            font-size: 22px;
         }
-        .sheet-row {
+        .sheet-bars-container {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .sheet-bar {
+            margin-bottom: 15px;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: transform 0.2s ease;
         }
-        .sheet-row:hover {
-            background-color: #f5f5f5;
+        .sheet-bar:hover {
+            transform: translateX(5px);
         }
-        .sheet-row.passed {
-            background-color: rgba(39, 174, 96, 0.1);
+        .sheet-bar:last-child {
+            margin-bottom: 0;
         }
-        .status-pass {
-            background-color: #d4edda;
-            color: #155724;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
+        .sheet-bar-content {
+            position: relative;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 25px;
+            padding: 15px 20px;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 20px;
+        }
+        .sheet-bar.passed .sheet-bar-content {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+        }
+        .sheet-bar.failed .sheet-bar-content {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            box-shadow: 0 4px 15px rgba(255, 65, 108, 0.3);
+        }
+        .sheet-bar.mixed .sheet-bar-content {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);
+        }
+        .sheet-name {
+            font-size: 16px;
             font-weight: bold;
+        }
+        .sheet-counts {
+            display: flex;
+            gap: 15px;
+            font-size: 14px;
+        }
+        .count-item {
+            background-color: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-weight: 600;
         }
         .sheet-content {
             display: none;
@@ -650,6 +680,8 @@ class HTMLReportGenerator(TestResultsExporter):
             background-color: #f8f9fa;
             border: 1px solid #ddd;
             border-top: none;
+            border-radius: 0 0 8px 8px;
+            margin-top: -5px;
         }
         .test-details-section {
             margin-top: 30px;
@@ -734,8 +766,8 @@ class HTMLReportGenerator(TestResultsExporter):
             createMainBarChart();
 
             // Toggle sheet content
-            document.querySelectorAll('.sheet-row').forEach(row => {
-                row.addEventListener('click', function() {
+            document.querySelectorAll('.sheet-bar').forEach(bar => {
+                bar.addEventListener('click', function() {
                     const sheetName = this.getAttribute('data-sheet');
                     const content = document.getElementById('sheet-content-' + sheetName);
                     if (content) {
@@ -770,10 +802,10 @@ class HTMLReportGenerator(TestResultsExporter):
             const passedCounts = [];
             const failedCounts = [];
 
-            document.querySelectorAll('.sheet-row').forEach(row => {
-                const sheetName = row.getAttribute('data-sheet');
-                const passed = parseInt(row.getAttribute('data-passed') || '0');
-                const failed = parseInt(row.getAttribute('data-failed') || '0');
+            document.querySelectorAll('.sheet-bar').forEach(bar => {
+                const sheetName = bar.getAttribute('data-sheet');
+                const passed = parseInt(bar.getAttribute('data-passed') || '0');
+                const failed = parseInt(bar.getAttribute('data-failed') || '0');
 
                 sheetNames.push(sheetName);
                 passedCounts.push(passed);
@@ -1242,6 +1274,9 @@ class HTMLReportGenerator(TestResultsExporter):
             1 for r in test_results if getattr(r, "passed", False)
         )
         failed_tests = total_tests - passed_tests
+        pass_rate = (
+            (passed_tests / total_tests * 100) if total_tests > 0 else 0
+        )
 
         # Generate timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1289,6 +1324,10 @@ class HTMLReportGenerator(TestResultsExporter):
                             <h3>Fail</h3>
                             <p class="failed">{failed_tests}</p>
                         </div>
+                        <div class="summary-item">
+                            <h3>Pass Rate</h3>
+                            <p class="pass-rate">{pass_rate:.1f}%</p>
+                        </div>
                     </div>
                 </div>
 
@@ -1296,16 +1335,9 @@ class HTMLReportGenerator(TestResultsExporter):
                     <canvas id="main-chart"></canvas>
                 </div>
 
-                <div class="sheet-results">
+                                <div class="sheet-results">
                     <h2>Test Results by Sheet</h2>
-                    <table class="sheet-table">
-                        <thead>
-                            <tr>
-                                <th>Sheet Name</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="sheet-bars-container">
         """
 
         # Add sheet rows and detailed content
@@ -1315,22 +1347,33 @@ class HTMLReportGenerator(TestResultsExporter):
             )
             sheet_failed = len(sheet_results) - sheet_passed
 
-            # Determine if sheet passed (all tests passed)
-            sheet_status = "PASSED" if sheet_failed == 0 else "FAILED"
-            sheet_class = "passed" if sheet_failed == 0 else "failed"
+            # Determine sheet status and class
+            if sheet_failed == 0:
+                sheet_status = "PASSED"
+                sheet_class = "passed"
+            elif sheet_passed == 0:
+                sheet_status = "FAILED"
+                sheet_class = "failed"
+            else:
+                sheet_status = "MIXED"
+                sheet_class = "mixed"
 
             safe_sheet_name = sheet_name.replace(" ", "-").replace("/", "-")
 
             html_content += f"""
-                            <tr class="sheet-row {sheet_class}" data-sheet="{safe_sheet_name}" data-passed="{sheet_passed}" data-failed="{sheet_failed}">
-                                <td>{sheet_name}</td>
-                                <td><span class="status-pass">{sheet_status}</span></td>
-                            </tr>
+                            <div class="sheet-bar {sheet_class}" data-sheet="{safe_sheet_name}" data-passed="{sheet_passed}" data-failed="{sheet_failed}">
+                                <div class="sheet-bar-content">
+                                    <span class="sheet-name">{sheet_name}</span>
+                                    <div class="sheet-counts">
+                                        <span class="count-item">Passed: {sheet_passed}</span>
+                                        <span class="count-item">Failed: {sheet_failed}</span>
+                                    </div>
+                                </div>
+                            </div>
             """
 
         html_content += """
-                        </tbody>
-                    </table>
+                    </div>
         """
 
         # Add detailed content for each sheet
