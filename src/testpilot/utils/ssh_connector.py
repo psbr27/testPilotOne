@@ -297,6 +297,56 @@ class SSHConnector:
                 return hc
         return None
 
+    def download_file(
+        self, host_name: str, remote_path: str, local_path: str
+    ) -> bool:
+        """Download a file from remote host to local machine"""
+        try:
+            conn = self.connections.get(host_name)
+            if not conn:
+                logger.error(f"No connection found for host {host_name}")
+                return False
+
+            sftp = conn.open_sftp()
+            sftp.get(remote_path, local_path)
+            sftp.close()
+            logger.debug(
+                f"Downloaded file from {host_name}:{remote_path} to {local_path}"
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                f"Failed to download file from {host_name}:{remote_path}: {e}"
+            )
+            return False
+
+    def cleanup_remote_file(self, host_name: str, remote_path: str) -> bool:
+        """Remove a file from remote host"""
+        try:
+            conn = self.connections.get(host_name)
+            if not conn:
+                logger.error(f"No connection found for host {host_name}")
+                return False
+
+            stdin, stdout, stderr = conn.exec_command(f"rm -f {remote_path}")
+            exit_status = stdout.channel.recv_exit_status()
+            if exit_status == 0:
+                logger.debug(
+                    f"Cleaned up remote file {host_name}:{remote_path}"
+                )
+                return True
+            else:
+                error_msg = stderr.read().decode().strip()
+                logger.warning(
+                    f"Failed to cleanup remote file {host_name}:{remote_path}: {error_msg}"
+                )
+                return False
+        except Exception as e:
+            logger.error(
+                f"Failed to cleanup remote file {host_name}:{remote_path}: {e}"
+            )
+            return False
+
     def close_all(self):
         for name, conn in self.connections.items():
             conn.close()

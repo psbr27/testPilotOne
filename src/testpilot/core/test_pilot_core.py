@@ -261,10 +261,14 @@ def build_url_based_command(
 def build_kubectl_logs_command(
     command, namespace, connector, host, host_cli_map=None
 ):
-    """Build kubectl logs command with dynamic pod name resolution. Handles multiple pod matches."""
+    """Build kubectl logs command with dynamic pod name resolution and file-based capture."""
     match = re.search(r"\{([^}]+)\}", command)
     if not match:
-        return command
+        # If no placeholder, generate file-based capture command directly
+        return _generate_logs_capture_command(
+            command, namespace, connector, host
+        )
+
     to_search_pod_name = match.group(1)
 
     # Check if we're in mock mode - if so, skip pod name resolution
@@ -281,7 +285,11 @@ def build_kubectl_logs_command(
             f"{{{to_search_pod_name}}}", mock_pod_name
         )
         logger.debug(f"Mock mode: using mock pod name '{mock_pod_name}'")
-        return [mock_command]
+        return [
+            _generate_logs_capture_command(
+                mock_command, namespace, connector, host
+            )
+        ]
 
     # Get CLI type (kubectl or oc) from host_cli_map
     cli_type = "kubectl"
@@ -296,6 +304,7 @@ def build_kubectl_logs_command(
         )
     else:
         find_pod = f"{cli_type} get pods | grep '{to_search_pod_name}' | awk '{{print $1}}'"
+
     # Get all matching pod names
     if connector is not None and getattr(connector, "use_ssh", False):
         result = connector.run_command(find_pod, [host])
@@ -310,17 +319,121 @@ def build_kubectl_logs_command(
         pod_names = [
             line.strip() for line in result.stdout.splitlines() if line.strip()
         ]
+
     if not pod_names:
         logger.error(
             f"No pod found matching '{to_search_pod_name}' on host {host}"
         )
         return None
 
-    commands = [
-        command.replace(f"{{{to_search_pod_name}}}", pod_name)
-        for pod_name in pod_names
-    ]
+    # Generate file-based capture commands for each pod
+    commands = []
+    for pod_name in pod_names:
+        resolved_command = command.replace(
+            f"{{{to_search_pod_name}}}", pod_name
+        )
+        capture_command = _generate_logs_capture_command(
+            resolved_command, namespace, connector, host
+        )
+        commands.append(capture_command)
+
     return commands
+
+
+def _generate_logs_capture_command(base_command, namespace, connector, host):
+    """Generate file-based kubectl logs capture command with configurable duration."""
+    # Load kubectl_logs_settings from config
+    config_file = getattr(connector, "config_file", "config/hosts.json")
+
+    try:
+        with open(config_file, "r") as f:
+            config = json.load(f)
+        kubectl_settings = config.get("kubectl_logs_settings", {})
+        capture_duration = kubectl_settings.get("capture_duration", 30)
+        log_file_prefix = kubectl_settings.get(
+            "log_file_prefix", "kubectl_logs_"
+        )
+    except Exception as e:
+        logger.warning(
+            f"Failed to load kubectl_logs_settings: {e}, using defaults"
+        )
+        capture_duration = 30
+        log_file_prefix = "kubectl_logs_"
+
+    # Extract pod name from base command for meaningful filename
+    pod_name = "unknown"
+    if "logs" in base_command:
+        # Parse kubectl logs command to extract pod name
+        # Examples: "kubectl logs pod-name -n namespace" or "kubectl logs pod-name"
+        parts = base_command.split()
+        if len(parts) >= 3 and parts[1] == "logs":
+            pod_name = parts[2]  # pod name is typically the 3rd argument
+        elif len(parts) >= 2 and "logs" in parts[1]:
+            # Handle cases like "kubectl logs-f pod-name"
+            if len(parts) >= 3:
+                pod_name = parts[2]
+
+    # Generate meaningful log filename using pod name
+    timestamp = str(int(time.time()))
+    log_filename = f"{log_file_prefix}{pod_name}_{timestamp}.log"
+
+    # Determine log file path based on SSH mode
+    if connector is not None and getattr(connector, "use_ssh", False):
+        # For SSH mode: use ssh_tmp folder on remote host, and ssh_tmp locally
+        remote_log_dir = "/tmp"  # Remote temp directory on SSH host
+        local_log_dir = "ssh_tmp"
+
+        # Create local ssh_tmp directory if it doesn't exist
+        if not os.path.exists(local_log_dir):
+            os.makedirs(local_log_dir)
+            logger.debug(f"Created directory: {local_log_dir}")
+
+        log_file_path = f"{remote_log_dir}/{log_filename}"
+    else:
+        # For local mode: use kubectl_logs folder
+        local_log_dir = "kubectl_logs"
+
+        # Create kubectl_logs directory if it doesn't exist
+        if not os.path.exists(local_log_dir):
+            os.makedirs(local_log_dir)
+            logger.debug(f"Created directory: {local_log_dir}")
+
+        log_file_path = f"{local_log_dir}/{log_filename}"
+
+    # Extract pod name and namespace from base command
+    # Example: kubectl logs pod-name -n namespace -> kubectl logs -f pod-name -n namespace
+    if "logs" in base_command:
+        # Convert to follow mode and redirect to file
+        follow_command = base_command.replace("logs", "logs -f", 1)
+
+        capture_command = f"""
+        {follow_command} > {log_file_path} &
+        LOG_PID=$!
+        sleep {capture_duration}
+        kill $LOG_PID 2>/dev/null || true
+        """
+
+        # Store metadata for later file handling
+        if not hasattr(connector, "_kubectl_log_files"):
+            connector._kubectl_log_files = {}
+
+        # Store both remote and local paths for SSH mode
+        metadata = {
+            "log_file_path": log_file_path,
+            "host": host,
+            "is_ssh": getattr(connector, "use_ssh", False),
+        }
+
+        if getattr(connector, "use_ssh", False):
+            metadata["local_dir"] = "ssh_tmp"
+        else:
+            metadata["local_dir"] = "kubectl_logs"
+
+        connector._kubectl_log_files[base_command] = metadata
+
+        return capture_command.strip()
+
+    return base_command
 
 
 def build_command_for_step(
@@ -442,7 +555,7 @@ def build_command_for_step(
 
 
 def execute_command(command, host, connector):
-    """Execute a command and return output, error, and duration."""
+    """Execute a command and return output, error, and duration. Handles file-based kubectl logs."""
     if not command:
         return "", "Command build failed", 0.0
 
@@ -459,11 +572,14 @@ def execute_command(command, host, connector):
             command, host, connector, sheet_name, test_name
         )
 
+    # Check if this is a kubectl logs file-based capture command
+    is_kubectl_logs = "kubectl logs -f" in command and "LOG_PID" in command
+
     # Original production execution
     logger.debug(f"Running command on [{host}]: {command}")
     start_time = time.time()
+
     if connector is not None and getattr(connector, "use_ssh", False):
-        # print *f"Executing command via SSH on {command} for host {host}")
         logger.debug(f"Executing command via SSH on {command}")
         result = connector.run_command(command, [host])
         res = result.get(host, {"output": "", "error": ""})
@@ -475,12 +591,136 @@ def execute_command(command, host, connector):
         )
         output = result.stdout.strip()
         error = result.stderr.strip()
+
     duration = time.time() - start_time
+
+    # Handle kubectl logs file-based capture
+    if is_kubectl_logs and hasattr(connector, "_kubectl_log_files"):
+        output, error = _handle_kubectl_logs_file_capture(
+            command, host, connector, output, error
+        )
+
     logger.debug(f"Command executed in {duration:.2f} seconds on [{host}]")
     logger.debug(f"Output: {output}")
     if error:
         logger.debug(f"Error: {error}")
     return output, error, duration
+
+
+def _handle_kubectl_logs_file_capture(
+    command, host, connector, original_output, original_error
+):
+    """Handle file transfer and loading for kubectl logs capture."""
+    log_files = getattr(connector, "_kubectl_log_files", {})
+
+    # Find matching log file metadata
+    log_file_info = None
+    for base_cmd, info in log_files.items():
+        if info["host"] == host:
+            log_file_info = info
+            break
+
+    if not log_file_info:
+        logger.warning("No log file metadata found for kubectl logs command")
+        return original_output, original_error
+
+    log_file_path = log_file_info["log_file_path"]
+    is_ssh = log_file_info["is_ssh"]
+
+    try:
+        if is_ssh:
+            # SSH mode: download file from remote host to ssh_tmp folder
+            ssh_tmp_dir = "ssh_tmp"
+            if not os.path.exists(ssh_tmp_dir):
+                os.makedirs(ssh_tmp_dir)
+                logger.debug(f"Created directory: {ssh_tmp_dir}")
+
+            local_temp_file = (
+                f"{ssh_tmp_dir}/{os.path.basename(log_file_path)}"
+            )
+
+            if connector.download_file(host, log_file_path, local_temp_file):
+                # Load local file content
+                with open(local_temp_file, "r") as f:
+                    log_content = f.read()
+
+                # Cleanup local temp file if configured
+                config_file = getattr(
+                    connector, "config_file", "config/hosts.json"
+                )
+                try:
+                    with open(config_file, "r") as f:
+                        config = json.load(f)
+                    cleanup_temp_files = config.get(
+                        "kubectl_logs_settings", {}
+                    ).get("cleanup_temp_files", True)
+                    if cleanup_temp_files:
+                        try:
+                            os.remove(local_temp_file)
+                            logger.debug(
+                                f"Cleaned up local temp file: {local_temp_file}"
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to cleanup local temp file {local_temp_file}: {e}"
+                            )
+
+                        # Cleanup remote file
+                        connector.cleanup_remote_file(host, log_file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to check cleanup config: {e}")
+
+                return log_content, original_error
+            else:
+                logger.error(
+                    f"Failed to download log file from {host}:{log_file_path}"
+                )
+                return (
+                    original_output,
+                    f"Failed to download log file: {original_error}",
+                )
+
+        else:
+            # Local mode: directly read the log file
+            if os.path.exists(log_file_path):
+                with open(log_file_path, "r") as f:
+                    log_content = f.read()
+
+                # Cleanup local temp file if configured
+                config_file = getattr(
+                    connector, "config_file", "config/hosts.json"
+                )
+                try:
+                    with open(config_file, "r") as f:
+                        config = json.load(f)
+                    cleanup_temp_files = config.get(
+                        "kubectl_logs_settings", {}
+                    ).get("cleanup_temp_files", True)
+                    if cleanup_temp_files:
+                        os.remove(log_file_path)
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to cleanup local log file {log_file_path}: {e}"
+                    )
+
+                return log_content, original_error
+            else:
+                logger.error(f"Log file not found: {log_file_path}")
+                return original_output, f"Log file not found: {log_file_path}"
+
+    except Exception as e:
+        logger.error(f"Failed to handle kubectl logs file capture: {e}")
+        return original_output, f"File capture error: {str(e)}"
+
+    finally:
+        # Clean up metadata
+        if hasattr(connector, "_kubectl_log_files"):
+            # Remove processed entries
+            connector._kubectl_log_files = {
+                k: v
+                for k, v in connector._kubectl_log_files.items()
+                if v["host"] != host
+            }
 
 
 def execute_mock_command(
