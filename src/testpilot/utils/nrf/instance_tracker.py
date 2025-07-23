@@ -32,6 +32,9 @@ class NRFInstanceTracker:
     def __init__(self):
         self.instance_registry: Dict[str, Dict[str, Any]] = {}
         self.active_stack: List[str] = []
+        self.deleted_stack: List[str] = (
+            []
+        )  # Stack for deleted but retained instances
         self.test_context_history: List[Dict[str, Any]] = []
         self.current_test_context: Optional[Dict[str, Any]] = None
         logger.debug("Initialized new NRFInstanceTracker")
@@ -128,18 +131,52 @@ class NRFInstanceTracker:
     def handle_delete_operation(
         self, test_context: Dict[str, Any]
     ) -> Optional[str]:
-        """Handle DELETE operation - remove instance from stack"""
+        """Handle DELETE operation - move instance to deleted stack for retention"""
+        # First check if we have an active instance
         nf_id = self.get_active_instance_id(test_context)
 
         if nf_id and nf_id in self.active_stack:
+            # Move from active to deleted stack (retain for verification)
             self.active_stack.remove(nf_id)
+            self.deleted_stack.append(nf_id)
             self._mark_deleted(nf_id, reason="DELETE_OPERATION")
-            logger.info(f"Deleted NRF instance: {nf_id}")
-            logger.debug(
-                f"Active stack size after delete: {len(self.active_stack)}"
+            logger.info(
+                f"Deleted NRF instance: {nf_id} (retained for verification)"
             )
+            logger.debug(
+                f"Active stack: {len(self.active_stack)}, Deleted stack: {len(self.deleted_stack)}"
+            )
+            return nf_id
 
-        return nf_id
+        # If no active instance, check deleted stack for second DELETE
+        if self.deleted_stack:
+            # Get the most recent deleted instance for this test
+            test_name = test_context.get("test_name")
+            for nf_id in reversed(self.deleted_stack):
+                record = self.instance_registry.get(nf_id, {})
+                if record.get("created_by", {}).get("test_name") == test_name:
+                    logger.info(
+                        f"Using deleted instance for verification: {nf_id}"
+                    )
+                    self._log_operation(
+                        nf_id, test_context.get("row_idx"), "DELETE_VERIFY"
+                    )
+                    return nf_id
+
+            # If no test-specific match, use most recent deleted
+            nf_id = self.deleted_stack[-1]
+            logger.info(
+                f"Using most recent deleted instance for verification: {nf_id}"
+            )
+            self._log_operation(
+                nf_id, test_context.get("row_idx"), "DELETE_VERIFY"
+            )
+            return nf_id
+
+        logger.warning(
+            "DELETE operation but no instance found (active or deleted)"
+        )
+        return None
 
     def _determine_cleanup_policy(
         self, test_context: Dict[str, Any]
@@ -161,7 +198,9 @@ class NRFInstanceTracker:
         """Clean up instances when test ends"""
         test_name = test_context.get("test_name")
         to_cleanup = []
+        deleted_to_cleanup = []
 
+        # Find active instances to cleanup
         for nf_id, record in self.instance_registry.items():
             if (
                 record["status"] == "active"
@@ -170,21 +209,35 @@ class NRFInstanceTracker:
             ):
                 to_cleanup.append(nf_id)
 
-        if to_cleanup:
+        # Find deleted instances from this test to cleanup
+        for nf_id in self.deleted_stack:
+            record = self.instance_registry.get(nf_id, {})
+            if record.get("created_by", {}).get("test_name") == test_name:
+                deleted_to_cleanup.append(nf_id)
+
+        if to_cleanup or deleted_to_cleanup:
             logger.info(
-                f"Auto-cleaning {len(to_cleanup)} instances for test: {test_name}"
+                f"Auto-cleaning {len(to_cleanup)} active + {len(deleted_to_cleanup)} deleted instances for test: {test_name}"
             )
 
+        # Clean active instances
         for nf_id in to_cleanup:
             if nf_id in self.active_stack:
                 self.active_stack.remove(nf_id)
             self._mark_deleted(nf_id, reason="auto_cleanup_test_end")
 
+        # Clean deleted instances
+        for nf_id in deleted_to_cleanup:
+            self.deleted_stack.remove(nf_id)
+            logger.debug(f"Removed {nf_id} from deleted stack (test cleanup)")
+
     def _cleanup_suite_instances(self, test_context: Dict[str, Any]):
         """Clean up instances when suite ends"""
         sheet = test_context.get("sheet")
         to_cleanup = []
+        deleted_to_cleanup = []
 
+        # Find active instances to cleanup
         for nf_id, record in self.instance_registry.items():
             if (
                 record["status"] == "active"
@@ -193,27 +246,46 @@ class NRFInstanceTracker:
             ):
                 to_cleanup.append(nf_id)
 
-        if to_cleanup:
+        # Find deleted instances from this suite to cleanup
+        for nf_id in self.deleted_stack:
+            record = self.instance_registry.get(nf_id, {})
+            if record.get("created_by", {}).get("sheet") == sheet:
+                deleted_to_cleanup.append(nf_id)
+
+        if to_cleanup or deleted_to_cleanup:
             logger.info(
-                f"Auto-cleaning {len(to_cleanup)} instances for suite: {sheet}"
+                f"Auto-cleaning {len(to_cleanup)} active + {len(deleted_to_cleanup)} deleted instances for suite: {sheet}"
             )
 
+        # Clean active instances
         for nf_id in to_cleanup:
             if nf_id in self.active_stack:
                 self.active_stack.remove(nf_id)
             self._mark_deleted(nf_id, reason="auto_cleanup_suite_end")
 
+        # Clean deleted instances
+        for nf_id in deleted_to_cleanup:
+            self.deleted_stack.remove(nf_id)
+            logger.debug(f"Removed {nf_id} from deleted stack (suite cleanup)")
+
     def cleanup_all_active_instances(self, reason: str = "session_end"):
-        """Clean up all active instances - typically at session end"""
+        """Clean up all active and deleted instances - typically at session end"""
         active_count = len(self.active_stack)
-        if active_count > 0:
+        deleted_count = len(self.deleted_stack)
+
+        if active_count > 0 or deleted_count > 0:
             logger.info(
-                f"Cleaning up {active_count} active instances: {reason}"
+                f"Cleaning up {active_count} active + {deleted_count} deleted instances: {reason}"
             )
 
+        # Clear active stack
         while self.active_stack:
             nf_id = self.active_stack.pop()
             self._mark_deleted(nf_id, reason=reason)
+
+        # Clear deleted stack
+        self.deleted_stack.clear()
+        logger.debug("Cleared deleted instances stack")
 
     def _log_operation(
         self, nf_id: str, test_step: Optional[int], method: str
@@ -248,11 +320,13 @@ class NRFInstanceTracker:
             "active_instances": len(active_instances),
             "active_instance_ids": active_instances,
             "active_stack_size": len(self.active_stack),
+            "deleted_stack_size": len(self.deleted_stack),
             "total_instances_created": len(self.instance_registry),
             "instances_by_test": self._group_by_test(),
             "instances_by_status": self._group_by_status(),
             "orphaned_instances": self._find_orphaned_instances(),
-            "stack_trace": self.active_stack.copy(),
+            "active_stack": self.active_stack.copy(),
+            "deleted_stack": self.deleted_stack.copy(),
         }
 
     def _group_by_test(self) -> Dict[str, Dict[str, int]]:
