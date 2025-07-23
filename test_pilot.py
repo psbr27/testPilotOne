@@ -52,6 +52,34 @@ from src.testpilot.utils.ssh_connector import SSHConnector
 logger = get_logger("TestPilot")
 
 
+def parse_sheet_names(sheet_arg):
+    """
+    Parse sheet names from command line argument.
+    Supports formats: 'sheet1,sheet2' or '[sheet1,sheet2]' or 'sheet1'
+
+    Args:
+        sheet_arg (str): The sheet argument from command line
+
+    Returns:
+        list: List of cleaned sheet names
+    """
+    if not sheet_arg:
+        return []
+
+    # Remove brackets if present: [sheet1,sheet2] -> sheet1,sheet2
+    cleaned_arg = sheet_arg.strip()
+    if cleaned_arg.startswith("[") and cleaned_arg.endswith("]"):
+        cleaned_arg = cleaned_arg[1:-1]
+
+    # Split by comma and clean each name
+    sheet_names = [name.strip() for name in cleaned_arg.split(",")]
+
+    # Remove empty strings
+    sheet_names = [name for name in sheet_names if name]
+
+    return sheet_names
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="TestPilot")
     parser.add_argument(
@@ -96,7 +124,7 @@ def parse_args():
         "-s",
         "--sheet",
         type=str,
-        help="Only run tests for the specified sheet name",
+        help="Only run tests for the specified sheet name(s). Supports comma-separated values: 'sheet1,sheet2' or bracket format: '[sheet1,sheet2]'",
     )
     parser.add_argument(
         "-t",
@@ -972,13 +1000,27 @@ def main():
     excel_parser, valid_sheets = load_excel_and_sheets(args.input)
 
     if args.sheet:
-        if args.sheet not in valid_sheets:
+        # Parse the sheet names from the argument
+        requested_sheets = parse_sheet_names(args.sheet)
+
+        # Validate that all requested sheets exist
+        invalid_sheets = [
+            sheet for sheet in requested_sheets if sheet not in valid_sheets
+        ]
+        if invalid_sheets:
             logger.error(
-                f"Sheet '{args.sheet}' not found in Excel file. Valid sheets: {valid_sheets}"
+                f"Sheet(s) {invalid_sheets} not found in Excel file. Valid sheets: {valid_sheets}"
             )
             sys.exit(1)
-        valid_sheets = [args.sheet]
-        logger.debug(f"Running tests for sheet: {args.sheet}")
+
+        # Use only the requested sheets
+        valid_sheets = requested_sheets
+        if len(requested_sheets) == 1:
+            logger.debug(f"Running tests for sheet: {requested_sheets[0]}")
+        else:
+            logger.debug(
+                f"Running tests for sheets: {', '.join(requested_sheets)}"
+            )
 
     # Process patterns from Excel file and generate enhanced pattern matches
     # This step has to be at the beginning where it processes and creates files

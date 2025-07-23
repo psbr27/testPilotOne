@@ -136,7 +136,7 @@ python3 test_pilot.py [options] --execution-mode mock
 ```bash
 -i, --input FILE          Excel file with test cases
 -m, --model MODEL         Model/pattern to use
--s, --sheet SHEET         Specific sheet to test
+-s, --sheet SHEET         Specific sheet(s) to test. Supports comma-separated values: 'sheet1,sheet2' or bracket format: '[sheet1,sheet2]'
 --execution-mode mock     Enable mock mode
 --mock-server-url URL     Mock server URL (default: http://localhost:8082)
 --log-level LEVEL         Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -147,6 +147,15 @@ python3 test_pilot.py [options] --execution-mode mock
 #### Test Specific Sheet
 ```bash
 python3 test_pilot.py -i Oracle_VzW_OCSLF_23.4.x_Auto_OTP_v1.2.xlsx -m otp --execution-mode mock -s oAuthValidation-igw
+```
+
+#### Test Multiple Sheets
+```bash
+# Comma-separated format
+python3 test_pilot.py -i Oracle_VzW_OCSLF_23.4.x_Auto_OTP_v1.2.xlsx -m otp --execution-mode mock -s oAuthValidation-igw,Registration-igw
+
+# Bracket format
+python3 test_pilot.py -i Oracle_VzW_OCSLF_23.4.x_Auto_OTP_v1.2.xlsx -m otp --execution-mode mock -s "[oAuthValidation-igw, Registration-igw]"
 ```
 
 #### Test All Sheets
