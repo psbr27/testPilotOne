@@ -799,12 +799,40 @@ class HTMLReportGenerator(TestResultsExporter):
             border-left: 4px solid #e74c3c;
         }
         .test-group-content {
-            display: none;
+            display: block;
             padding: 20px;
             background-color: #fafafa;
         }
+        .filter-controls {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        .filter-btn {
+            margin: 0 5px;
+            padding: 8px 16px;
+            border: 1px solid #007bff;
+            background-color: #fff;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .filter-btn.active {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .filter-btn:hover {
+            background-color: #0056b3;
+            color: #fff;
+        }
+        .test-step.hidden {
+            display: none;
+        }
         .test-step {
-            margin-bottom: 25px;
+            margin-bottom: 15px;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             overflow: hidden;
@@ -820,6 +848,35 @@ class HTMLReportGenerator(TestResultsExporter):
             font-weight: 600;
             color: #495057;
             border-bottom: 1px solid #dee2e6;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+        .step-header:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+        .step-header.passed {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+        .step-header.failed {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+        .step-header.passed:hover {
+            background: linear-gradient(135deg, #c3e6cb 0%, #b5d5c0 100%);
+        }
+        .step-header.failed:hover {
+            background: linear-gradient(135deg, #f5c6cb 0%, #f1b0b7 100%);
+        }
+        .step-content {
+            display: none;
+            padding: 0;
+        }
+        .step-content.active {
+            display: block;
         }
         """
 
@@ -861,15 +918,65 @@ class HTMLReportGenerator(TestResultsExporter):
                 });
             });
 
-            // Toggle test group content
-            document.querySelectorAll('.test-group-header').forEach(header => {
+            // Test step tab functionality with auto-collapse
+            document.querySelectorAll('.step-header').forEach(header => {
                 header.addEventListener('click', function() {
-                    const content = this.nextElementSibling;
-                    if (content.style.display === 'block') {
-                        content.style.display = 'none';
-                    } else {
-                        content.style.display = 'block';
+                    const stepId = this.getAttribute('data-step');
+                    const stepContent = document.getElementById('step-content-' + stepId);
+
+                    if (stepContent) {
+                        // Check if this step is currently open
+                        const isCurrentlyOpen = stepContent.classList.contains('active');
+
+                        // First, close all open step contents in the same sheet
+                        const sheetContent = this.closest('.sheet-content');
+                        sheetContent.querySelectorAll('.step-content').forEach(content => {
+                            content.classList.remove('active');
+                        });
+
+                        // If the clicked step was closed, open it
+                        // If it was open, it stays closed (toggle behavior)
+                        if (!isCurrentlyOpen) {
+                            stepContent.classList.add('active');
+
+                            // Optionally scroll to the opened section
+                            stepContent.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                     }
+                });
+            });
+
+            // Filter functionality for test steps
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const filter = this.getAttribute('data-filter');
+                    const sheetName = this.getAttribute('data-sheet');
+
+                    // Update active button
+                    const sheetContent = document.getElementById('sheet-content-' + sheetName);
+                    sheetContent.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    // Filter test steps
+                    const testSteps = sheetContent.querySelectorAll('.test-step');
+                    testSteps.forEach(step => {
+                        const stepStatus = step.getAttribute('data-status');
+
+                        if (filter === 'all') {
+                            step.classList.remove('hidden');
+                        } else if (filter === 'pass' && stepStatus === 'pass') {
+                            step.classList.remove('hidden');
+                        } else if (filter === 'fail' && stepStatus === 'fail') {
+                            step.classList.remove('hidden');
+                        } else {
+                            step.classList.add('hidden');
+                        }
+                    });
+
+                    // Close all step contents when filtering
+                    sheetContent.querySelectorAll('.step-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
                 });
             });
         });
@@ -1501,6 +1608,11 @@ class HTMLReportGenerator(TestResultsExporter):
             html_content += f"""
                             <div class="sheet-content" id="sheet-content-{safe_sheet_name}">
                                 <h3>{sheet_name} - Detailed Results</h3>
+                                <div class="filter-controls">
+                                    <button class="filter-btn active" data-filter="all" data-sheet="{safe_sheet_name}">All Steps</button>
+                                    <button class="filter-btn" data-filter="pass" data-sheet="{safe_sheet_name}">Passed Only</button>
+                                    <button class="filter-btn" data-filter="fail" data-sheet="{safe_sheet_name}">Failed Only</button>
+                                </div>
             """
 
             # Add test groups for this sheet
@@ -1541,14 +1653,24 @@ class HTMLReportGenerator(TestResultsExporter):
                         response_payload if response_payload else output
                     )
 
-                    # Extract response headers if available
+                    # Extract response headers if available - check multiple possible field names
                     response_headers = (
-                        getattr(result, "response_headers", None) or {}
+                        getattr(result, "response_headers", None)
+                        or getattr(result, "Response_Headers", None)
+                        or getattr(result, "headers", None)
+                        or getattr(result, "Headers", None)
+                        or {}
                     )
+
                     if isinstance(response_headers, dict) and response_headers:
                         headers_display = json.dumps(
                             response_headers, indent=2
                         )
+                    elif response_headers and isinstance(
+                        response_headers, str
+                    ):
+                        # Handle case where headers might be stored as string
+                        headers_display = response_headers
                     else:
                         headers_display = "No headers available"
 
@@ -1571,10 +1693,21 @@ class HTMLReportGenerator(TestResultsExporter):
                     )
 
                     # Build HTML with conditional request payload section
+                    step_status_class = (
+                        "test-step-pass" if passed else "test-step-fail"
+                    )
+                    header_status_class = "passed" if passed else "failed"
+                    status_text = "PASS" if passed else "FAIL"
+                    safe_step_id = f"{safe_sheet_name}-step-{step_index}"
+
                     html_content += f"""
-                                        <div class="test-step">
-                                            <h4 class="step-header">Step {step_index}: {step_name}</h4>
-                                            <div class="test-details-grid">
+                                        <div class="test-step {step_status_class}" data-status="{'pass' if passed else 'fail'}">
+                                            <h4 class="step-header {header_status_class}" data-step="{safe_step_id}">
+                                                <span>Step {step_index}: {step_name}</span>
+                                                <span class="status-indicator" style="float: right; font-weight: bold;">{status_text}</span>
+                                            </h4>
+                                            <div class="step-content" id="step-content-{safe_step_id}">
+                                                <div class="test-details-grid">
                                                 <div class="detail-box">
                                                     <h4>Command</h4>
                                                     <pre>{command}</pre>
@@ -1615,6 +1748,7 @@ class HTMLReportGenerator(TestResultsExporter):
                                                 <div class="detail-box output-section" style="grid-column: span 3;">
                                                     <h4>HTTP Response From Server</h4>
                                                     <div class="detail-content">{actual_response}</div>
+                                                </div>
                                                 </div>
                                             </div>
                                         </div>
