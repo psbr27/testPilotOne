@@ -235,9 +235,12 @@ def build_url_based_command(
         # substituted_url = substitute_placeholders(
         #     safe_str(url), svc_map, placeholder_pattern
         # )
+        logger.debug(f"Original URL: {safe_str(url)}")
+        logger.debug(f"Service map for substitution: {svc_map}")
         substituted_url = replace_placeholder_in_command(
             safe_str(url), svc_map
         )
+        logger.debug(f"Substituted URL: {substituted_url}")
         ssh_cmd, _ = build_ssh_k8s_curl_command(
             namespace=namespace or "default",
             container=pod_exec,
@@ -399,9 +402,12 @@ def build_command_for_step(
             # substituted_url = substitute_placeholders(
             #     safe_str(url), svc_map, placeholder_pattern
             # )
+            logger.debug(f"Pod mode - Original URL: {safe_str(url)}")
+            logger.debug(f"Pod mode - Service map for substitution: {svc_map}")
             substituted_url = replace_placeholder_in_command(
                 safe_str(url), svc_map
             )
+            logger.debug(f"Pod mode - Substituted URL: {substituted_url}")
         curl_cmd, _ = build_pod_mode(
             substituted_url,
             method=method,
@@ -726,6 +732,8 @@ def process_single_step(
 
         all_raw_outputs = []
         accumulated_raw_output = ""
+        duration = 0.0  # Initialize duration in case no commands are executed
+        command = None  # Initialize command variable
         for command in commands:
             if not command:
                 if not show_table:
@@ -735,6 +743,9 @@ def process_single_step(
                 continue
             if not show_table:
                 logger.info(f"[CALLFLOW] Built command: {command}")
+                logger.info(
+                    f"[CALLFLOW] Service map for host {host}: {svc_map}"
+                )
                 logger.info(f"[CALLFLOW] Executing command on host {host}...")
             output, error, duration = execute_command(command, host, connector)
             parsed_output = parse_curl_output(output, error)

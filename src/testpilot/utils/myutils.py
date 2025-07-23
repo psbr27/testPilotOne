@@ -74,9 +74,13 @@ def replace_placeholder_in_command(command, service_map):
                 updated_command,
             )
         else:
-            # TODO; Handle the case where the placeholder is not found in the service map
-            # This could be a warning or an error depending on your requirements.
-            pass
+            # Handle the case where the placeholder is not found in the service map
+            print(
+                f"Warning: Placeholder '{placeholder_name}' not found in service map."
+            )
+            print(f"Available service map keys: {list(service_map.keys())}")
+            print(f"Service map contents: {service_map}")
+            # TODO: Consider whether this should be an error or warning
 
     return updated_command
 

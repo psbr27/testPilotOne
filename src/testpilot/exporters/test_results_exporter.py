@@ -308,9 +308,9 @@ class TestResultsExporter:
                     "Yes" if pattern_match["matched"] else "No",
                     response_body["size_bytes"],
                     response_body["content_type"],
-                    getattr(result, "error", "")[
+                    (getattr(result, "error", "") or "")[
                         :200
-                    ],  # Limit error message length
+                    ],  # Limit error message length, handle None
                 ]
                 writer.writerow(row)
 

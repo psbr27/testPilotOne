@@ -234,84 +234,163 @@ def extract_placeholders(excel_parser, valid_sheets):
 def resolve_service_map_ssh(
     connector, target_hosts, placeholders, host_cli_map
 ):
+    """
+    Resolve service maps via SSH with fallback hierarchy:
+    1. virtualservices -> 2. services -> 3. resource_map.json
+    """
     svc_maps = {}
+
     for host in target_hosts:
         conn = connector.connections.get(host)
         if not conn:
             logger.error(
                 f"No SSH connection available for host '{host}' (skipping service resolution)"
             )
+            svc_maps[host] = {}
             continue
+
+        host_map = {}
+
         try:
             # Get namespace from host config if present
             host_cfg = connector.get_host_config(host)
             namespace = (
                 getattr(host_cfg, "namespace", None) if host_cfg else None
             )
-            if namespace:
-                cli_type = (
-                    host_cli_map.get(host, "kubectl")
-                    if host_cli_map
-                    else "kubectl"
-                )
-                kubectl_cmd = (
-                    f"{cli_type} get virtualservices -n {namespace} -o json"
-                )
-            else:
-                cli_type = (
-                    host_cli_map.get(host, "kubectl")
-                    if host_cli_map
-                    else "kubectl"
-                )
-                kubectl_cmd = f"{cli_type} get virtualservices -A -o json"
-            stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
-            out = stdout.read().decode()
-            err = stderr.read().decode()
-            if err:
-                logger.error(f"kubectl error on host {host}: {err}")
-                continue
-
-            svc_json = json.loads(out)
-            host_map = {}
-            hosts = []
-
-            # fetch all the hosts from the kubectl output
-            for item in svc_json.get("items", []):
-                name = item["spec"]["hosts"]
-                ns = item["metadata"]["namespace"]
-                if name not in hosts:
-                    hosts.append(name)
-
-            # compare hosts with placeholders
-            for svc_host in hosts:
-                for p in placeholders:
-                    if isinstance(svc_host, list) and p in svc_host[0]:
-                        host_map[p] = f"{svc_host}"
-            svc_maps[host] = host_map
-        except Exception as e:
-            logger.error(f"Failed to resolve services on host {host}: {e}")
-
-    # fallback to get services command if there are no virtual services
-    for host in target_hosts:
-        if not len(svc_maps[host]):
             cli_type = (
                 host_cli_map.get(host, "kubectl")
                 if host_cli_map
                 else "kubectl"
             )
-            kubectl_cmd = f"{cli_type} get svc -n {namespace} -o json"
+
+            # Step 1: Try virtualservices first
+            logger.debug(f"Step 1: Trying virtualservices for host {host}")
+            if namespace:
+                kubectl_cmd = (
+                    f"{cli_type} get virtualservices -n {namespace} -o json"
+                )
+            else:
+                kubectl_cmd = f"{cli_type} get virtualservices -A -o json"
+
             stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
             out = stdout.read().decode()
             err = stderr.read().decode()
-            svc_json = json.loads(out)
-            host_map = {}
-            for item in svc_json.get("items", []):
-                name = item["metadata"]["name"]
-                ns = item["metadata"]["namespace"]
-                for p in placeholders:
-                    if p in name:
-                        host_map[p] = f"['{name}']"
-            svc_maps[host] = host_map
+
+            if not err and out.strip():
+                svc_json = json.loads(out)
+                hosts = []
+
+                # Extract hosts from virtualservices
+                for item in svc_json.get("items", []):
+                    vs_hosts = item.get("spec", {}).get("hosts", [])
+                    for vs_host in vs_hosts:
+                        if vs_host not in hosts:
+                            hosts.append(vs_host)
+
+                # Match hosts with placeholders
+                for svc_host in hosts:
+                    for p in placeholders:
+                        if isinstance(svc_host, str) and p in svc_host:
+                            host_map[p] = f"['{svc_host}']"
+                        elif isinstance(svc_host, list) and p in str(svc_host):
+                            host_map[p] = str(svc_host)
+
+                logger.debug(
+                    f"Found {len(host_map)} mappings from virtualservices"
+                )
+
+            # Step 2: Fall back to services if virtualservices didn't work
+            if not host_map:
+                logger.debug(f"Step 2: Trying services for host {host}")
+                if namespace:
+                    kubectl_cmd = f"{cli_type} get svc -n {namespace} -o json"
+                else:
+                    kubectl_cmd = f"{cli_type} get svc -A -o json"
+
+                stdin, stdout, stderr = conn.exec_command(kubectl_cmd)
+                out = stdout.read().decode()
+                err = stderr.read().decode()
+
+                if not err and out.strip():
+                    svc_json = json.loads(out)
+
+                    # Extract service names
+                    for item in svc_json.get("items", []):
+                        name = item.get("metadata", {}).get("name", "")
+                        for p in placeholders:
+                            if p in name:
+                                host_map[p] = f"['{name}']"
+
+                    logger.debug(
+                        f"Found {len(host_map)} mappings from services"
+                    )
+
+            # Step 3: Fall back to resource_map.json if both kubectl methods failed
+            if not host_map:
+                logger.debug(
+                    f"Step 3: Trying resource_map.json for host {host}"
+                )
+                resource_map_path = "config/resource_map.json"
+
+                # Read resource_map.json from local filesystem (contains manually captured data)
+                if os.path.isfile(resource_map_path):
+                    try:
+                        with open(resource_map_path, "r") as f:
+                            resource_map = json.load(f)
+
+                        # Match placeholders with resource map entries
+                        for p in placeholders:
+                            if p in resource_map:
+                                host_map[p] = resource_map[p]
+                        logger.debug(
+                            f"Found {len(host_map)} mappings from resource_map.json"
+                        )
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not read local resource_map.json: {e}"
+                        )
+                else:
+                    logger.warning(
+                        f"resource_map.json not found at {resource_map_path}"
+                    )
+
+        except Exception as e:
+            logger.error(f"Failed to resolve services on host {host}: {e}")
+
+        svc_maps[host] = host_map
+        logger.info(
+            f"Host {host}: Resolved {len(host_map)} service mappings {svc_maps[host]}"
+        )
+
+    # Generate resource_map.json when using SSH and mappings were found
+    if svc_maps:
+        try:
+            # Combine all host mappings into a single resource map
+            combined_resource_map = {}
+            for host, mappings in svc_maps.items():
+                if mappings:  # Only include non-empty mappings
+                    combined_resource_map.update(mappings)
+
+            if combined_resource_map:
+                resource_map_path = "config/resource_map.json"
+                os.makedirs(
+                    "config", exist_ok=True
+                )  # Ensure config directory exists
+
+                with open(resource_map_path, "w") as f:
+                    json.dump(combined_resource_map, f, indent=2)
+
+                logger.info(
+                    f"Generated {resource_map_path} with {len(combined_resource_map)} service mappings"
+                )
+                logger.debug(f"Resource map contents: {combined_resource_map}")
+            else:
+                logger.debug(
+                    "No service mappings found via SSH to save to resource_map.json"
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to generate resource_map.json: {e}")
 
     return svc_maps
 
@@ -323,17 +402,26 @@ def resolve_service_map_local(
     namespace=None,
     config_file="config/hosts.json",
 ):
+    """
+    Resolve service maps locally with fallback hierarchy:
+    1. virtualservices -> 2. services -> 3. resource_map.json
+    """
     svc_maps = {}
-    # If namespace is not provided, try to fetch from config using connect_to host
-    if namespace is None:
-        try:
-            with open(config_file, "r") as f:
-                data = json.load(f)
-            connect_to = data.get("connect_to")
-            hosts = data.get("hosts")
-            pod_mode = data.get("pod_mode")
-            namespace = None
-            if isinstance(hosts, list) and connect_to:
+
+    # Get configuration details
+    connect_to = "localhost"
+    pod_mode = False
+
+    try:
+        with open(config_file, "r") as f:
+            data = json.load(f)
+        connect_to = data.get("connect_to", "localhost")
+        pod_mode = data.get("pod_mode", False)
+
+        # If namespace not provided, try to get from config
+        if namespace is None:
+            hosts = data.get("hosts", [])
+            if isinstance(hosts, list):
                 for host_cfg in hosts:
                     if isinstance(host_cfg, dict) and (
                         host_cfg.get("name") == connect_to
@@ -341,96 +429,141 @@ def resolve_service_map_local(
                     ):
                         namespace = host_cfg.get("namespace")
                         break
-            elif isinstance(hosts, dict) and connect_to:
-                host_cfg = hosts.get(connect_to)
+            elif isinstance(hosts, dict):
+                host_cfg = hosts.get(connect_to, {})
                 if isinstance(host_cfg, dict):
                     namespace = host_cfg.get("namespace")
-        except Exception as e:
-            logger.warning(f"Could not fetch namespace from config: {e}")
-            namespace = None
 
+    except Exception as e:
+        logger.warning(f"Could not load config from {config_file}: {e}")
+
+    host_map = {}
+    cli_type = (
+        host_cli_map.get("localhost", "kubectl") if host_cli_map else "kubectl"
+    )
+
+    # Step 1: Try virtualservices first
+    logger.debug("Step 1: Trying virtualservices locally")
     try:
-        if not pod_mode:
-            # Construct kubectl command based on namespace
+        if namespace:
+            kubectl_cmd = [
+                cli_type,
+                "get",
+                "virtualservices",
+                "-n",
+                namespace,
+                "-o",
+                "json",
+            ]
+        else:
+            kubectl_cmd = [
+                cli_type,
+                "get",
+                "virtualservices",
+                "-A",
+                "-o",
+                "json",
+            ]
+
+        logger.debug(f"Running command: {' '.join(kubectl_cmd)}")
+        result = subprocess.run(kubectl_cmd, capture_output=True, text=True)
+
+        if result.returncode == 0 and result.stdout.strip():
+            svc_json = json.loads(result.stdout)
+            hosts = []
+
+            # Extract hosts from virtualservices
+            for item in svc_json.get("items", []):
+                vs_hosts = item.get("spec", {}).get("hosts", [])
+                for vs_host in vs_hosts:
+                    if vs_host not in hosts:
+                        hosts.append(vs_host)
+
+            # Match hosts with placeholders
+            for svc_host in hosts:
+                for p in placeholders:
+                    if isinstance(svc_host, str) and p in svc_host:
+                        host_map[p] = f"['{svc_host}']"
+                    elif isinstance(svc_host, list) and p in str(svc_host):
+                        host_map[p] = str(svc_host)
+
+            logger.debug(
+                f"Found {len(host_map)} mappings from virtualservices"
+            )
+
+    except Exception as e:
+        logger.debug(f"Virtualservices failed: {e}")
+
+    # Step 2: Fall back to services if virtualservices didn't work
+    if not host_map:
+        logger.debug("Step 2: Trying services locally")
+        try:
             if namespace:
-                cli_type = (
-                    host_cli_map.get("localhost", "kubectl")
-                    if host_cli_map
-                    else "kubectl"
-                )
                 kubectl_cmd = [
                     cli_type,
                     "get",
-                    "virtualservices",
+                    "svc",
                     "-n",
                     namespace,
                     "-o",
                     "json",
                 ]
             else:
-                cli_type = (
-                    host_cli_map.get("localhost", "kubectl")
-                    if host_cli_map
-                    else "kubectl"
-                )
-                kubectl_cmd = [cli_type, "get", "svc", "-o", "json"]
-            logger.debug(
-                f"Running local kubectl command: {' '.join(kubectl_cmd)}"
-            )
+                kubectl_cmd = [cli_type, "get", "svc", "-A", "-o", "json"]
+
+            logger.debug(f"Running command: {' '.join(kubectl_cmd)}")
             result = subprocess.run(
-                kubectl_cmd,
-                capture_output=True,
-                text=True,
+                kubectl_cmd, capture_output=True, text=True
             )
-            if result.returncode != 0:
-                logger.error(f"Local kubectl error: {result.stderr}")
-                return {}
 
-            svc_json = json.loads(result.stdout)
-            host_map = {}
-            hosts = []
-            for item in svc_json.get("items", []):
-                name = item["spec"]["hosts"]
-                ns = item["metadata"]["namespace"]
-                if name not in hosts:
-                    hosts.append(name)
+            if result.returncode == 0 and result.stdout.strip():
+                svc_json = json.loads(result.stdout)
 
-            # compare hosts with placeholders
-            for svc_host in hosts:
+                # Extract service names
+                for item in svc_json.get("items", []):
+                    name = item.get("metadata", {}).get("name", "")
+                    for p in placeholders:
+                        if p in name:
+                            host_map[p] = f"['{name}']"
+
+                logger.debug(f"Found {len(host_map)} mappings from services")
+
+        except Exception as e:
+            logger.debug(f"Services failed: {e}")
+
+    # Step 3: Fall back to resource_map.json if both kubectl methods failed
+    if not host_map:
+        logger.debug("Step 3: Trying resource_map.json locally")
+        resource_map_path = os.path.join(
+            os.path.dirname(config_file), "resource_map.json"
+        )
+
+        if os.path.isfile(resource_map_path):
+            try:
+                with open(resource_map_path, "r") as f:
+                    resource_map = json.load(f)
+
+                # Match placeholders with resource map entries
                 for p in placeholders:
-                    # TODO may we dont need to check first svc_host[0] rather copy the whole thing
-                    if isinstance(svc_host, list) and p in svc_host[0]:
-                        host_map[p] = f"{svc_host}"
-            svc_maps[connect_to] = host_map
+                    if p in resource_map:
+                        host_map[p] = resource_map[p]
 
-        if target_hosts is None:
-            target_hosts = []
-        for host in target_hosts:
-            if not len(svc_maps[host]):
-                # In pod_mode, check for resource_map.json in config/
-                resource_map_path = os.path.join(
-                    os.path.dirname(config_file), "resource_map.json"
+                logger.debug(
+                    f"Found {len(host_map)} mappings from resource_map.json"
                 )
-                if os.path.isfile(resource_map_path):
-                    try:
-                        with open(resource_map_path, "r") as f:
-                            svc_json = json.load(f)
-                        logger.debug(
-                            f"pod_mode enabled: using resource_map.json at {resource_map_path} for service maps."
-                        )
-                        svc_maps[connect_to] = svc_json
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to load resource_map.json: {e}. Falling back to local service map resolution."
-                        )
-                else:
-                    logger.error(
-                        "pod_mode enabled: resource_map.json not found, please add it to config/ directory."
-                    )
-                    sys.exit(1)
 
-    except Exception as e:
-        logger.error(f"Failed to resolve services locally: {e}")
+            except Exception as e:
+                logger.error(f"Failed to load resource_map.json: {e}")
+        else:
+            logger.warning(
+                f"resource_map.json not found at {resource_map_path}"
+            )
+
+    svc_maps[connect_to] = host_map
+    logger.info(
+        f"Local resolution: Found {len(host_map)} service mappings {svc_maps[connect_to]}"
+    )
+
     return svc_maps
 
 
