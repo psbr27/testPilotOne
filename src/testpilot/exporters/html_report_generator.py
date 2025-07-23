@@ -19,6 +19,40 @@ class HTMLReportGenerator(TestResultsExporter):
         super().__init__(results_dir)
         self.css_styles = self._get_css_styles()
         self.js_scripts = self._get_js_scripts()
+        self.nf_css_styles = self._get_nf_css_styles()
+        self.nf_js_scripts = self._get_nf_js_scripts()
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from hosts.json"""
+        config_paths = [
+            "config/hosts.json",
+            "hosts.json",
+            os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "config",
+                "hosts.json",
+            ),
+        ]
+
+        for config_path in config_paths:
+            try:
+                if os.path.exists(config_path):
+                    with open(config_path, "r") as f:
+                        return json.load(f)
+            except Exception as e:
+                continue
+
+        # Return default config if file not found
+        return {
+            "html_generator": {"use_nf_style": False},
+            "system_under_test": {
+                "nf_type": "Network Function",
+                "version": "v1.0.0",
+                "environment": "Test Environment",
+                "deployment": "Test Deployment",
+                "description": "Network Function Under Test",
+            },
+        }
 
     def _get_css_styles(self):
         """Return CSS styles for the HTML report"""
@@ -475,6 +509,348 @@ class HTMLReportGenerator(TestResultsExporter):
         }
         """
 
+    def _get_nf_css_styles(self):
+        """Return CSS styles for the NF-style HTML report"""
+        return """
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border: 2px solid #ddd;
+        }
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+        .report-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .timestamp {
+            font-size: 14px;
+            color: #777;
+            margin-bottom: 20px;
+        }
+        .system-under-test {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            border-left: 4px solid #007bff;
+        }
+        .system-under-test h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 18px;
+        }
+        .system-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .system-detail {
+            font-size: 14px;
+        }
+        .system-detail strong {
+            color: #34495e;
+        }
+        .overall-summary {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .summary-stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .summary-item {
+            text-align: center;
+        }
+        .summary-item h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #555;
+        }
+        .summary-item p {
+            margin: 5px 0 0;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .passed { color: #27ae60; }
+        .failed { color: #e74c3c; }
+        .main-chart {
+            margin: 20px auto;
+            max-width: 800px;
+            height: 400px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .sheet-results {
+            margin-top: 30px;
+        }
+        .sheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .sheet-table th, .sheet-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .sheet-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .sheet-row {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .sheet-row:hover {
+            background-color: #f5f5f5;
+        }
+        .sheet-row.passed {
+            background-color: rgba(39, 174, 96, 0.1);
+        }
+        .status-pass {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .sheet-content {
+            display: none;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+        .test-details-section {
+            margin-top: 30px;
+        }
+        .test-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .detail-box {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .detail-box h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #555;
+            font-weight: 600;
+        }
+        .detail-box pre, .detail-box .detail-content {
+            margin: 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            overflow: auto;
+            max-height: 150px;
+        }
+        .validation-result {
+            background-color: #d4edda !important;
+            color: #155724;
+            font-weight: bold;
+        }
+        .output-section {
+            grid-column: span 2;
+        }
+        .output-section .detail-content {
+            min-height: 200px;
+            max-height: 400px;
+        }
+        .test-group {
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .test-group-header {
+            background-color: #f5f5f5;
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+        .test-group-header:hover {
+            background-color: #e8e8e8;
+        }
+        .test-group-header.passed {
+            border-left: 4px solid #27ae60;
+        }
+        .test-group-header.failed {
+            border-left: 4px solid #e74c3c;
+        }
+        .test-group-content {
+            display: none;
+            padding: 20px;
+            background-color: #fafafa;
+        }
+        """
+
+    def _get_nf_js_scripts(self):
+        """Return JavaScript for the NF-style HTML report"""
+        return """
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create main bar chart
+            createMainBarChart();
+
+            // Toggle sheet content
+            document.querySelectorAll('.sheet-row').forEach(row => {
+                row.addEventListener('click', function() {
+                    const sheetName = this.getAttribute('data-sheet');
+                    const content = document.getElementById('sheet-content-' + sheetName);
+                    if (content) {
+                        if (content.style.display === 'block') {
+                            content.style.display = 'none';
+                        } else {
+                            content.style.display = 'block';
+                        }
+                    }
+                });
+            });
+
+            // Toggle test group content
+            document.querySelectorAll('.test-group-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    if (content.style.display === 'block') {
+                        content.style.display = 'none';
+                    } else {
+                        content.style.display = 'block';
+                    }
+                });
+            });
+        });
+
+        // Function to create the main bar chart
+        function createMainBarChart() {
+            const ctx = document.getElementById('main-chart').getContext('2d');
+
+            // Collect data from sheet rows
+            const sheetNames = [];
+            const passedCounts = [];
+            const failedCounts = [];
+
+            document.querySelectorAll('.sheet-row').forEach(row => {
+                const sheetName = row.getAttribute('data-sheet');
+                const passed = parseInt(row.getAttribute('data-passed') || '0');
+                const failed = parseInt(row.getAttribute('data-failed') || '0');
+
+                sheetNames.push(sheetName);
+                passedCounts.push(passed);
+                failedCounts.push(failed);
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sheetNames,
+                    datasets: [
+                        {
+                            label: 'Passed',
+                            data: passedCounts,
+                            backgroundColor: '#27ae60',
+                            borderColor: '#2ecc71',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Failed',
+                            data: failedCounts,
+                            backgroundColor: '#e74c3c',
+                            borderColor: '#c0392b',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Sheet Name',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Tests',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Test Results by Sheet - Pass and Failed',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        """
+
     def _extract_test_name(self, test_name: str) -> str:
         """Extract base test name by removing _<digits> suffix"""
         import re
@@ -825,6 +1201,236 @@ class HTMLReportGenerator(TestResultsExporter):
             </div>
             <script>
             {self.js_scripts}
+            </script>
+        </body>
+        </html>
+        """
+
+        # Write HTML to file
+        with open(filename, "w") as f:
+            f.write(html_content)
+
+        return filename
+
+    def export_to_nf_html(
+        self,
+        test_results: List[Any],
+        filename: str = None,
+        config: Dict[str, Any] = None,
+    ) -> str:
+        """Export test results to NF-style HTML report"""
+        if not filename:
+            filename = self._generate_filename("html")
+
+        if not config:
+            config = self._load_config()
+
+        # Get system under test details
+        system_info = config.get("system_under_test", {})
+
+        # Group results by sheet
+        results_by_sheet = {}
+        for result in test_results:
+            sheet = getattr(result, "sheet", "Unknown")
+            if sheet not in results_by_sheet:
+                results_by_sheet[sheet] = []
+            results_by_sheet[sheet].append(result)
+
+        # Calculate summary statistics
+        total_tests = len(test_results)
+        passed_tests = sum(
+            1 for r in test_results if getattr(r, "passed", False)
+        )
+        failed_tests = total_tests - passed_tests
+
+        # Generate timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Generate HTML content
+        html_content = f"""<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>&lt;NF&gt; Test Report</title>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <style>
+            {self.nf_css_styles}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="report-header">
+                    <div class="report-title">&lt;NF&gt; Test Report</div>
+                    <div class="timestamp">Timestamp: {timestamp}</div>
+                </div>
+
+                <div class="system-under-test">
+                    <h3>System Under Test:</h3>
+                    <div class="system-details">
+                        <div class="system-detail"><strong>NF Type:</strong> {system_info.get('nf_type', 'Network Function')}</div>
+                        <div class="system-detail"><strong>Version:</strong> {system_info.get('version', 'v1.0.0')}</div>
+                        <div class="system-detail"><strong>Environment:</strong> {system_info.get('environment', 'Test Environment')}</div>
+                        <div class="system-detail"><strong>Deployment:</strong> {system_info.get('deployment', 'Test Deployment')}</div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <div class="system-detail"><strong>Description:</strong> {system_info.get('description', 'Network Function Under Test')}</div>
+                    </div>
+                </div>
+
+                <div class="overall-summary">
+                    <h2>Overall Test Summary</h2>
+                    <div class="summary-stats">
+                        <div class="summary-item">
+                            <h3>Pass</h3>
+                            <p class="passed">{passed_tests}</p>
+                        </div>
+                        <div class="summary-item">
+                            <h3>Fail</h3>
+                            <p class="failed">{failed_tests}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="main-chart">
+                    <canvas id="main-chart"></canvas>
+                </div>
+
+                <div class="sheet-results">
+                    <h2>Test Results by Sheet</h2>
+                    <table class="sheet-table">
+                        <thead>
+                            <tr>
+                                <th>Sheet Name</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        """
+
+        # Add sheet rows and detailed content
+        for sheet_name, sheet_results in results_by_sheet.items():
+            sheet_passed = sum(
+                1 for r in sheet_results if getattr(r, "passed", False)
+            )
+            sheet_failed = len(sheet_results) - sheet_passed
+
+            # Determine if sheet passed (all tests passed)
+            sheet_status = "PASSED" if sheet_failed == 0 else "FAILED"
+            sheet_class = "passed" if sheet_failed == 0 else "failed"
+
+            safe_sheet_name = sheet_name.replace(" ", "-").replace("/", "-")
+
+            html_content += f"""
+                            <tr class="sheet-row {sheet_class}" data-sheet="{safe_sheet_name}" data-passed="{sheet_passed}" data-failed="{sheet_failed}">
+                                <td>{sheet_name}</td>
+                                <td><span class="status-pass">{sheet_status}</span></td>
+                            </tr>
+            """
+
+        html_content += """
+                        </tbody>
+                    </table>
+        """
+
+        # Add detailed content for each sheet
+        for sheet_name, sheet_results in results_by_sheet.items():
+            safe_sheet_name = sheet_name.replace(" ", "-").replace("/", "-")
+
+            # Group tests by test name (without _<digits>)
+            tests_by_name = {}
+            for result in sheet_results:
+                test_name = getattr(result, "test_name", "Unknown")
+                base_test_name = self._extract_test_name(test_name)
+                if base_test_name not in tests_by_name:
+                    tests_by_name[base_test_name] = []
+                tests_by_name[base_test_name].append(result)
+
+            html_content += f"""
+                    <div class="sheet-content" id="sheet-content-{safe_sheet_name}">
+                        <h3>{sheet_name} - Detailed Results</h3>
+            """
+
+            # Add test groups for this sheet
+            for test_name, test_results in tests_by_name.items():
+                # Determine if all tests in this group passed
+                all_passed = all(
+                    getattr(r, "passed", False) for r in test_results
+                )
+                group_status = "passed" if all_passed else "failed"
+                status_text = "PASS" if all_passed else "FAIL"
+
+                html_content += f"""
+                        <div class="test-group">
+                            <div class="test-group-header {group_status}">
+                                <span>{test_name} ({len(test_results)} steps)</span>
+                                <span class="status-pass">{status_text}</span>
+                            </div>
+                            <div class="test-group-content">
+                """
+
+                # Show details for first test step as example
+                if test_results:
+                    result = test_results[0]  # Show first test step
+                    command = getattr(result, "command", "")
+                    output = getattr(result, "output", "")
+                    pattern_match = getattr(result, "pattern_match", "")
+                    expected_status = getattr(result, "expected_status", "N/A")
+                    actual_status = getattr(result, "actual_status", "N/A")
+                    passed = getattr(result, "passed", False)
+
+                    validation_result_class = (
+                        "validation-result" if passed else ""
+                    )
+
+                    html_content += f"""
+                                <div class="test-details-grid">
+                                    <div class="detail-box">
+                                        <h4>Command</h4>
+                                        <pre>{command}</pre>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>HTTP Response From Server</h4>
+                                        <div class="detail-content">{output}</div>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>Pattern to match</h4>
+                                        <pre>{pattern_match}</pre>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>Expected HTTP status</h4>
+                                        <pre>{expected_status}</pre>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>HTTP status from server</h4>
+                                        <pre>{actual_status}</pre>
+                                    </div>
+                                    <div class="detail-box">
+                                        <h4>HTTP status Validation result</h4>
+                                        <div class="detail-content {validation_result_class}">{'PASS' if passed else 'FAIL'}</div>
+                                    </div>
+                                    <div class="detail-box output-section">
+                                        <h4>Output from server</h4>
+                                        <div class="detail-content">{output}</div>
+                                    </div>
+                                </div>
+                    """
+
+                html_content += """
+                            </div>
+                        </div>
+                """
+
+            html_content += """
+                    </div>
+            """
+
+        # Close HTML document
+        html_content += f"""
+                </div>
+            </div>
+            <script>
+            {self.nf_js_scripts}
             </script>
         </body>
         </html>

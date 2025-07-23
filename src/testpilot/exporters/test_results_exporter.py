@@ -390,9 +390,22 @@ class TestResultsExporter:
         # Import HTMLReportGenerator here to avoid circular imports
         from .html_report_generator import HTMLReportGenerator
 
-        # Create HTML report generator and export
+        # Create HTML report generator
         html_generator = HTMLReportGenerator(self.results_dir)
-        html_file = html_generator.export_to_html(test_results, filename)
+
+        # Check config to determine which HTML style to use
+        config = html_generator._load_config()
+        use_nf_style = config.get("html_generator", {}).get(
+            "use_nf_style", False
+        )
+
+        # Export using appropriate style
+        if use_nf_style:
+            html_file = html_generator.export_to_nf_html(
+                test_results, filename, config
+            )
+        else:
+            html_file = html_generator.export_to_html(test_results, filename)
 
         # Open in browser if requested
         if open_browser:

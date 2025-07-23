@@ -3,6 +3,18 @@
     "pod_mode": false,
     "nf_name": "YOUR_NF_NAME",
     "connect_to": "HOST_NAME_OR_ALL",
+    "html_generator": {
+        "use_nf_style": false,
+        "_comment": "Set to true for NF-style HTML reports, false for standard reports"
+    },
+    "system_under_test": {
+        "nf_type": "AMF",
+        "version": "v23.4.x",
+        "environment": "Test Lab Environment",
+        "deployment": "Kubernetes Cluster",
+        "description": "5G Core Network Function - Access and Mobility Management Function",
+        "_comment": "Details shown in NF-style HTML reports"
+    },
     "ssh_settings": {
         "auto_add_hosts": true,
         "known_hosts_file": "~/.ssh/known_hosts",
@@ -35,6 +47,8 @@
         "use_ssh": "Set to true for SSH connections, false for local execution",
         "pod_mode": "Set to true when running inside a Kubernetes pod",
         "connect_to": "Specify host name from hosts array or 'all' for all hosts",
+        "html_generator": "Controls HTML report style - standard vs NF-style layout",
+        "system_under_test": "Information about the system being tested (for NF-style reports)",
         "environment_variables": [
             "Export environment variables before running:",
             "export HOST1_HOSTNAME='your.host.com'",
