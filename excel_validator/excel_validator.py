@@ -110,47 +110,67 @@ class ExcelValidator:
         method = method.upper() if method else ""
 
         if method in self.methods_check:
-            expected_pattern = self.methods_check[method]
+            method_config = self.methods_check[method]
 
-            # Handle different validation types based on pattern format
-            if expected_pattern.startswith("Content-Type:"):
-                # This is a header validation (e.g., for PATCH)
-                expected_content_type = expected_pattern.split(":", 1)[1]
+            # Handle new generic format with "found" and "replace" properties
+            if (
+                isinstance(method_config, dict)
+                and "found" in method_config
+                and "replace" in method_config
+            ):
+                found_patterns = method_config["found"]
+                replace_value = method_config["replace"]
 
-                # Check if curl command has the correct Content-Type header
-                if curl_command:
-                    # Extract Content-Type from curl command headers
-                    content_type_match = re.search(
-                        r"-H\s+['\"]Content-Type:\s*([^'\"]+)['\"]",
-                        curl_command,
-                    )
-                    if content_type_match:
-                        actual_content_type = content_type_match.group(
-                            1
-                        ).strip()
-                        if actual_content_type != expected_content_type:
-                            issues.append(
-                                f"Method '{method}' should use Content-Type '{expected_content_type}', but found '{actual_content_type}'"
-                            )
-                    else:
-                        issues.append(
-                            f"Method '{method}' should have Content-Type header '{expected_content_type}', but no Content-Type found"
+                # Handle Content-Type validation (string pattern)
+                if (
+                    isinstance(found_patterns, str)
+                    and "Content-Type:" in found_patterns
+                ):
+                    # This is a header validation (e.g., for PATCH)
+                    expected_content_type = replace_value.split(":", 1)[1]
+                    found_content_type = found_patterns.split(":", 1)[1]
+
+                    # Check if curl command has the incorrect Content-Type header
+                    if curl_command:
+                        # Extract Content-Type from curl command headers
+                        content_type_match = re.search(
+                            r"-H\s+['\"]Content-Type:\s*([^'\"]+)['\"]",
+                            curl_command,
                         )
+                        if content_type_match:
+                            actual_content_type = content_type_match.group(
+                                1
+                            ).strip()
+                            if actual_content_type == found_content_type:
+                                issues.append(
+                                    f"Method '{method}' should use '{replace_value}', but found '{found_patterns}'"
+                                )
+                        else:
+                            # If no Content-Type found, that's also an issue for methods that require it
+                            issues.append(
+                                f"Method '{method}' should have '{replace_value}' header, but no Content-Type found"
+                            )
 
-            else:
-                # This is a status code validation (e.g., for PUT)
-                if pd.notna(expected_status):
+                # Handle status code validation (list of numbers)
+                elif isinstance(found_patterns, list) and pd.notna(
+                    expected_status
+                ):
                     expected_status_str = str(expected_status).strip()
 
-                    # For PUT method expecting 2xx, flag specific codes like 200, 201
-                    if method == "PUT" and expected_pattern == "2xx":
-                        if expected_status_str in ["200", "201", "204"]:
+                    # Convert expected_status to comparable format
+                    try:
+                        status_value = float(expected_status_str)
+                        if status_value in found_patterns:
                             issues.append(
-                                f"Method '{method}' should return '{expected_pattern}', but Expected_Status shows specific code '{expected_status_str}'"
+                                f"Method '{method}' should return '{replace_value}', but Expected_Status shows specific code '{expected_status_str}'"
                             )
-                        elif expected_status_str not in ["2xx", "20x"]:
+                    except (ValueError, TypeError):
+                        # Handle string status codes
+                        if expected_status_str in [
+                            str(p) for p in found_patterns
+                        ]:
                             issues.append(
-                                f"Method '{method}' should return '{expected_pattern}', but Expected_Status shows '{expected_status_str}'"
+                                f"Method '{method}' should return '{replace_value}', but Expected_Status shows specific code '{expected_status_str}'"
                             )
 
         return issues
@@ -418,9 +438,17 @@ class ExcelValidator:
                                         == "Expected_Status"
                                     ):
                                         if "specific code" in issue["issue"]:
-                                            cell.value = (
-                                                "2xx"  # Fix to generic pattern
+                                            # Extract replacement value from issue message
+                                            replace_match = re.search(
+                                                r"should return '([^']+)'",
+                                                issue["issue"],
                                             )
+                                            if replace_match:
+                                                cell.value = (
+                                                    replace_match.group(1)
+                                                )
+                                            else:
+                                                cell.value = "2xx"  # Fallback
                                         break
 
                         elif (
@@ -477,14 +505,13 @@ class ExcelValidator:
         fixed_command = command
 
         if "Content-Type" in issue["issue"]:
-            # Extract expected Content-Type from the issue
-            if "should use Content-Type" in issue["issue"]:
-                # Extract expected content type
-                match = re.search(
-                    r"should use Content-Type '([^']+)'", issue["issue"]
-                )
+            # Extract replacement Content-Type from the issue message
+            if "should use" in issue["issue"]:
+                # Extract the replacement pattern (e.g., "Content-Type:application/json-patch+json")
+                match = re.search(r"should use '([^']+)'", issue["issue"])
                 if match:
-                    expected_content_type = match.group(1)
+                    replacement_header = match.group(1)
+                    expected_content_type = replacement_header.split(":", 1)[1]
 
                     # Check if Content-Type header exists and replace it
                     content_type_pattern = (
@@ -507,14 +534,16 @@ class ExcelValidator:
                             after = fixed_command[insert_pos:]
                             fixed_command = f"{before} -H 'Content-Type:{expected_content_type}'{after}"
 
-            elif "should have Content-Type header" in issue["issue"]:
+            elif (
+                "should have" in issue["issue"] and "header" in issue["issue"]
+            ):
                 # Add missing Content-Type header
                 match = re.search(
-                    r"should have Content-Type header '([^']+)'",
-                    issue["issue"],
+                    r"should have '([^']+)' header", issue["issue"]
                 )
                 if match:
-                    expected_content_type = match.group(1)
+                    replacement_header = match.group(1)
+                    expected_content_type = replacement_header.split(":", 1)[1]
 
                     # Insert after the URL
                     url_match = re.search(r'"[^"]*"', fixed_command)

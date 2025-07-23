@@ -6,8 +6,15 @@
         "nnrf-disc/v1": "ocnrf-discovery"
     },
     "methods_check": {
-        "PUT" : "2xx",
-        "PATCH": "Content-Type:application/json-patch+json"
+        "PUT" :
+        { "found": [200, 201],
+            "replace": "2xx"
+        },
+        "PATCH":
+        {
+            "found":  "Content-Type:application/json",
+            "replace": "Content-Type:application/json-patch+json"
+        }
     },
     "pattern_match_check" : {
         "json_fix": true

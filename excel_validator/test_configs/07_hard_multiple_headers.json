@@ -1,0 +1,29 @@
+{
+    "wrap_text": true,
+    "urls_check": {
+        "nnrf-nfm/v1/": "ocnrf-ingressgateway",
+        "nrf-configuration/v1/": "ocnrf-configuration",
+        "nnrf-disc/v1": "ocnrf-discovery"
+    },
+    "methods_check": {
+        "PUT": {
+            "found": [200, 201, 204],
+            "replace": "2xx"
+        },
+        "PATCH": {
+            "found": "Content-Type:application/json",
+            "replace": "Content-Type:application/json-patch+json"
+        },
+        "POST": {
+            "found": "Authorization:Bearer token123",
+            "replace": "Authorization:Bearer {access-token}"
+        },
+        "GET": {
+            "found": "Accept:text/plain",
+            "replace": "Accept:application/json"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

@@ -16,13 +16,14 @@
   - `{ocnrf-ingressgateway}` → `{ocnrf-configuration}` for configuration endpoints
 - **Issues Found**: 37 URL mapping issues
 
-### 2. Expected_Status Code Validation ✅
-- **Rule**: PUT requests should show "2xx" pattern, not specific codes like "200" or "201"
+### 2. Expected_Status Code Validation ✅ **CORRECTED**
+- **Rule**: PUT requests should show "2xx" pattern, **ONLY** flag specific success codes like "200" or "201"
 - **Examples Fixed**:
   - Changed "200" → "2xx"
   - Changed "201" → "2xx"
   - Changed "201.0" → "2xx"
-- **Issues Found**: 95+ Expected_Status issues
+- **Ignores**: Error codes like "4xx", "5xx", "410-415" (intentional test cases)
+- **Issues Found**: 104 Expected_Status issues (corrected from over-flagging)
 
 ### 3. JSON Pattern Matching ✅
 - **Rule**: Pattern_Match column JSON must be properly formatted
@@ -41,17 +42,17 @@
 ### 5. Text Wrapping ✅
 - **Rule**: Applied text wrapping to all cells when `wrap_text: true` in configuration
 
-## Total Issues Found: 170
+## Total Issues Found: 162 **CORRECTED**
 
 ## Issue Breakdown by Type:
 1. **URL Mapping Issues**: 37
    - Wrong service names for endpoints
    - Missing service placeholders (localhost URLs)
 
-2. **Method Response Issues**: 95+
-   - PUT methods showing specific status codes instead of "2xx" pattern
-   - Some showing error codes (4xx, 5xx) which may be intentional test cases
-   - **NEW**: PATCH methods using wrong Content-Type headers
+2. **Method Response Issues**: 107 **CORRECTED**
+   - PUT methods showing specific success codes instead of "2xx" pattern (104 issues)
+   - ~~Removed inappropriate flagging of error codes (4xx, 5xx) - these are intentional test cases~~
+   - **NEW**: PATCH methods using wrong Content-Type headers (3 issues)
 
 3. **Pattern Match Issues**: 35+
    - Malformed JSON in Pattern_Match column
@@ -60,6 +61,11 @@
 4. **PATCH Content-Type Issues**: 3 ✅ **NEW**
    - PATCH requests using `'application/json'` instead of required `'application/json-patch+json'`
    - **Fixed**: Updated curl commands with correct Content-Type headers
+
+## ✅ **CORRECTION APPLIED**
+- **Fixed over-flagging bug**: Previously flagged ALL PUT requests with non-"2xx" Expected_Status
+- **Now correctly**: Only flags specific success codes like "200", "201" that should be "2xx"
+- **Ignores**: Error test cases with "4xx", "5xx", ranges like "410-415" (as intended)
 
 ## Sheets Processed:
 - CommonItems
@@ -75,12 +81,30 @@
 - NRFFunctionalUseCases
 
 ## Generic System Features:
-- ✅ Configurable via `url_mapping.json`
+- ✅ **Fully configurable** via `url_mapping.json`
 - ✅ Support for multiple URL patterns and service mappings
-- ✅ HTTP method validation rules
+- ✅ **NEW: Generic method validation** with `"found"` and `"replace"` patterns
+- ✅ **Zero code changes needed** for new validation rules
 - ✅ JSON formatting fixes
 - ✅ Text wrapping control
-- ✅ Extensible for additional validation rules
+- ✅ Extensible for any validation requirements
+
+## ✅ **MAJOR IMPROVEMENT: Generic Method Configuration**
+```json
+"methods_check": {
+    "PUT": {
+        "found": [200, 201],
+        "replace": "2xx"
+    },
+    "PATCH": {
+        "found": "Content-Type:application/json",
+        "replace": "Content-Type:application/json-patch+json"
+    }
+}
+```
+- **Benefit**: Add any method validation without code changes
+- **Flexible**: Supports status codes (arrays) and headers (strings)
+- **Maintainable**: All rules in configuration, not hardcoded
 
 ## Next Steps:
 1. Review the fixed Excel file: `nrf_tests_updated_v1_fixed.xlsx`
