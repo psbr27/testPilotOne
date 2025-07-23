@@ -1,0 +1,15 @@
+{
+    "wrap_text": true,
+    "urls_check": {
+        "nnrf-nfm/v1/": "ocnrf-ingressgateway",
+        "nrf-configuration/v1/" : "ocnrf-configuration",
+        "nnrf-disc/v1": "ocnrf-discovery"
+    },
+    "methods_check": {
+        "PUT" : "2xx",
+        "PATCH": "Content-Type:application/json-patch+json"
+    },
+    "pattern_match_check" : {
+        "json_fix": true
+    }
+}
