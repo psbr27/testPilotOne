@@ -647,6 +647,75 @@ class TestValidateResponseEnhanced:
 
         assert result["pattern_match_overall"] is True
 
+    def test_validate_pattern_match_comma_separated_key_values(self):
+        """Test comma-separated key-value pattern matching - this should fail with current implementation"""
+        response_body = {
+            "user": {"name": "John", "status": "active"},
+            "system": {"version": "1.0", "mode": "production"},
+            "count": 5,
+        }
+
+        # Test case 1: "key1:val1,key2:val2" format
+        result1 = validate_response_enhanced(
+            pattern_match="user.name:John,system.version:1.0",
+            response_headers=None,
+            response_body=response_body,
+            response_payload=None,
+            logger=self.mock_logger,
+        )
+
+        # This currently fails but should pass
+        print(
+            f"Test 1 - key1:val1,key2:val2 format: {result1['pattern_match_overall']}"
+        )
+        for match in result1["pattern_matches"]:
+            print(f"  {match['type']}: {match['result']} - {match['details']}")
+
+        # Test case 2: "key1:val1","key2:val2" format (with quotes)
+        result2 = validate_response_enhanced(
+            pattern_match='"user.name:John","system.version:1.0"',
+            response_headers=None,
+            response_body=response_body,
+            response_payload=None,
+            logger=self.mock_logger,
+        )
+
+        # This currently fails but should pass
+        print(f"Test 2 - quoted format: {result2['pattern_match_overall']}")
+        for match in result2["pattern_matches"]:
+            print(f"  {match['type']}: {match['result']} - {match['details']}")
+
+        # After the fix, these should now pass
+        assert result1["pattern_match_overall"] is True  # Should now pass
+        assert result2["pattern_match_overall"] is True  # Should now pass
+
+        # Test case 3: Partial match (one key found, one not found)
+        result3 = validate_response_enhanced(
+            pattern_match="user.name:John,nonexistent.field:missing",
+            response_headers=None,
+            response_body=response_body,
+            response_payload=None,
+            logger=self.mock_logger,
+        )
+
+        # This should fail because not all pairs are found
+        print(f"Test 3 - partial match: {result3['pattern_match_overall']}")
+        for match in result3["pattern_matches"]:
+            print(f"  {match['type']}: {match['result']} - {match['details']}")
+
+        assert result3["pattern_match_overall"] is False  # Should fail
+
+        # Test case 4: Single key-value (should still work)
+        result4 = validate_response_enhanced(
+            pattern_match="user.name:John",
+            response_headers=None,
+            response_body=response_body,
+            response_payload=None,
+            logger=self.mock_logger,
+        )
+
+        assert result4["pattern_match_overall"] is True  # Should pass
+
     def test_validate_pattern_match_regex_success(self):
         """Test successful regex pattern matching"""
         response_body = '{"timestamp": "2023-12-25T10:30:45Z", "status": "ok"}'

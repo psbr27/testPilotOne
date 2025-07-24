@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Any, Dict
 from unittest.mock import MagicMock, Mock, call, patch
 
@@ -13,6 +14,7 @@ from src.testpilot.core.test_pilot_core import (
     build_kubectl_logs_command,
     build_url_based_command,
     execute_command,
+    execute_kubectl_logs_parallel,
     extract_step_data,
     manage_workflow_context,
     process_single_step,
@@ -537,6 +539,449 @@ class TestExecuteCommand:
         assert (
             duration > 0
         )  # Duration is calculated by execute_command, not from mock
+
+
+class TestExecuteKubectlLogsParallel:
+    """Test cases for execute_kubectl_logs_parallel function"""
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.save_kubectl_logs")
+    def test_execute_kubectl_logs_parallel_empty_commands(
+        self, mock_save_logs, mock_execute
+    ):
+        """Test parallel execution with empty command list"""
+        step = Mock()
+        flow = Mock()
+
+        result_output, pod_names, duration = execute_kubectl_logs_parallel(
+            [], "test-host", None, step, flow
+        )
+
+        assert result_output == ""
+        assert pod_names == []
+        assert duration == 0.0
+        mock_execute.assert_not_called()
+        mock_save_logs.assert_not_called()
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.save_kubectl_logs")
+    @patch("src.testpilot.core.test_pilot_core.parse_curl_output")
+    @patch(
+        "src.testpilot.core.test_pilot_core._extract_and_display_epoch_timestamps"
+    )
+    def test_execute_kubectl_logs_parallel_single_command_ssh(
+        self, mock_timestamps, mock_parse, mock_save_logs, mock_execute
+    ):
+        """Test parallel execution with single kubectl command via SSH"""
+        # Setup mocks
+        mock_execute.return_value = ("kubectl log output", "", 1.5)
+        mock_parse.return_value = {
+            "raw_output": "kubectl log output",
+            "is_kubectl_logs": True,
+        }
+
+        step = Mock()
+        step.row_idx = 1
+        flow = Mock()
+        flow.test_name = "test_parallel"
+
+        connector = Mock()
+        connector.use_ssh = True
+
+        commands = ["kubectl logs test-pod-123"]
+
+        result_output, pod_names, duration = execute_kubectl_logs_parallel(
+            commands, "test-host", connector, step, flow, show_table=True
+        )
+
+        # Verify results
+        assert result_output == "kubectl log output"
+        assert len(pod_names) == 1
+        assert pod_names[0] == "test-pod-123"
+        assert duration == 1.5
+
+        # Verify execute_command was called correctly
+        mock_execute.assert_called_once_with(
+            "kubectl logs test-pod-123", "test-host", connector
+        )
+
+        # Verify kubectl logs were saved
+        mock_save_logs.assert_called_once_with(
+            "kubectl log output",
+            "test-host",
+            "1_test-pod-123",
+            "test_parallel",
+        )
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.save_kubectl_logs")
+    @patch("src.testpilot.core.test_pilot_core.parse_curl_output")
+    def test_execute_kubectl_logs_parallel_single_command_local(
+        self, mock_parse, mock_save_logs, mock_execute
+    ):
+        """Test parallel execution with single kubectl command locally"""
+        # Setup mocks
+        mock_execute.return_value = ("local kubectl output", "", 0.8)
+        mock_parse.return_value = {
+            "raw_output": "local kubectl output",
+            "is_kubectl_logs": True,
+        }
+
+        step = Mock()
+        step.row_idx = 2
+        flow = Mock()
+        flow.test_name = "test_local"
+
+        # No connector (local execution)
+        connector = None
+
+        commands = ["kubectl logs app-pod-456"]
+
+        result_output, pod_names, duration = execute_kubectl_logs_parallel(
+            commands, "localhost", connector, step, flow
+        )
+
+        # Verify results
+        assert result_output == "local kubectl output"
+        assert len(pod_names) == 1
+        assert pod_names[0] == "app-pod-456"
+        assert duration == 0.8
+
+        # Verify execute_command was called correctly
+        mock_execute.assert_called_once_with(
+            "kubectl logs app-pod-456", "localhost", connector
+        )
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.save_kubectl_logs")
+    @patch("src.testpilot.core.test_pilot_core.parse_curl_output")
+    def test_execute_kubectl_logs_parallel_multiple_commands(
+        self, mock_parse, mock_save_logs, mock_execute
+    ):
+        """Test parallel execution with multiple kubectl commands"""
+
+        # Setup mocks for multiple commands
+        def mock_execute_side_effect(command, host, connector):
+            if "pod1" in command:
+                return ("logs from pod1", "", 1.0)
+            elif "pod2" in command:
+                return ("logs from pod2", "", 1.2)
+            elif "pod3" in command:
+                return ("logs from pod3", "", 0.9)
+            return ("", "", 0.0)
+
+        mock_execute.side_effect = mock_execute_side_effect
+        mock_parse.return_value = {"raw_output": "", "is_kubectl_logs": True}
+
+        # Mock parse_curl_output to return different outputs
+        def mock_parse_side_effect(output, error):
+            return {"raw_output": output, "is_kubectl_logs": True}
+
+        mock_parse.side_effect = mock_parse_side_effect
+
+        step = Mock()
+        step.row_idx = 3
+        flow = Mock()
+        flow.test_name = "test_multiple"
+
+        connector = Mock()
+        connector.use_ssh = True
+
+        commands = [
+            "kubectl logs test-pod1",
+            "kubectl logs test-pod2",
+            "kubectl logs test-pod3",
+        ]
+
+        result_output, pod_names, duration = execute_kubectl_logs_parallel(
+            commands, "test-host", connector, step, flow, show_table=True
+        )
+
+        # Verify results (order may vary due to parallel execution)
+        assert "logs from pod1" in result_output
+        assert "logs from pod2" in result_output
+        assert "logs from pod3" in result_output
+        assert len(pod_names) == 3
+        assert "test-pod1" in pod_names
+        assert "test-pod2" in pod_names
+        assert "test-pod3" in pod_names
+        assert duration == 1.2  # Should be max duration
+
+        # Verify all commands were executed
+        assert mock_execute.call_count == 3
+        assert mock_save_logs.call_count == 3
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.save_kubectl_logs")
+    @patch("src.testpilot.core.test_pilot_core.parse_curl_output")
+    def test_execute_kubectl_logs_parallel_with_oc_commands(
+        self, mock_parse, mock_save_logs, mock_execute
+    ):
+        """Test parallel execution with oc logs commands (OpenShift)"""
+        # Setup mocks
+        mock_execute.return_value = ("oc log output", "", 1.1)
+        mock_parse.return_value = {
+            "raw_output": "oc log output",
+            "is_kubectl_logs": True,
+        }
+
+        step = Mock()
+        step.row_idx = 4
+        flow = Mock()
+        flow.test_name = "test_oc"
+
+        connector = Mock()
+        connector.use_ssh = False
+
+        commands = ["oc logs openshift-pod-789"]
+
+        result_output, pod_names, duration = execute_kubectl_logs_parallel(
+            commands, "openshift-host", connector, step, flow
+        )
+
+        # Verify results
+        assert result_output == "oc log output"
+        assert len(pod_names) == 1
+        assert pod_names[0] == "openshift-pod-789"
+        assert duration == 1.1
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    def test_execute_kubectl_logs_parallel_command_failure(self, mock_execute):
+        """Test parallel execution with command failures"""
+        # Setup mock to raise exception
+        mock_execute.side_effect = Exception("Command failed")
+
+        step = Mock()
+        step.row_idx = 5
+        flow = Mock()
+        flow.test_name = "test_failure"
+
+        connector = Mock()
+
+        commands = ["kubectl logs failing-pod"]
+
+        result_output, pod_names, duration = execute_kubectl_logs_parallel(
+            commands, "test-host", connector, step, flow, show_table=True
+        )
+
+        # Should handle failure gracefully
+        assert result_output == ""
+        assert pod_names == []
+        assert duration == 0.0
+
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.save_kubectl_logs")
+    @patch("src.testpilot.core.test_pilot_core.parse_curl_output")
+    def test_execute_kubectl_logs_parallel_pod_name_extraction(
+        self, mock_parse, mock_save_logs, mock_execute
+    ):
+        """Test pod name extraction from various kubectl command formats"""
+        mock_execute.return_value = ("test output", "", 1.0)
+        mock_parse.return_value = {
+            "raw_output": "test output",
+            "is_kubectl_logs": True,
+        }
+
+        step = Mock()
+        step.row_idx = 6
+        flow = Mock()
+        flow.test_name = "test_extraction"
+
+        connector = Mock()
+
+        # Test various command formats
+        test_cases = [
+            ("kubectl logs simple-pod", "simple-pod"),
+            ("kubectl logs complex-pod-123-abc", "complex-pod-123-abc"),
+            ("oc logs openshift-pod", "openshift-pod"),
+            ("kubectl logs", None),  # Missing pod name
+        ]
+
+        for idx, (command, expected_pod) in enumerate(test_cases):
+            mock_execute.reset_mock()
+            mock_save_logs.reset_mock()
+
+            result_output, pod_names, duration = execute_kubectl_logs_parallel(
+                [command], "test-host", connector, step, flow
+            )
+
+            assert len(pod_names) == 1
+            assert pod_names[0] == expected_pod
+
+
+class TestKubectlParallelIntegration:
+    """Integration tests for kubectl parallel execution in main command flow"""
+
+    @patch("src.testpilot.core.test_pilot_core.execute_kubectl_logs_parallel")
+    @patch("src.testpilot.core.test_pilot_core.execute_command")
+    @patch("src.testpilot.core.test_pilot_core.parse_curl_output")
+    @patch("src.testpilot.core.test_pilot_core.build_command_for_step")
+    @patch("src.testpilot.core.test_pilot_core.extract_step_data")
+    @patch("src.testpilot.core.test_pilot_core.manage_workflow_context")
+    @patch("src.testpilot.core.test_pilot_core.resolve_namespace")
+    @patch("src.testpilot.core.test_pilot_core.validate_and_create_result")
+    @patch("src.testpilot.core.test_pilot_core.log_test_result")
+    def test_mixed_command_separation_and_execution(
+        self,
+        mock_log,
+        mock_validate,
+        mock_resolve,
+        mock_manage,
+        mock_extract,
+        mock_build,
+        mock_parse,
+        mock_execute,
+        mock_parallel,
+    ):
+        """Test that kubectl logs and other commands are properly separated and executed"""
+        # Setup mocks
+        mock_extract.return_value = {"command": "mixed_test"}
+        mock_resolve.return_value = "default"
+        mock_build.return_value = [
+            "kubectl logs app-pod-1",
+            "kubectl logs app-pod-2",
+            "curl http://api.example.com/health",
+            "oc logs openshift-pod",
+        ]
+
+        # Mock parallel execution results
+        mock_parallel.return_value = (
+            "kubectl logs output",
+            ["app-pod-1", "app-pod-2", "openshift-pod"],
+            2.5,
+        )
+
+        # Mock regular command execution
+        mock_execute.return_value = ("curl health check output", "", 0.5)
+        mock_parse.return_value = {"raw_output": "curl health check output"}
+
+        # Mock validation
+        mock_result = Mock()
+        mock_result.passed = True
+        mock_validate.return_value = mock_result
+
+        # Create test objects
+        step = Mock()
+        step.other_fields = {}
+        step.row_idx = 1
+        step.step_name = "test_step"
+
+        flow = Mock()
+        flow.test_name = "integration_test"
+        flow.sheet = "TestSheet"
+        flow.context = {}
+
+        connector = Mock()
+        connector.use_ssh = True
+
+        test_results = []
+
+        # Execute
+        process_single_step(
+            step=step,
+            flow=flow,
+            target_hosts=["test-host"],
+            svc_maps={"test-host": {}},
+            placeholder_pattern=re.compile(r"\{\{(\w+)\}\}"),
+            connector=connector,
+            host_cli_map={"test-host": "kubectl"},
+            test_results=test_results,
+            show_table=True,
+            dashboard=None,
+        )
+
+        # Verify that parallel execution was called with kubectl commands
+        mock_parallel.assert_called_once_with(
+            [
+                "kubectl logs app-pod-1",
+                "kubectl logs app-pod-2",
+                "oc logs openshift-pod",
+            ],
+            "test-host",
+            connector,
+            step,
+            flow,
+            True,
+        )
+
+        # Verify that regular execution was called with non-kubectl command
+        mock_execute.assert_called_once_with(
+            "curl http://api.example.com/health", "test-host", connector
+        )
+
+        # Verify results were created
+        assert len(test_results) == 1
+        assert test_results[0] == mock_result
+
+    @patch("src.testpilot.core.test_pilot_core.execute_kubectl_logs_parallel")
+    @patch("src.testpilot.core.test_pilot_core.build_command_for_step")
+    @patch("src.testpilot.core.test_pilot_core.extract_step_data")
+    @patch("src.testpilot.core.test_pilot_core.manage_workflow_context")
+    @patch("src.testpilot.core.test_pilot_core.resolve_namespace")
+    def test_only_kubectl_commands_use_parallel_execution(
+        self,
+        mock_resolve,
+        mock_manage,
+        mock_extract,
+        mock_build,
+        mock_parallel,
+    ):
+        """Test that only kubectl logs commands trigger parallel execution"""
+        # Setup mocks
+        mock_extract.return_value = {"command": "kubectl_only_test"}
+        mock_resolve.return_value = "default"
+        mock_build.return_value = [
+            "kubectl logs pod-1",
+            "kubectl logs pod-2",
+            "oc logs openshift-pod-3",
+        ]
+
+        mock_parallel.return_value = (
+            "all kubectl logs",
+            ["pod-1", "pod-2", "openshift-pod-3"],
+            1.8,
+        )
+
+        # Create minimal test objects
+        step = Mock()
+        step.other_fields = {}
+        step.row_idx = 2
+
+        flow = Mock()
+        flow.context = {}
+
+        # Use show_table=True to suppress logging output during test
+        with patch(
+            "src.testpilot.core.test_pilot_core.validate_and_create_result"
+        ) as mock_validate:
+            mock_result = Mock()
+            mock_result.passed = True
+            mock_validate.return_value = mock_result
+
+            test_results = []
+            process_single_step(
+                step=step,
+                flow=flow,
+                target_hosts=["kubectl-host"],
+                svc_maps={"kubectl-host": {}},
+                placeholder_pattern=re.compile(r"\{\{(\w+)\}\}"),
+                connector=Mock(),
+                host_cli_map={},
+                test_results=test_results,
+                show_table=True,
+                dashboard=None,
+            )
+
+        # Verify parallel execution was called (since all commands are kubectl logs)
+        mock_parallel.assert_called_once()
+
+        # Verify all commands were passed to parallel execution
+        args, kwargs = mock_parallel.call_args
+        kubectl_commands = args[0]
+        assert len(kubectl_commands) == 3
+        assert "kubectl logs pod-1" in kubectl_commands
+        assert "kubectl logs pod-2" in kubectl_commands
+        assert "oc logs openshift-pod-3" in kubectl_commands
 
 
 class TestProcessSingleStep:

@@ -795,11 +795,11 @@ class GetFullValidator(ValidationStrategy):
 class GetStatusOnlyValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetStatusOnlyValidator")
-        if context.actual_status == context.expected_status:
+        if status_matches(context.expected_status, context.actual_status):
             logger.debug("GET status only validation passed")
             return ValidationResult(True)
         logger.debug(
-            f"Status mismatch: {context.actual_status} != {context.expected_status}"
+            f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
         )
         return ValidationResult(
             False,
@@ -810,9 +810,9 @@ class GetStatusOnlyValidator(ValidationStrategy):
 class GetStatusAndPayloadValidator(ValidationStrategy):
     def validate(self, context: ValidationContext) -> ValidationResult:
         logger = get_logger("ValidationEngine.GetStatusAndPayloadValidator")
-        if context.actual_status != context.expected_status:
+        if not status_matches(context.expected_status, context.actual_status):
             logger.debug(
-                f"Status mismatch: {context.actual_status} != {context.expected_status}"
+                f"Status mismatch: {context.actual_status} != {context.expected_status} (range-aware)"
             )
             return ValidationResult(
                 False,
@@ -1449,7 +1449,7 @@ class ValidationEngine:
             except (ValueError, TypeError):
                 pass
 
-            if actual_status != expected_status:
+            if not status_matches(expected_status, actual_status):
                 result = ValidationResult(
                     False,
                     fail_reason=f"HTTP status mismatch: {actual_status} != {expected_status}",
@@ -1522,7 +1522,7 @@ class ValidationEngine:
             result,
             "http_status_match",
             (
-                (actual_status == expected_status)
+                status_matches(expected_status, actual_status)
                 if (actual_status is not None and expected_status is not None)
                 else None
             ),

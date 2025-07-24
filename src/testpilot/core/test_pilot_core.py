@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pprint import pprint
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -160,6 +161,102 @@ def save_kubectl_logs(
     filepath = os.path.join(dir_path, filename)
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(raw_output, f, indent=2)
+
+
+def execute_kubectl_logs_parallel(
+    kubectl_commands, host, connector, step, flow, show_table=False
+):
+    """Execute kubectl logs commands in parallel and return accumulated results."""
+    if not kubectl_commands:
+        return "", [], 0.0
+
+    def execute_single_kubectl_command(command):
+        """Execute a single kubectl logs command and return structured result."""
+        try:
+            output, error, duration = execute_command(command, host, connector)
+            parsed_output = parse_curl_output(output, error)
+            raw_output = parsed_output.get("raw_output", "")
+
+            # Extract pod name for logging
+            pod_name = None
+            if command.startswith("kubectl logs") or command.startswith(
+                "oc logs"
+            ):
+                parts = command.split()
+                try:
+                    pod_name = parts[2]
+                except IndexError:
+                    pod_name = None
+
+            # Save kubectl logs if applicable
+            if parsed_output.get("is_kubectl_logs"):
+                save_kubectl_logs(
+                    parsed_output.get("raw_output"),
+                    host,
+                    f"{step.row_idx}_{pod_name}" if pod_name else step.row_idx,
+                    getattr(flow, "test_name", "unknown"),
+                )
+
+            if not show_table:
+                logger.info(f"[CALLFLOW] Built command: {command}")
+                logger.info(
+                    f"[CALLFLOW] Executing kubectl logs command on host {host}..."
+                )
+                logger.debug(
+                    f"[CALLFLOW] Command executed in {duration:.2f} seconds"
+                )
+                logger.info(f"[CALLFLOW] Output from server: {output}")
+                if error:
+                    logger.info(f"[CALLFLOW] HTTP Output from server: {error}")
+
+                # Extract and display epochSecond timestamps for kubectl logs
+                if raw_output:
+                    _extract_and_display_epoch_timestamps(raw_output)
+
+            return {
+                "raw_output": raw_output,
+                "pod_name": pod_name,
+                "duration": duration,
+                "success": True,
+            }
+        except Exception as e:
+            logger.error(
+                f"[CALLFLOW] Error executing kubectl command {command}: {e}"
+            )
+            return {
+                "raw_output": "",
+                "pod_name": None,
+                "duration": 0.0,
+                "success": False,
+            }
+
+    # Execute all kubectl logs commands in parallel
+    accumulated_raw_output = ""
+    pod_names = []
+    total_duration = 0.0
+
+    with ThreadPoolExecutor(
+        max_workers=min(len(kubectl_commands), 10)
+    ) as executor:
+        future_to_command = {
+            executor.submit(execute_single_kubectl_command, cmd): cmd
+            for cmd in kubectl_commands
+        }
+
+        for future in as_completed(future_to_command):
+            result = future.result()
+            if result["success"]:
+                accumulated_raw_output += result["raw_output"]
+                pod_names.append(result["pod_name"])
+                total_duration = max(total_duration, result["duration"])
+            else:
+                command = future_to_command[future]
+                if not show_table:
+                    logger.warning(
+                        f"[CALLFLOW] Failed to execute kubectl command: {command}"
+                    )
+
+    return accumulated_raw_output, pod_names, total_duration
 
 
 def safe_str(val: Any) -> str:
@@ -942,63 +1039,76 @@ def process_single_step(
         elif commands is None:
             commands = []
 
-        all_raw_outputs = []
         accumulated_raw_output = ""
         duration = 0.0  # Initialize duration in case no commands are executed
         command = None  # Initialize command variable
-        for command in commands:
-            if not command:
+
+        # Separate kubectl logs commands from other commands
+        kubectl_commands = []
+        other_commands = []
+
+        # Filter out empty commands and separate by type
+        for cmd in commands:
+            if not cmd:
                 if not show_table:
                     logger.warning(
                         f"[CALLFLOW] Command could not be built for host {host}, step {getattr(step, 'step_name', 'N/A')}. Skipping."
                     )
                 continue
+
+            if cmd.startswith("kubectl logs") or cmd.startswith("oc logs"):
+                kubectl_commands.append(cmd)
+            else:
+                other_commands.append(cmd)
+
+        # Execute kubectl logs commands in parallel if any exist
+        if kubectl_commands:
+            if not show_table:
+                logger.info(
+                    f"[CALLFLOW] Executing {len(kubectl_commands)} kubectl logs commands in parallel on host {host}..."
+                )
+                logger.info(
+                    f"[CALLFLOW] Service map for host {host}: {svc_map}"
+                )
+
+            kubectl_raw_output, kubectl_pod_names, kubectl_duration = (
+                execute_kubectl_logs_parallel(
+                    kubectl_commands, host, connector, step, flow, show_table
+                )
+            )
+            accumulated_raw_output += kubectl_raw_output
+            pod_names.extend(kubectl_pod_names)
+            duration = max(duration, kubectl_duration)
+
+        # Execute other commands sequentially (preserve existing behavior)
+        for command in other_commands:
             if not show_table:
                 logger.info(f"[CALLFLOW] Built command: {command}")
                 logger.info(
                     f"[CALLFLOW] Service map for host {host}: {svc_map}"
                 )
                 logger.info(f"[CALLFLOW] Executing command on host {host}...")
-            output, error, duration = execute_command(command, host, connector)
+
+            output, error, cmd_duration = execute_command(
+                command, host, connector
+            )
             parsed_output = parse_curl_output(output, error)
+            duration = max(duration, cmd_duration)
 
             # Get the raw_output and append to accumulated string
             raw_output = parsed_output.get("raw_output", "")
             accumulated_raw_output += raw_output
 
-            # Try to extract pod name for log file naming
-            pod_name = None
-            if command.startswith("kubectl logs") or command.startswith(
-                "oc logs"
-            ):
-                parts = command.split()
-                try:
-                    pod_name = parts[2]
-                except IndexError:
-                    pod_name = None
-            pod_names.append(pod_name)
-            if parsed_output.get("is_kubectl_logs"):
-                save_kubectl_logs(
-                    parsed_output.get("raw_output"),
-                    host,
-                    f"{step.row_idx}_{pod_name}" if pod_name else step.row_idx,
-                    getattr(flow, "test_name", "unknown"),
-                )
+            # For non-kubectl commands, append None to pod_names to maintain consistency
+            pod_names.append(None)
 
             if not show_table:
                 logger.debug(
-                    f"[CALLFLOW] Command executed in {duration:.2f} seconds"
+                    f"[CALLFLOW] Command executed in {cmd_duration:.2f} seconds"
                 )
                 logger.info(f"[CALLFLOW] Output from server: {output}")
                 if error:
                     logger.info(f"[CALLFLOW] HTTP Output from server: {error}")
-
-                # For kubectl logs commands, extract and display epochSecond timestamps
-                if (
-                    command.startswith("kubectl logs")
-                    or command.startswith("oc logs")
-                ) and raw_output:
-                    _extract_and_display_epoch_timestamps(raw_output)
 
                 # Add pattern match string to CALLFLOW output
                 pattern = step.pattern_match

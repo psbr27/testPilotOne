@@ -183,6 +183,60 @@ def _list_dicts_match(expected_list, actual_list, ignore_fields):
     return True
 
 
+def _parse_comma_separated_key_values(pattern_match):
+    """
+    Parse comma-separated key-value patterns like:
+    - "key1:val1,key2:val2"
+    - "key1:val1","key2:val2"
+    - key1=val1,key2=val2
+
+    Returns a list of (key, value) tuples
+    """
+    # Handle quoted comma-separated patterns like "key1:val1","key2:val2"
+    if '"' in pattern_match and "," in pattern_match:
+        # Try to split on "," pattern
+        import re
+
+        quoted_pattern = re.findall(r'"([^"]*)"', pattern_match)
+        if quoted_pattern:
+            pairs = []
+            for quoted_item in quoted_pattern:
+                if ":" in quoted_item or "=" in quoted_item:
+                    sep = ":" if ":" in quoted_item else "="
+                    if sep in quoted_item:
+                        key, val = quoted_item.split(sep, 1)
+                        pairs.append((key.strip(), val.strip()))
+            if pairs:
+                return pairs
+
+    # Handle unquoted comma-separated patterns like "key1:val1,key2:val2"
+    if "," in pattern_match and (":" in pattern_match or "=" in pattern_match):
+        # Check if this looks like multiple key-value pairs
+        parts = pattern_match.split(",")
+        pairs = []
+        for part in parts:
+            part = part.strip()
+            if ":" in part or "=" in part:
+                sep = ":" if ":" in part else "="
+                if sep in part:
+                    key, val = part.split(sep, 1)
+                    pairs.append(
+                        (key.strip().strip('"'), val.strip().strip('"'))
+                    )
+
+        # Only return if we found multiple valid pairs (at least 2)
+        if len(pairs) >= 2:
+            return pairs
+
+    # Fallback to single key-value pair
+    if ":" in pattern_match or "=" in pattern_match:
+        sep = ":" if ":" in pattern_match else "="
+        key, val = pattern_match.split(sep, 1)
+        return [(key.strip().strip('"'), val.strip().strip('"'))]
+
+    return []
+
+
 def _deep_array_search(obj, pattern_array):
     """
     Search for pattern array elements deeply within a nested structure.
@@ -477,95 +531,143 @@ def validate_response_enhanced(
                         "Skipping key-value parsing for JSON array pattern"
                     )
                 else:
-                    sep = ":" if ":" in pattern_match else "="
-                    key, val = pattern_match.split(sep, 1)
-                    key = key.strip().strip('"')
-                    val = val.strip().strip('"')
-                    # Try to parse as JSON, but also keep original string for comparison
-                    val_original = val
-                    try:
-                        val_json = json.loads(val)
-                    except Exception:
-                        val_json = val
+                    # Parse comma-separated key-value pairs
+                    key_value_pairs = _parse_comma_separated_key_values(
+                        pattern_match
+                    )
 
-                    # For body: check all dicts in list, or just dict
-                    if isinstance(actual, dict):
-                        # Try with parsed value first
-                        found_kv_body = _search_nested_key_value(
-                            actual, key, val_json
-                        )
-                        # If not found and value was parsed differently, try with original string
-                        if not found_kv_body and val_json != val_original:
-                            found_kv_body = _search_nested_key_value(
-                                actual, key, val_original
-                            )
+                    if key_value_pairs:
+                        all_pairs_found = True
+                        found_pairs = []
+                        not_found_pairs = []
 
-                        # Also search in all nested arrays within the dict
-                        if not found_kv_body:
-                            for k, v in actual.items():
-                                if isinstance(v, list):
-                                    for item in v:
-                                        if isinstance(
-                                            item, dict
-                                        ) and _search_nested_key_value(
-                                            item, key, val_json
-                                        ):
-                                            found_kv_body = True
-                                            break
-                                        if (
-                                            not found_kv_body
-                                            and val_json != val_original
-                                            and isinstance(item, dict)
-                                        ):
-                                            if _search_nested_key_value(
-                                                item, key, val_original
-                                            ):
-                                                found_kv_body = True
+                        for key, val in key_value_pairs:
+                            # Try to parse as JSON, but also keep original string for comparison
+                            val_original = val
+                            try:
+                                val_json = json.loads(val)
+                            except Exception:
+                                val_json = val
+
+                            pair_found_body = False
+                            pair_found_headers = False
+
+                            # For body: check all dicts in list, or just dict
+                            if isinstance(actual, dict):
+                                # Try with parsed value first
+                                pair_found_body = _search_nested_key_value(
+                                    actual, key, val_json
+                                )
+                                # If not found and value was parsed differently, try with original string
+                                if (
+                                    not pair_found_body
+                                    and val_json != val_original
+                                ):
+                                    pair_found_body = _search_nested_key_value(
+                                        actual, key, val_original
+                                    )
+
+                                # Also search in all nested arrays within the dict
+                                if not pair_found_body:
+                                    for k, v in actual.items():
+                                        if isinstance(v, list):
+                                            for item in v:
+                                                if isinstance(
+                                                    item, dict
+                                                ) and _search_nested_key_value(
+                                                    item, key, val_json
+                                                ):
+                                                    pair_found_body = True
+                                                    break
+                                                if (
+                                                    not pair_found_body
+                                                    and val_json
+                                                    != val_original
+                                                    and isinstance(item, dict)
+                                                ):
+                                                    if _search_nested_key_value(
+                                                        item, key, val_original
+                                                    ):
+                                                        pair_found_body = True
+                                                        break
+                                            if pair_found_body:
                                                 break
-                                    if found_kv_body:
-                                        break
-                    elif isinstance(actual, list):
+                            elif isinstance(actual, list):
+                                pair_found_body = any(
+                                    _search_nested_key_value(
+                                        item, key, val_json
+                                    )
+                                    or (
+                                        val_json != val_original
+                                        and _search_nested_key_value(
+                                            item, key, val_original
+                                        )
+                                    )
+                                    for item in actual
+                                    if isinstance(item, dict)
+                                )
+
+                            # Check headers
+                            if isinstance(response_headers, dict):
+                                pair_found_headers = (
+                                    response_headers.get(key) == val_json
+                                )  # entire string
+                                # check substring
+                                if pair_found_headers is False:
+                                    if key in response_headers:
+                                        pair_found_headers = val_json in str(
+                                            response_headers[key]
+                                        )
+
+                            pair_found = pair_found_body or pair_found_headers
+
+                            if pair_found:
+                                found_pairs.append(f"{key}:{val}")
+                            else:
+                                not_found_pairs.append(f"{key}:{val}")
+                                all_pairs_found = False
+
+                        found_kv = all_pairs_found
                         found_kv_body = any(
-                            _search_nested_key_value(item, key, val_json)
-                            or (
-                                val_json != val_original
-                                and _search_nested_key_value(
-                                    item, key, val_original
+                            found_pairs
+                        )  # For backward compatibility
+                        found_kv_headers = False  # Simplified for now
+
+                        if len(key_value_pairs) > 1:
+                            # Multiple pairs - provide detailed feedback
+                            details = f"Multi-pair key-value match: "
+                            if found_kv:
+                                details += (
+                                    f"All {len(key_value_pairs)} pairs found"
                                 )
-                            )
-                            for item in actual
-                            if isinstance(item, dict)
+                            else:
+                                details += f"Found {len(found_pairs)}/{len(key_value_pairs)} pairs"
+                                if not_found_pairs:
+                                    details += f" (missing: {', '.join(not_found_pairs)})"
+                        else:
+                            # Single pair - use existing logic
+                            details = f"Key-value found in: "
+                            if pair_found_body:
+                                details += "body "
+                            if pair_found_headers:
+                                details += "headers"
+                            if not found_kv:
+                                details = (
+                                    "Key-value not found in body or headers"
+                                )
+
+                        logger.debug(
+                            f"Key-value search: {len(key_value_pairs)} pairs, found={found_kv}, pairs={key_value_pairs}"
                         )
-                    if isinstance(response_headers, dict):
-                        found_kv_headers = (
-                            response_headers.get(key) == val_json
-                        )  # entire string
-                        # check substring
-                        if found_kv_headers is False:
-                            if key in response_headers:
-                                found_kv_headers = val_json in str(
-                                    response_headers[key]
-                                )
-                    found_kv = found_kv_body or found_kv_headers
-                    details = f"Key-value found in: "
-                    if found_kv_body:
-                        details += "body "
-                    if found_kv_headers:
-                        details += "headers"
-                    if not found_kv:
-                        details = "Key-value not found in body or headers"
-                    logger.debug(
-                        f"Key-value search: key={key}, value={val_json}, found_body={found_kv_body}, found_headers={found_kv_headers}"
-                    )
-                    pattern_matches.append(
-                        {
-                            "type": "key-value",
-                            "result": found_kv,
-                            "details": details.strip(),
-                        }
-                    )
-                    if found_kv:
-                        pattern_match_overall = True
+                        pattern_matches.append(
+                            {
+                                "type": "key-value",
+                                "result": found_kv,
+                                "details": details.strip(),
+                            }
+                        )
+                        if found_kv:
+                            pattern_match_overall = True
 
             # 2.3 Regex search
             try:
