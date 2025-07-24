@@ -2,7 +2,7 @@
     "use_ssh": true,
     "pod_mode": false,
     "nf_name": "SLF",
-    "connect_to": "tailgate",
+    "connect_to": "",
     "ssh_settings": {
        "auto_add_hosts": true,
        "known_hosts_file": "~/.ssh/known_hosts",
@@ -11,12 +11,12 @@
     },
     "hosts": [
       {
-        "name": "tailgate",
-        "hostname": "10.75.184.84",
-        "username": "aziz.tejani",
-        "key_file": "/home/cloud-user/aziz/sshkeys/aziz_ssh_key",
+        "name": "",
+        "hostname": "",
+        "username": "",
+        "key_file": "",
         "password": null,
-        "namespace": "ocnrfslf",
+        "namespace": "",
         "port": 22
       },
       {
