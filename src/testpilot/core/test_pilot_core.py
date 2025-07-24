@@ -383,6 +383,32 @@ def build_kubectl_logs_command(
             line.strip() for line in result.stdout.splitlines() if line.strip()
         ]
 
+    # Filter out provgw pods (pods with -prov- in name) when NF is SLF
+    # Load config to check if this is an SLF deployment
+    config_file = (
+        getattr(connector, "config_file", "config/hosts.json")
+        if connector
+        else "config/hosts.json"
+    )
+
+    try:
+        with open(config_file, "r") as f:
+            config = json.load(f)
+        nf_name = config.get("nf_name", "")
+
+        # If this is SLF deployment, filter out provgw pods for all pod searches
+        if "SLF" in nf_name.upper():
+            original_count = len(pod_names)
+            pod_names = [pod for pod in pod_names if "-prov-" not in pod]
+            filtered_count = len(pod_names)
+            if original_count > filtered_count:
+                logger.debug(
+                    f"SLF deployment detected: Filtered out {original_count - filtered_count} "
+                    f"provgw pods for '{to_search_pod_name}' search. Remaining pods: {pod_names}"
+                )
+    except Exception as e:
+        logger.debug(f"Could not load config for provgw filtering: {e}")
+
     if not pod_names:
         logger.error(
             f"No pod found matching '{to_search_pod_name}' on host {host}"
