@@ -200,7 +200,7 @@ class TestNRFInstanceTracker:
         # Create instance in one test
         nf_id1 = "orphan-id"
         test1_context = {
-            "test_name": "test_1",
+            "test_name": "test_1_registration_flow",
             "sheet": "NRFRegistration",
             "row_idx": 1,
         }
@@ -220,7 +220,7 @@ class TestNRFInstanceTracker:
         orphaned = self.tracker._find_orphaned_instances()
         assert len(orphaned) == 1
         assert orphaned[0]["nfInstanceId"] == nf_id1
-        assert orphaned[0]["created_by"] == "test_1"
+        assert orphaned[0]["created_by"] == "test_1_registration_flow"
 
     def test_no_active_instance_returns_none(self):
         """Test GET/DELETE operations return None when no active instances"""

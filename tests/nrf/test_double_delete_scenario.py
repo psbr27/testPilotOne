@@ -104,7 +104,7 @@ def test_double_delete_scenario():
         print(f"   Active instances: {report['active_instances']}")
         print(f"   Total created: {report['total_instances_created']}")
         print(f"   Stack size: {report['active_stack_size']}")
-        print(f"   Stack contents: {report['stack_trace']}")
+        print(f"   Stack contents: {report['active_stack']}")
 
     # Cleanup
     sequence_manager.cleanup_session("test_double_delete")

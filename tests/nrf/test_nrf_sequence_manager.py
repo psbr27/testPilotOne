@@ -241,7 +241,7 @@ class TestNRFSequenceManager:
         """Test getting diagnostic report for specific session"""
         # Create session and add instances
         handle_nrf_operation(
-            url="http://nrf:8081/",
+            url="http://nrf:8081/nnrf-nfm/v1/nf-instances/",
             method="PUT",
             payload=self.test_payload,
             test_context=self.test_context,
@@ -267,7 +267,7 @@ class TestNRFSequenceManager:
         context2["session_id"] = "session2"
 
         handle_nrf_operation(
-            url="http://nrf:8081/",
+            url="http://nrf:8081/nnrf-nfm/v1/nf-instances/",
             method="PUT",
             payload=self.test_payload,
             test_context=context1,
@@ -275,7 +275,7 @@ class TestNRFSequenceManager:
         )
 
         handle_nrf_operation(
-            url="http://nrf:8081/",
+            url="http://nrf:8081/nnrf-nfm/v1/nf-instances/",
             method="PUT",
             payload=json.dumps({"nfInstanceId": "id-2"}),
             test_context=context2,
