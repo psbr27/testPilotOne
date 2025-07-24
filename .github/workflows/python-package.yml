@@ -5,7 +5,7 @@ name: Python package
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "*" ]  # Run on push to any branch
   pull_request:
     branches: [ "main" ]
 
@@ -31,4 +31,18 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Test with pytest
       run: |
-        pytest
+        python -m pytest tests/ -v --tb=short
+    - name: Test by category
+      run: |
+        echo "Testing Core components..."
+        python -m pytest tests/core/ -v --tb=line || true
+        echo "Testing NRF components..."
+        python -m pytest tests/nrf/ -v --tb=line || true
+        echo "Testing Utils..."
+        python -m pytest tests/utils/ -v --tb=line || true
+        echo "Testing Validation..."
+        python -m pytest tests/validation/ -v --tb=line || true
+        echo "Testing Mock integration..."
+        python -m pytest tests/mock/ -v --tb=line || true
+        echo "Testing Exporters..."
+        python -m pytest tests/exporters/ -v --tb=line || true
