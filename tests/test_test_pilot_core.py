@@ -344,6 +344,131 @@ class TestBuildKubectlLogsCommand:
             assert "test-pod-abc123" in result[0]
             assert "test-pod-def456" in result[1]
 
+    @patch("subprocess.run")
+    @patch("builtins.open")
+    def test_build_kubectl_logs_slf_provgw_filtering(
+        self, mock_open, mock_run
+    ):
+        """Test kubectl logs command with SLF provgw filtering using instance labels"""
+        # Mock config file for SLF deployment
+        mock_config = {"nf_name": "SLF_TEST"}
+        mock_file = Mock()
+        mock_file.read.return_value = json.dumps(mock_config)
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        # Mock pod list and kubectl get pod commands
+        def mock_subprocess_side_effect(*args, **kwargs):
+            if args and len(args) > 0:
+                if (
+                    isinstance(args[0], str)
+                    and "get pods" in args[0]
+                    and "grep" in args[0]
+                ):
+                    # Return mix of slf and provgw pods for the initial grep search
+                    return Mock(
+                        stdout="slf-ingressgateway-prov-abc123\nprovgw-prov-ingressgateway-def456\nslf-group-prov-ghi789",
+                        returncode=0,
+                    )
+                elif isinstance(args[0], str) and "jsonpath=" in args[0]:
+                    # Now using shell=True, so command is a string
+                    if "slf-ingressgateway-prov-abc123" in args[0]:
+                        return Mock(stdout="namespace", returncode=0)
+                    elif "provgw-prov-ingressgateway-def456" in args[0]:
+                        return Mock(stdout="provgw", returncode=0)
+                    elif "slf-group-prov-ghi789" in args[0]:
+                        return Mock(stdout="namespace", returncode=0)
+            return Mock(stdout="", returncode=1)
+
+        mock_run.side_effect = mock_subprocess_side_effect
+
+        with patch(
+            "src.testpilot.core.test_pilot_core._generate_logs_capture_command"
+        ) as mock_generate:
+            mock_generate.return_value = "kubectl logs pod > logs.txt"
+
+            result = build_kubectl_logs_command(
+                "kubectl logs {ingressgateway}", "default", None, "test-host"
+            )
+
+            # Should only include slf pods, not provgw pods
+            assert len(result) == 2
+            # Verify the correct pods were processed (mock_generate gets called for each filtered pod)
+            assert mock_generate.call_count == 2
+            # Verify that only slf pods were passed to _generate_logs_capture_command
+            call_args_list = mock_generate.call_args_list
+            pod_commands = [call[0][0] for call in call_args_list]
+            assert (
+                "kubectl logs slf-ingressgateway-prov-abc123" in pod_commands
+            )
+            assert "kubectl logs slf-group-prov-ghi789" in pod_commands
+            # Verify provgw pod was filtered out
+            assert all(
+                "provgw-prov-ingressgateway-def456" not in cmd
+                for cmd in pod_commands
+            )
+
+    @patch("builtins.open")
+    def test_build_kubectl_logs_slf_provgw_filtering_ssh(self, mock_open):
+        """Test kubectl logs command with SLF provgw filtering using instance labels via SSH"""
+        # Mock config file for SLF deployment
+        mock_config = {"nf_name": "SLF_TEST"}
+        mock_file = Mock()
+        mock_file.read.return_value = json.dumps(mock_config)
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        # Mock SSH connector
+        connector = Mock()
+        connector.use_ssh = True
+
+        def mock_run_command_side_effect(cmd, hosts):
+            if "get pods" in cmd and "grep" in cmd:
+                # Return mix of slf and provgw pods for the initial grep search
+                return {
+                    "test-host": {
+                        "output": "slf-ingressgateway-prov-abc123\nprovgw-prov-ingressgateway-def456\nslf-group-prov-ghi789",
+                        "error": "",
+                    }
+                }
+            elif "jsonpath=" in cmd:
+                if "slf-ingressgateway-prov-abc123" in cmd:
+                    return {"test-host": {"output": "namespace", "error": ""}}
+                elif "provgw-prov-ingressgateway-def456" in cmd:
+                    return {"test-host": {"output": "provgw", "error": ""}}
+                elif "slf-group-prov-ghi789" in cmd:
+                    return {"test-host": {"output": "namespace", "error": ""}}
+            return {"test-host": {"output": "", "error": "command not found"}}
+
+        connector.run_command.side_effect = mock_run_command_side_effect
+
+        with patch(
+            "src.testpilot.core.test_pilot_core._generate_logs_capture_command"
+        ) as mock_generate:
+            mock_generate.return_value = "kubectl logs pod > logs.txt"
+
+            result = build_kubectl_logs_command(
+                "kubectl logs {ingressgateway}",
+                "default",
+                connector,
+                "test-host",
+            )
+
+            # Should only include slf pods, not provgw pods
+            assert len(result) == 2
+            # Verify the correct pods were processed
+            assert mock_generate.call_count == 2
+            # Verify that only slf pods were passed to _generate_logs_capture_command
+            call_args_list = mock_generate.call_args_list
+            pod_commands = [call[0][0] for call in call_args_list]
+            assert (
+                "kubectl logs slf-ingressgateway-prov-abc123" in pod_commands
+            )
+            assert "kubectl logs slf-group-prov-ghi789" in pod_commands
+            # Verify provgw pod was filtered out
+            assert all(
+                "provgw-prov-ingressgateway-def456" not in cmd
+                for cmd in pod_commands
+            )
+
 
 class TestExecuteCommand:
     """Test cases for execute_command function"""

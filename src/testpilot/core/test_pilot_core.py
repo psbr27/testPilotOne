@@ -383,7 +383,7 @@ def build_kubectl_logs_command(
             line.strip() for line in result.stdout.splitlines() if line.strip()
         ]
 
-    # Filter out provgw pods (pods with -prov- in name) when NF is SLF
+    # Filter out provgw pods using app.kubernetes.io/instance label when NF is SLF
     # Load config to check if this is an SLF deployment
     config_file = (
         getattr(connector, "config_file", "config/hosts.json")
@@ -396,10 +396,55 @@ def build_kubectl_logs_command(
             config = json.load(f)
         nf_name = config.get("nf_name", "")
 
-        # If this is SLF deployment, filter out provgw pods for all pod searches
+        # If this is SLF deployment, filter out provgw pods using label-based filtering
         if "SLF" in nf_name.upper():
             original_count = len(pod_names)
-            pod_names = [pod for pod in pod_names if "-prov-" not in pod]
+            filtered_pods = []
+
+            for pod in pod_names:
+                try:
+                    # Get the app.kubernetes.io/instance label for the pod
+                    label_command = f"{cli_type} get pod {pod} -o jsonpath='{{.metadata.labels.app\\.kubernetes\\.io/instance}}'"
+                    if namespace:
+                        label_command = f"{cli_type} get pod {pod} -n {namespace} -o jsonpath='{{.metadata.labels.app\\.kubernetes\\.io/instance}}'"
+
+                    if connector is not None and getattr(
+                        connector, "use_ssh", False
+                    ):
+                        # Use SSH to run the command on remote host
+                        result = connector.run_command(label_command, [host])
+                        res = result.get(host, {"output": "", "error": ""})
+                        instance_label = res["output"].strip()
+                        command_success = not res.get("error", "")
+                    else:
+                        # Run locally
+                        result = subprocess.run(
+                            label_command,
+                            shell=True,
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                        )
+                        instance_label = result.stdout.strip()
+                        command_success = result.returncode == 0
+
+                    if command_success:
+                        # Include pod if instance label is not "provgw" (slf pods return namespace)
+                        if instance_label != "provgw":
+                            filtered_pods.append(pod)
+                    else:
+                        # If kubectl command fails, include the pod to be safe
+                        filtered_pods.append(pod)
+
+                except (
+                    subprocess.TimeoutExpired,
+                    subprocess.SubprocessError,
+                    Exception,
+                ):
+                    # If there's any error, include the pod to be safe
+                    filtered_pods.append(pod)
+
+            pod_names = filtered_pods
             filtered_count = len(pod_names)
             if original_count > filtered_count:
                 logger.debug(
