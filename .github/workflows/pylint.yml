@@ -19,6 +19,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install pylint pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Install the package in editable mode so pylint can check imports
+        pip install -e .
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
