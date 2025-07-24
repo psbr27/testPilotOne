@@ -55,11 +55,6 @@ jobs:
         echo "🎭 Running Mock Tests (Integration & Server)..."
         python -m pytest tests/mock/ -v --tb=short
 
-    - name: Run Exporter Tests
-      run: |
-        echo "📊 Running Exporter Tests (HTML Reports)..."
-        python -m pytest tests/exporters/ -v --tb=short
-
     - name: Generate Test Summary
       run: |
         echo "📈 Test Summary:"

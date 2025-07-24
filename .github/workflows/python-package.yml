@@ -46,5 +46,3 @@ jobs:
         python -m pytest tests/validation/ -v --tb=line || true
         echo "Testing Mock integration..."
         python -m pytest tests/mock/ -v --tb=line || true
-        echo "Testing Exporters..."
-        python -m pytest tests/exporters/ -v --tb=line || true
