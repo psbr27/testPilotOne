@@ -1,3 +1,4 @@
+# Requirements for Python 3.9
 bcrypt==4.3.0
 black==25.1.0
 blessed==1.21.0
@@ -10,12 +11,10 @@ isort==5.13.2
 jsondiff==2.2.1
 markdown-it-py==3.0.0
 mdurl==0.1.2
-numpy==1.26.4; python_version < '3.10'
-numpy==2.2.6; python_version >= '3.10'
+numpy==1.26.4
 openpyxl==3.1.5
 orderly-set==5.5.0
-pandas==1.5.3; python_version < '3.10'
-pandas==2.3.1; python_version >= '3.10'
+pandas==1.5.3
 paramiko==3.5.1
 pre-commit==4.2.0
 pycparser==2.22

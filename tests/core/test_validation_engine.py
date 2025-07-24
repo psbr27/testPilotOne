@@ -77,7 +77,7 @@ class TestValidationEngine(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertFalse(result.http_status_match)
-        self.assertIn("HTTP status mismatch", result.reason)
+        self.assertIn("HTTP status mismatch", result.fail_reason)
 
     def test_http_status_excel_float_handling(self):
         """Test handling of Excel float formatting for status codes."""
@@ -125,7 +125,7 @@ class TestValidationEngine(unittest.TestCase):
         )
 
         self.assertFalse(result.passed)
-        self.assertIn("Response payload mismatch", result.reason)
+        self.assertIn("Response structure does not match", result.fail_reason)
 
     def test_pattern_matching_string_success(self):
         """Test successful string pattern matching."""
@@ -155,7 +155,9 @@ class TestValidationEngine(unittest.TestCase):
 
         self.assertFalse(result.passed)
         self.assertFalse(result.pattern_found)
-        self.assertIn("Pattern match failed", result.reason)
+        self.assertIn(
+            "Expected text/pattern was not found", result.fail_reason
+        )
 
     def test_pattern_matching_json_success(self):
         """Test successful JSON pattern matching."""
@@ -239,7 +241,7 @@ class TestValidationEngine(unittest.TestCase):
         )
 
         self.assertFalse(result.passed)
-        self.assertIn("Response payload mismatch", result.reason)
+        self.assertIn("Response payload mismatch", result.fail_reason)
 
     def test_invalid_json_response(self):
         """Test handling of invalid JSON in response."""
@@ -251,7 +253,7 @@ class TestValidationEngine(unittest.TestCase):
         )
 
         self.assertFalse(result.passed)
-        self.assertIn("Invalid JSON", result.reason)
+        self.assertIn("Invalid JSON", result.fail_reason)
 
 
 if __name__ == "__main__":

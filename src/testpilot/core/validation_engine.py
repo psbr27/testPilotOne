@@ -100,7 +100,11 @@ def status_matches(expected, actual):
 
         # Handle exact match (either string or int)
         else:
-            return actual_int == int(expected)
+            # Handle Excel float format like "201.0"
+            if isinstance(expected, str) and "." in expected:
+                return actual_int == int(float(expected))
+            else:
+                return actual_int == int(expected)
 
     except Exception as e:
         logger = get_logger("ValidationEngine.status_matches")
