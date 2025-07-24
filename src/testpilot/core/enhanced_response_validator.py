@@ -304,7 +304,7 @@ def validate_response_enhanced(
             else:
                 dict_match = False
         logger.info(
-            f"Response payload matches actual with {dict_match_result['match_percentage']}% confidence."
+            f"Response payload matches actual with {dict_match_result['match_percentage']}% "
         )
         logger.debug(
             f"Dict comparison result: {dict_match}, differences: {differences}"

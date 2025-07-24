@@ -29,6 +29,10 @@ fi
 log_info "Cleaning previous builds..."
 rm -rf dist build *.spec
 
+# Update build info before creating spec file
+log_info "Updating build information..."
+python3 scripts/update_build_info.py
+
 # Create the spec file
 log_info "Creating testPilot.spec file..."
 cat > testPilot.spec << 'EOF'
@@ -46,7 +50,7 @@ def find_local_modules():
     for py_file in Path(project_root).glob('*.py'):
         if py_file.name != 'test_pilot.py':
             modules.append(py_file.stem)
-    
+
     # Add src package and its modules
     src_path = Path(project_root) / 'src'
     if src_path.exists():
@@ -55,12 +59,12 @@ def find_local_modules():
         testpilot_path = src_path / 'testpilot'
         if testpilot_path.exists():
             modules.append('src.testpilot')
-    
+
     # Add scripts package and its modules
     scripts_path = Path(project_root) / 'scripts'
     if scripts_path.exists():
         modules.append('scripts')
-    
+
     # Add examples package and its modules
     examples_path = Path(project_root) / 'examples'
     if examples_path.exists():
@@ -82,7 +86,7 @@ def find_local_modules():
             if py_file.name != '__init__.py':
                 full_module = f"{module_name}.{py_file.stem}"
                 modules.append(full_module)
-    
+
     return modules
 
 local_modules = find_local_modules()
@@ -119,7 +123,8 @@ a = Analysis(
     datas=[
         ('config', 'config'),
         ('src/testpilot', 'src/testpilot'),
-        ('examples', 'examples')
+        ('examples', 'examples'),
+        ('build_info.py', '.')
     ],
     hiddenimports=all_imports,
     hookspath=[],

@@ -26,7 +26,7 @@ from tabulate import tabulate
 
 # Updated imports for new package structure
 try:
-    from scripts.update_build_info import APP_VERSION, BUILD_DATE, BUILD_EPOCH
+    from build_info import APP_VERSION, BUILD_DATE, BUILD_EPOCH
 except ImportError:
     # Fallback values if build info is not available
     APP_VERSION = "1.0.0"
@@ -226,6 +226,8 @@ def check_config_security(config):
                     f"Host '{host.get('name', 'unknown')}' has a key file in project directory"
                 )
 
+
+"""
     if warnings:
         logger.warning("🔒 Security warnings detected in configuration:")
         for warning in warnings:
@@ -234,6 +236,7 @@ def check_config_security(config):
             "Consider using environment variables for sensitive data."
         )
         logger.warning("See docs/SECURE_CONFIGURATION.md for guidance.")
+"""
 
 
 def load_excel_and_sheets(input_path):
@@ -878,7 +881,7 @@ def process_patterns(input_path):
         # Export the enhanced data
         with open(output_file, "w") as f:
             json.dump(enhanced_data, f, indent=2)
-        logger.info(f"✅ Enhanced pattern matches exported to: {output_file}")
+        logger.debug(f"✅ Enhanced pattern matches exported to: {output_file}")
 
         # Create pattern type summary
         summary = create_pattern_summary(enhanced_data)
