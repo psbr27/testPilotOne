@@ -1480,6 +1480,24 @@ class HTMLReportGenerator(TestResultsExporter):
         # Get system under test details
         system_info = config.get("system_under_test", {})
 
+        # Get namespace based on connect_to value
+        connect_to = config.get("connect_to", "")
+        namespace = ""
+        hosts = config.get("hosts", [])
+
+        # Find the host that matches connect_to value
+        for host in hosts:
+            if (
+                host.get("name") == connect_to
+                or host.get("hostname") == connect_to
+            ):
+                namespace = host.get("namespace", "")
+                break
+
+        # If connect_to is "all" or not found, use the first host's namespace
+        if not namespace and hosts:
+            namespace = hosts[0].get("namespace", "")
+
         # Group results by sheet
         results_by_sheet = {}
         for result in test_results:
@@ -1548,7 +1566,7 @@ class HTMLReportGenerator(TestResultsExporter):
                             <div class="system-detail"><strong>Deployment:</strong> {system_info.get('deployment', 'Test Deployment')}</div>
                         </div>
                         <div style="margin-top: 10px;">
-                            <div class="system-detail"><strong>Description:</strong> {system_info.get('description', 'Network Function Under Test')}</div>
+                            <div class="system-detail"><strong>Namespace:</strong> {namespace if namespace else 'No namespace configured'}</div>
                         </div>
                     </div>
 
