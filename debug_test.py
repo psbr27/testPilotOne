@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def debug_test(test_name, row_index):
     # Load test data
     with open(
-        "/Users/sarathp/Documents/incubator/testPilotOne/test_results_UserAgentHeader-egw.json",
+        "Users/sarathp/Documents/incubator/testPilotOne/test_results/test_results_slf_registration.json",
         "r",
     ) as f:
         data = json.load(f)
@@ -173,15 +173,97 @@ def debug_test(test_name, row_index):
         print(f"Raw output: {repr(raw_output)}")
 
 
+def debug_all_tests():
+    """Debug all tests in the file"""
+    # Load test data
+    with open(
+        "/Users/sarathp/Documents/incubator/testPilotOne/test_results/test_results_slf_registration.json",
+        "r",
+    ) as f:
+        data = json.load(f)
+
+    print("=== DEBUGGING ALL TESTS ===")
+    print(f"Total tests: {len(data['results'])}")
+    print(
+        f"Summary: {data['summary']['passed']} passed, {data['summary']['failed']} failed"
+    )
+    print()
+
+    for i, result in enumerate(data["results"], 1):
+        test_name = result.get("test_name")
+        row_index = result.get("row_index")
+        original_passed = result["passed"]
+
+        print(f"--- Test {i}: {test_name} (row {row_index}) ---")
+        print(f"Original result: {'PASS' if original_passed else 'FAIL'}")
+
+        # Extract validation data
+        pattern_match_data = result.get("pattern_match", {})
+        response_body_data = result.get("response_body", {})
+
+        pattern_match = pattern_match_data.get("raw_pattern_match", "")
+        response_body = response_body_data.get("parsed_json")
+        raw_output = response_body_data.get("raw_output", "")
+
+        # Run enhanced validation
+        validation_result = validate_response_enhanced(
+            pattern_match=pattern_match if pattern_match.strip() else None,
+            response_headers=result.get("response_headers"),
+            response_body=response_body,
+            response_payload=response_body,
+            logger=logger,
+            raw_output=raw_output,
+        )
+
+        enhanced_passed = validation_result.get(
+            "pattern_match_overall"
+        ) or validation_result.get("dict_match")
+        dict_match = validation_result.get("dict_match")
+        pattern_match_overall = validation_result.get("pattern_match_overall")
+
+        print(f"Enhanced validation:")
+        print(f"  - Dict match: {dict_match}")
+        print(f"  - Pattern match: {pattern_match_overall}")
+        print(
+            f"  - Overall result: {'PASS' if enhanced_passed else 'FAIL' if enhanced_passed is False else 'NO_CRITERIA'}"
+        )
+
+        # Analysis
+        if original_passed == False and enhanced_passed == True:
+            print(
+                "  🔍 DISCREPANCY: Original FAILED but enhanced validation PASSES (false negative)"
+            )
+        elif original_passed == True and enhanced_passed == False:
+            print(
+                "  🔍 DISCREPANCY: Original PASSED but enhanced validation FAILS (false positive)"
+            )
+        elif enhanced_passed is None:
+            print(
+                "  ⚪ NO VALIDATION CRITERIA: Cannot determine if test should pass or fail"
+            )
+        else:
+            result_str = "PASS" if original_passed else "FAIL"
+            print(f"  ✅ CONSISTENT: Both agree ({result_str})")
+
+        print(f"  Response size: {len(raw_output)} bytes")
+        print(f"  Has pattern: {bool(pattern_match.strip())}")
+        print()
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Debug a specific test from SLF registration results"
+        description="Debug test results from NFInstanceDiscovery-NRF file"
     )
     parser.add_argument(
         "test_name",
-        help="Name of the test to debug (e.g., test_sbi_overload_igw_3)",
+        nargs="?",
+        help="Name of the test to debug (e.g., test_nf_discovery_nrf_1). If omitted, debug all tests.",
     )
-    parser.add_argument("row_index", help="Row index is required)")
+    parser.add_argument(
+        "row_index",
+        nargs="?",
+        help="Row index (required when test_name is provided)",
+    )
     parser.add_argument(
         "--quiet", "-q", action="store_true", help="Reduce logging verbosity"
     )
@@ -191,7 +273,16 @@ def main():
     if args.quiet:
         logging.getLogger().setLevel(logging.WARNING)
 
-    debug_test(args.test_name, args.row_index)
+    if not args.test_name:
+        # No arguments provided - debug all tests
+        debug_all_tests()
+    else:
+        # Specific test provided
+        if not args.row_index:
+            print("Error: row_index is required when test_name is provided")
+            parser.print_help()
+            return
+        debug_test(args.test_name, args.row_index)
 
 
 if __name__ == "__main__":

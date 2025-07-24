@@ -296,7 +296,7 @@ def validate_response_enhanced(
             )
             differences = (
                 dict_match_result["missing_details"]
-                if not dict_match
+                if dict_match_result["match_percentage"] <= 50
                 else None
             )
             if dict_match_result["match_percentage"] > 50:

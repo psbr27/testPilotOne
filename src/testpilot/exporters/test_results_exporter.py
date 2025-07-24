@@ -38,21 +38,24 @@ class TestResultsExporter:
             result, "Response_Payload", None
         ) or getattr(result, "response_payload", "")
 
+        # Also include the output field for backward compatibility
+        output = getattr(result, "output", "")
+
+        # Use Response_Payload if available, otherwise fall back to output
+        content_to_analyze = response_payload if response_payload else output
+
         response_body = {
-            "raw_payload": str(response_payload) if response_payload else "",
+            "raw_payload": (
+                str(content_to_analyze) if content_to_analyze else ""
+            ),
             "parsed_json": None,
             "content_type": "unknown",
             "size_bytes": 0,
             "from_excel_column": True,
         }
 
-        # Also include the output field for backward compatibility
-        output = getattr(result, "output", "")
         if output:
             response_body["raw_output"] = output
-
-        # Use Response_Payload if available, otherwise fall back to output
-        content_to_analyze = response_payload if response_payload else output
 
         if content_to_analyze:
             response_body["size_bytes"] = len(str(content_to_analyze))
