@@ -155,14 +155,14 @@ try:
     session_report = report["sessions"]["test_session"]
     print(f"  Active instances: {session_report['active_instances']}")
     print(f"  Total created: {session_report['total_instances_created']}")
-    print(f"  Active stack: {session_report['stack_trace']}")
+    print(f"  Active stack: {session_report.get('stack_trace', 'N/A')}")
 
 except ImportError as e:
     print(f"❌ Import error: {e}")
-    sys.exit(1)
+    raise
 except AssertionError as e:
     print(f"❌ Test failed: {e}")
-    sys.exit(1)
+    raise
 except Exception as e:
     print(f"❌ Unexpected error: {e}")
-    sys.exit(1)
+    raise

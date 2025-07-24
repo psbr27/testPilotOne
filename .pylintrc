@@ -1,0 +1,75 @@
+[MESSAGES CONTROL]
+# Disable specific pylint warnings for tests and common non-critical issues
+disable=
+    # Style issues that don't affect functionality
+    missing-module-docstring,
+    missing-function-docstring,
+    missing-class-docstring,
+    line-too-long,
+    too-many-lines,
+    too-many-public-methods,
+    too-few-public-methods,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+
+    # Test-specific issues
+    attribute-defined-outside-init,
+    unused-variable,
+    unused-import,
+    unused-argument,
+    protected-access,
+    broad-exception-caught,
+
+    # Format issues handled by black/isort
+    wrong-import-position,
+    wrong-import-order,
+
+    # Other non-critical warnings
+    singleton-comparison,
+    f-string-without-interpolation,
+    duplicate-code,
+    cyclic-import,
+
+    # Import issues for optional test dependencies
+    import-error,
+    import-outside-toplevel,
+
+    # Code style issues
+    no-else-return,
+    use-implicit-booleaness-not-comparison,
+    consider-using-with,
+    subprocess-run-check,
+    unspecified-encoding,
+    invalid-name,
+    redefined-outer-name,
+    too-many-positional-arguments,
+    assignment-from-none
+
+[FORMAT]
+# Maximum number of characters on a single line (handled by black)
+max-line-length=100
+
+[DESIGN]
+# Increase limits for test files
+max-args=10
+max-locals=25
+max-returns=10
+max-branches=20
+max-statements=100
+max-parents=10
+max-attributes=15
+max-public-methods=30
+min-public-methods=1
+max-bool-expr=10
+
+[BASIC]
+# Allow short variable names in tests
+good-names=i,j,k,ex,Run,_,id,setUp,tearDown
+
+[SIMILARITIES]
+# Ignore similar lines in test files (common test patterns)
+min-similarity-lines=10
+ignore-comments=yes
+ignore-docstrings=yes
+ignore-imports=yes
