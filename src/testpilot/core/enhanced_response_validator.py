@@ -289,6 +289,9 @@ def validate_response_enhanced(
     ignore_array_order = (config or {}).get(
         "ignore_array_order", True
     )  # Default to order-independent
+    json_match_threshold = (config or {}).get(
+        "json_match_threshold", 50
+    )  # Configurable percentage threshold for JSON matching
 
     # Parse actual response if it's a string
     actual = response_body
@@ -350,10 +353,11 @@ def validate_response_enhanced(
             )
             differences = (
                 dict_match_result["missing_details"]
-                if dict_match_result["match_percentage"] <= 50
+                if dict_match_result["match_percentage"]
+                <= json_match_threshold
                 else None
             )
-            if dict_match_result["match_percentage"] > 50:
+            if dict_match_result["match_percentage"] > json_match_threshold:
                 dict_match = True
             else:
                 dict_match = False

@@ -26,6 +26,10 @@
         "since_duration": "1s",
         "_comment": "kubectl logs configuration: capture_duration (seconds to capture), since_duration (how far back to look: 1s, 5s, 1m, 1h, etc.)"
     },
+    "validation_settings": {
+        "json_match_threshold": 50,
+        "_comment": "JSON matching configuration: json_match_threshold (percentage above which JSON payloads are considered matching, default: 50)"
+    },
     "hosts": [
         {
             "name": "example-host-1",
@@ -55,6 +59,7 @@
         "html_generator": "Controls HTML report style - standard vs NF-style layout",
         "system_under_test": "Information about the system being tested (for NF-style reports)",
         "kubectl_logs_settings": "Configure kubectl logs behavior: capture_duration (seconds to capture logs), since_duration (how far back to look for logs)",
+        "validation_settings": "Configure validation behavior: json_match_threshold (percentage threshold for JSON payload matching)",
         "environment_variables": [
             "Export environment variables before running:",
             "export HOST1_HOSTNAME='your.host.com'",

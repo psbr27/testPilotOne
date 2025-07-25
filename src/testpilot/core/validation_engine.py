@@ -390,12 +390,18 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
                     fail_reason="Unknown error during payload comparison",
                 )
 
+        # Load validation config for enhanced response validation
+        validation_config = ValidationDispatcher()._get_validation_config(
+            context.args
+        )
+
         result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
             context.response_payload,
             logger,
+            config=validation_config,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
@@ -411,6 +417,20 @@ class PutStatusPayloadPatternValidator(ValidationStrategy):
 class ValidationDispatcher:
     def __init__(self):
         self.logger = get_logger("ValidationEngine.Dispatcher")
+
+    def _get_validation_config(self, args=None):
+        """Load validation configuration from hosts.json."""
+        try:
+            config_file = "config/hosts.json"
+            if args and hasattr(args, "config"):
+                config_file = args.config
+
+            with open(config_file, "r") as f:
+                config = json.load(f)
+            return config.get("validation_settings", {})
+        except Exception:
+            # Return default config if loading fails
+            return {"json_match_threshold": 50}
 
     def dispatch(self, context: ValidationContext) -> ValidationResult:
         self.logger.debug(
@@ -731,6 +751,11 @@ class KubectlPatternValidator(ValidationStrategy):
         try:
             if response_body is not None:
                 lines = response_body.split("\n")
+                # Load validation config for enhanced response validation
+                validation_config = (
+                    ValidationDispatcher()._get_validation_config(context.args)
+                )
+
                 for line in lines:
                     result = validate_response_enhanced(
                         context.pattern_match,
@@ -738,6 +763,7 @@ class KubectlPatternValidator(ValidationStrategy):
                         line,  # Use each line as the response body
                         context.response_payload,
                         logger,
+                        config=validation_config,
                         args=context.args,  # Pass args
                         sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
                         row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
@@ -779,12 +805,18 @@ class GetFullValidator(ValidationStrategy):
                 fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
         # No need to check the response_payload here, as we are validating against the expected payload
+        # Load validation config for enhanced response validation
+        validation_config = ValidationDispatcher()._get_validation_config(
+            context.args
+        )
+
         result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
             context.response_payload,
             logger,
+            config=validation_config,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
@@ -823,12 +855,18 @@ class GetStatusAndPayloadValidator(ValidationStrategy):
                 fail_reason=f"Status mismatch: {context.actual_status} != {context.expected_status}",
             )
 
+        # Load validation config for enhanced response validation
+        validation_config = ValidationDispatcher()._get_validation_config(
+            context.args
+        )
+
         results = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
             context.response_payload,
             logger,
+            config=validation_config,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
@@ -866,12 +904,18 @@ class GetStatusAndPatternValidator(ValidationStrategy):
 
         # Step 2: Normalize inputs
         # Use the reusable pattern matching function
+        # Load validation config for enhanced response validation
+        validation_config = ValidationDispatcher()._get_validation_config(
+            context.args
+        )
+
         result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
             context.response_payload,
             logger,
+            config=validation_config,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
@@ -1125,12 +1169,18 @@ class PostStatusPayloadPatternValidator(ValidationStrategy):
                     fail_reason="Unknown error during payload comparison",
                 )
 
+        # Load validation config for enhanced response validation
+        validation_config = ValidationDispatcher()._get_validation_config(
+            context.args
+        )
+
         result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
             context.response_payload,
             logger,
+            config=validation_config,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
@@ -1274,12 +1324,18 @@ class PatchStatusPayloadPatternValidator(ValidationStrategy):
                     False,
                     fail_reason="Unknown error during payload comparison",
                 )
+        # Load validation config for enhanced response validation
+        validation_config = ValidationDispatcher()._get_validation_config(
+            context.args
+        )
+
         result = validate_response_enhanced(
             context.pattern_match,
             context.response_headers,
             context.response_body,
             context.response_payload,
             logger,
+            config=validation_config,
             args=context.args,  # Pass args
             sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
             row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
