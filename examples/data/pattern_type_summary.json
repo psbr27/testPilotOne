@@ -1,106 +1,101 @@
 {
-  "json_extracted": {
-    "count": 29,
+  "json_object": {
+    "count": 7,
     "examples": [
       {
-        "original": "\"autoCreate\":true",
+        "original": "{\n  \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",\n  \"nfType\": \"SMF\",\n  \"nfStatus\": \"REGISTERED\",\n  \"smfInfo\": {\n    \"vsmfSupportInd\": true\n  }\n}",
         "converted": {
-          "autoCreate": true
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "smfInfo": {
+            "vsmfSupportInd": true
+          }
         }
       },
       {
-        "original": "\"level\": \"DEBUG\"",
+        "original": "{\n  \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c\",\n  \"nfType\": \"SMF\",\n  \"nfStatus\": \"REGISTERED\",\n  \"fqdn\": \"SMF.d5g.oracle.com\",\n  \"smfInfoList\": {\n    \"vsmfSupportInd\": true\n  }\n}",
         "converted": {
-          "level": "DEBUG"
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "fqdn": "SMF.d5g.oracle.com",
+          "smfInfoList": {
+            "vsmfSupportInd": true
+          }
         }
       },
       {
-        "original": "\"level\": \"DEBUG\"",
+        "original": "{\n  \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",\n  \"nfType\": \"SMF\",\n  \"nfStatus\": \"REGISTERED\",\n  \"fqdn\": \"SMF.d5g.oracle.com\",\n  \"smfInfo\": {\n    \"vsmfSupportInd\": false\n  }\n}",
         "converted": {
-          "level": "DEBUG"
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "fqdn": "SMF.d5g.oracle.com",
+          "smfInfo": {
+            "vsmfSupportInd": false
+          }
         }
       }
     ],
     "sheets": [
-      "ControlledShutdown",
-      "ServerHeader",
-      "SLFRegistrationProfile",
-      "SBIOverload-igw",
-      "UserAgentHeader-egw",
-      "ErrorCodes-egw",
-      "UserAgentHeader-igw",
-      "SubscriberActivity",
-      "SLFRegistration-NRF",
-      "AutoCreateSubs",
-      "ErrorCodes-igw",
-      "SBICorrelationHeader",
-      "ServiceLogLevel",
-      "NFScoring"
+      "NRFRegistration",
+      "NRFDiscovery"
     ]
   },
   "raw": {
-    "count": 1,
+    "count": 2,
     "examples": [
       {
-        "original": "\"0119292c-b593-4093-8153-a7157553804b\"",
+        "original": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\"",
         "converted": {
-          "raw_value": "\"0119292c-b593-4093-8153-a7157553804b\""
+          "raw_value": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\""
+        }
+      },
+      {
+        "original": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\"",
+        "converted": {
+          "raw_value": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\""
         }
       }
     ],
     "sheets": [
-      "SLFRegistration-NRF"
+      "NRFDiscovery"
     ]
   },
-  "json_object": {
-    "count": 4,
+  "json_extracted": {
+    "count": 11,
     "examples": [
       {
-        "original": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
-        "converted": "3gpp-sbi-correlation-info: imsi-302720603940001"
-      },
-      {
-        "original": "\"3gpp-sbi-correlation-info: msisdn-19195220001\"",
-        "converted": "3gpp-sbi-correlation-info: msisdn-19195220001"
-      },
-      {
-        "original": "\"3gpp-sbi-correlation-info: imsi-302720603940001\"",
-        "converted": "3gpp-sbi-correlation-info: imsi-302720603940001"
-      }
-    ],
-    "sheets": [
-      "SBICorrelationHeader"
-    ]
-  },
-  "http_header": {
-    "count": 10,
-    "examples": [
-      {
-        "original": "server: UDR-0119292c-b593-4093-8153-a7157553804b",
+        "original": "{  \"target-nf-type\": \"PCF\", _x000D_\n  \"requester-nf-type\": \"NRF\", _x000D_\n  \"preferred-locality\": \"US East\", _x000D_\n  \"service-names\": \"npcf-am-policy-control\"}",
         "converted": {
-          "header_type": "server",
-          "server_value": "UDR-0119292c-b593-4093-8153-a7157553804b"
+          "target-nf-type": "PCF",
+          "requester-nf-type": "NRF",
+          "preferred-locality": "US East",
+          "service-names": "npcf-am-policy-control"
         }
       },
       {
-        "original": "server: UDR-0119292c-b593-4093-8153-a7157553804b",
+        "original": "{_x000D_\n\"target-nf-type\": \"UDR\", _x000D_\n\"requester-nf-type\": \"NEF\", _x000D_\n\"data-set\": \"A_PFD\"_x000D_\n}",
         "converted": {
-          "header_type": "server",
-          "server_value": "UDR-0119292c-b593-4093-8153-a7157553804b"
+          "target-nf-type": "UDR",
+          "requester-nf-type": "NEF",
+          "data-set": "A_PFD"
         }
       },
       {
-        "original": "3gpp-Sbi-Lci",
+        "original": "{_x000D_\n  \"target-nf-type\": \"UDR\", _x000D_\n  \"requester-nf-type\": \"NEF\", _x000D_\n  \"data-set\": \"APPLICATION\", _x000D_\n  \"supi\": 10000005_x000D_\n}",
         "converted": {
-          "header_type": "3gpp_sbi",
-          "header_name": "3gpp-Sbi-Lci",
-          "header_value": null
+          "target-nf-type": "UDR",
+          "requester-nf-type": "NEF",
+          "data-set": "APPLICATION",
+          "supi": "10000005_x000D_\n"
         }
       }
     ],
     "sheets": [
-      "LciOciHeader-igw",
-      "ServerHeader"
+      "NRFDiscovery",
+      "NRFFunctionalUseCases"
     ]
   }
 }

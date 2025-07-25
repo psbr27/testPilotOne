@@ -3,9 +3,24 @@ import os
 from datetime import datetime
 from typing import Optional
 
+# Global log level that can be set by CLI arguments
+_global_log_level = logging.INFO
+
+
+def set_global_log_level(level):
+    """Set the global log level for all loggers created by get_logger."""
+    global _global_log_level
+    if isinstance(level, str):
+        _global_log_level = getattr(logging, level.upper())
+    else:
+        _global_log_level = level
+
 
 def get_logger(
-    name: str = "TestPilot", log_to_file: bool = True, log_dir: str = "logs"
+    name: str = "TestPilot",
+    log_to_file: bool = True,
+    log_dir: str = "logs",
+    level: Optional[str] = None,
 ) -> logging.Logger:
     """
     Get a logger with both console and file output.
@@ -14,12 +29,24 @@ def get_logger(
         name: Logger name
         log_to_file: Whether to enable file logging
         log_dir: Directory for log files
+        level: Optional specific log level for this logger (overrides global)
 
     Returns:
         Configured logger instance
     """
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+
+    # Use specific level if provided, otherwise use global level
+    if level:
+        log_level = (
+            getattr(logging, level.upper())
+            if isinstance(level, str)
+            else level
+        )
+    else:
+        log_level = _global_log_level
+
+    logger.setLevel(log_level)
     logger.propagate = False  # Prevent double logging by disabling propagation
 
     if not logger.handlers:
@@ -29,7 +56,7 @@ def get_logger(
 
         # Console handler
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(log_level)  # Use the same level as logger
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
 

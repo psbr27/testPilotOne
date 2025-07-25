@@ -45,7 +45,7 @@ from src.testpilot.utils.config_resolver import (
     mask_sensitive_data,
 )
 from src.testpilot.utils.excel_parser import ExcelParser, parse_excel_to_flows
-from src.testpilot.utils.logger import get_logger
+from src.testpilot.utils.logger import get_logger, set_global_log_level
 from src.testpilot.utils.myutils import set_pdb_trace
 from src.testpilot.utils.ssh_connector import SSHConnector
 
@@ -985,13 +985,15 @@ def main():
     args = parse_args()
 
     # Configure logging based on command line arguments
+    # Set global log level for ALL loggers in the project
+    set_global_log_level(args.log_level.upper())
+
     global logger
     logger = get_logger(
         name="TestPilot",
         log_to_file=not args.no_file_logging,
         log_dir=args.log_dir,
     )
-    logger.setLevel(args.log_level.upper())
 
     logger.debug(f"TestPilot started with args: {args}")
     logger.debug(f"Module specified: {args.module}")

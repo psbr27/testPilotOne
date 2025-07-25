@@ -1,0 +1,382 @@
+{
+  "enhanced_patterns": {
+    "NRFRegistration": [
+      {
+        "row_number": 21,
+        "pattern_match": "{\n  \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",\n  \"nfType\": \"SMF\",\n  \"nfStatus\": \"REGISTERED\",\n  \"smfInfo\": {\n    \"vsmfSupportInd\": true\n  }\n}",
+        "test_name": "test_5_1_6_Validate_NRF_supports_registration_of_SMF_profiles_with_valid_vsmfSupportInd_attribute",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/ -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+            "nfType": "SMF",
+            "nfStatus": "REGISTERED",
+            "smfInfo": {
+              "vsmfSupportInd": true
+            }
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 24,
+        "pattern_match": "{\n  \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c\",\n  \"nfType\": \"SMF\",\n  \"nfStatus\": \"REGISTERED\",\n  \"fqdn\": \"SMF.d5g.oracle.com\",\n  \"smfInfoList\": {\n    \"vsmfSupportInd\": true\n  }\n}",
+        "test_name": "test_5_1_6_Validate_NRF_supports_registration_of_SMF_profiles_with_valid_vsmfSupportInd_attribute",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c",
+            "nfType": "SMF",
+            "nfStatus": "REGISTERED",
+            "fqdn": "SMF.d5g.oracle.com",
+            "smfInfoList": {
+              "vsmfSupportInd": true
+            }
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 27,
+        "pattern_match": "{\n  \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\",\n  \"nfType\": \"SMF\",\n  \"nfStatus\": \"REGISTERED\",\n  \"fqdn\": \"SMF.d5g.oracle.com\",\n  \"smfInfo\": {\n    \"vsmfSupportInd\": false\n  }\n}",
+        "test_name": "test_5_1_6_Validate_NRF_supports_registration_of_SMF_profiles_with_valid_vsmfSupportInd_attribute",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+            "nfType": "SMF",
+            "nfStatus": "REGISTERED",
+            "fqdn": "SMF.d5g.oracle.com",
+            "smfInfo": {
+              "vsmfSupportInd": false
+            }
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 39,
+        "pattern_match": "{\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"NRF-d5g.oracle.com: Nnrf_NFManagement: supportedDataSets should not be blank or empty: ONRF-REG-REGN-E0008\",\n  \"cause\": \"OPTIONAL_IE_INCORRECT\",\n  \"invalidParams\": [\n    {\n      \"param\": \"udrInfo.supportedDataSets\",\n      \"reason\": \"supportedDataSets should not be blank or empty\"\n    }\n  ]\n}",
+        "test_name": "test_5_1_7_Feat126_UDR_Update_with_supportedDataSets",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X PUT \"http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/\" -H 'Content-Type:application/json'",
+        "expected_status": "4xx",
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "NRF-d5g.oracle.com: Nnrf_NFManagement: supportedDataSets should not be blank or empty: ONRF-REG-REGN-E0008",
+            "cause": "OPTIONAL_IE_INCORRECT",
+            "invalidParams": [
+              {
+                "param": "udrInfo.supportedDataSets",
+                "reason": "supportedDataSets should not be blank or empty"
+              }
+            ]
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 40,
+        "pattern_match": "{\n  \"title\": \"Bad Request\",\n  \"status\": 400,\n  \"detail\": \"NRF-d5g.oracle.com: Nnrf_NFManagement: nfServiceInstanceIds in the nfProfile are not unique: ONRF-REG-REGN-E0007\",\n  \"cause\": \"MANDATORY_IE_INCORRECT\"\n}",
+        "test_name": "test_5_1_8_reg66_validate_badRequest_with_duplicate_serviceInstanceIds",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X PUT \"http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/\" -H 'Content-Type:application/json'",
+        "expected_status": "4xx",
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "NRF-d5g.oracle.com: Nnrf_NFManagement: nfServiceInstanceIds in the nfProfile are not unique: ONRF-REG-REGN-E0007",
+            "cause": "MANDATORY_IE_INCORRECT"
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 43,
+        "pattern_match": "{\n  \"title\": \"NF Profile Size Limit Breached\",\n  \"status\": 413,\n  \"detail\": \"NRF-d5g.oracle.com: Nnrf_NFManagement: NF Profile Size Limit Breached: ONRF-REG-REGN-E0023\",\n  \"cause\": \"UNSPECIFIED_MSG_FAILURE\"\n}",
+        "test_name": "test_5_1_9_NFRegister_nProfileLimit_01",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X PUT \"http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/\" -H 'Content-Type:application/json'",
+        "expected_status": "410-415",
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {
+            "title": "NF Profile Size Limit Breached",
+            "status": 413,
+            "detail": "NRF-d5g.oracle.com: Nnrf_NFManagement: NF Profile Size Limit Breached: ONRF-REG-REGN-E0023",
+            "cause": "UNSPECIFIED_MSG_FAILURE"
+          },
+          "conversion_method": "direct_json_parse"
+        }
+      }
+    ],
+    "NRFDiscovery": [
+      {
+        "row_number": 12,
+        "pattern_match": "{}",
+        "test_name": "test_5.2.3_Disc52_validate_targetNfTypeSpecific_validityPeriod ",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/ -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_object",
+          "data": {},
+          "conversion_method": "direct_json_parse"
+        }
+      },
+      {
+        "row_number": 17,
+        "pattern_match": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\"",
+        "test_name": "test_5_2_5_Feat121_validate_priority_in_nfServiceList_discoveryRequest",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/ -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "raw",
+          "data": {
+            "raw_value": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\""
+          },
+          "conversion_method": "raw_storage"
+        }
+      },
+      {
+        "row_number": 28,
+        "pattern_match": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\"",
+        "test_name": "test_5_2_8_Services_present_with_same_name_feature",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances/ -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "raw",
+          "data": {
+            "raw_value": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\""
+          },
+          "conversion_method": "raw_storage"
+        }
+      },
+      {
+        "row_number": 37,
+        "pattern_match": "{  \"target-nf-type\": \"PCF\", _x000D_\n  \"requester-nf-type\": \"NRF\", _x000D_\n  \"preferred-locality\": \"US East\", _x000D_\n  \"service-names\": \"npcf-am-policy-control\"}",
+        "test_name": "test_5_2_8_Services_present_with_same_name_feature",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?service-names=npcf-am-policy-control&target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "PCF",
+            "requester-nf-type": "NRF",
+            "preferred-locality": "US East",
+            "service-names": "npcf-am-policy-control"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 55,
+        "pattern_match": "{_x000D_\n\"target-nf-type\": \"UDR\", _x000D_\n\"requester-nf-type\": \"NEF\", _x000D_\n\"data-set\": \"A_PFD\"_x000D_\n}",
+        "test_name": "test_5_2_10_Validate_that_NRF_supports_the_NF_discover_with_data_set",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?target-nf-type=UDR&requester-nf-type=NEF&data-set=A_PFD -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "UDR",
+            "requester-nf-type": "NEF",
+            "data-set": "A_PFD"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 60,
+        "pattern_match": "{_x000D_\n  \"target-nf-type\": \"UDR\", _x000D_\n  \"requester-nf-type\": \"NEF\", _x000D_\n  \"data-set\": \"APPLICATION\", _x000D_\n  \"supi\": 10000005_x000D_\n}",
+        "test_name": "test_5_2_10_Validate_that_NRF_supports_the_NF_discover_with_data_set",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?target-nf-type=UDR&requester-nf-type=NEF&data-set=APPLICATION&supi=imsi-10000005\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "UDR",
+            "requester-nf-type": "NEF",
+            "data-set": "APPLICATION",
+            "supi": "10000005_x000D_\n"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 70,
+        "pattern_match": "{_x000D_\n    \"target-nf-type\": \"PCF\", _x000D_\n    \"requester-nf-type\": \"AMF\", _x000D_\n    \"preferred-locality\": \"RKL\", _x000D_\n    \"service-names\": [\"npcf-am-policy-control\"]_x000D_\n}",
+        "test_name": "test_5_2_11_ServicePriorityUpdate04_discovery_with_service_name",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?service-names=npcf-am-policy-control&target-nf-type=PCF&requester-nf-type=AMF& preferred-locality=RKL\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "PCF",
+            "requester-nf-type": "AMF",
+            "preferred-locality": "RKL",
+            "service-names": "[\"npcf-am-policy-control\""
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 83,
+        "pattern_match": "{_x000D_\n    \"target-nf-type\": \"AMF\", _x000D_\n    \"requester-nf-type\": \"CHF\", _x000D_\n    \"preferred-locality\": \"RKL\", _x000D_\n    \"service-names\": [\"namf-mt\"]_x000D_\n}",
+        "test_name": "test_5_2_11_ServicePriorityUpdate04_discovery_with_service_name",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?service-names=namf-mt=target-nf-type=AMF&requester-nf-type=CHF& preferred-locality=RKL -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "AMF",
+            "requester-nf-type": "CHF",
+            "preferred-locality": "RKL",
+            "service-names": "[\"namf-mt\""
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 95,
+        "pattern_match": "{_x000D_\n    \"target-nf-type\": \"PCF\", _x000D_\n    \"requester-nf-type\": \"AMF\", _x000D_\n    \"service-names\": [_x000D_\n        \"namf-mt\"_x000D_\n    ]_x000D_\n}",
+        "test_name": "test_5_2_12_Disc72 validate load filter",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?service-names=namf-mt&target-nf-type=PCF&requester-nf-type=AMF\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "PCF",
+            "requester-nf-type": "AMF",
+            "service-names": "[_x000D_\n        \"namf-mt\"_x000D_\n    "
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 104,
+        "pattern_match": "{_x000D_\n    \"target-nf-type\": \"PCF\", _x000D_\n    \"requester-nf-type\": \"AMF\", _x000D_\n    \"service-names\": [_x000D_\n        \"namf-mt\"_x000D_\n    ]_x000D_\n}",
+        "test_name": "test_5_2_12_Disc72 validate load filter",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?service-names=namf-mt&target-nf-type=PCF&requester-nf-type=AMF\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "PCF",
+            "requester-nf-type": "AMF",
+            "service-names": "[_x000D_\n        \"namf-mt\"_x000D_\n    "
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ],
+    "NRFFunctionalUseCases": [
+      {
+        "row_number": 13,
+        "pattern_match": "{_x000D_\n    \"title\": \"Bad Request\", _x000D_\n    \"status\": 400, _x000D_\n    \"detail\": \"Bad Request\", _x000D_\n    \"cause\": \"INVALID_QUERY_PARAM\"_x000D_\n}",
+        "test_name": "test_5_12_4_Feat122_NfProfileRetrieval_sends_Bad_Request_on_invalid_Query_Param",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET \"http://{ocnrf-nfdiscovery}:8081/nnrf-disc/v1/nf-instances -H 'Content-Type:application/json'",
+        "expected_status": 400,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "title": "Bad Request",
+            "status": 400,
+            "detail": "Bad Request",
+            "cause": "INVALID_QUERY_PARAM"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 20,
+        "pattern_match": "{_x000D_\n  \"target-nf-type\": \"AMF\", _x000D_\n  \"requester-nf-type\": \"AMF\", _x000D_\n  \"guami\": {_x000D_\n    \"plmnId\": {_x000D_\n      \"mcc\": \"311\", _x000D_\n      \"mnc\": \"480\"_x000D_\n    }, _x000D_\n    \"amfId\": \"8E02C2\"_x000D_\n  }_x000D_\n}",
+        "test_name": "test_5.12.6_Validate_Discovery_Request_with_guami_query_parameter_with_emptyList_and_forwarding_features_enabled",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?target-nf-type=AMF&requester-nf-type=AMF&guami=%7B%22plmnId%22%3A%7B%22mcc%22%3A%22311%22%2C%22mnc%22%3A%22480%22%7D%2C%22amfId%22%3A%228E02C2%22%7D\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "AMF",
+            "requester-nf-type": "AMF",
+            "guami": "{_x000D_\n    \"plmnId\": {_x000D_\n      \"mcc\": \"311\"",
+            "mnc": 480,
+            "amfId": "8E02C2"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 30,
+        "pattern_match": "{_x000D_\n  \"target-nf-type\": \"AMF\", _x000D_\n  \"requester-nf-type\": \"AMF\", _x000D_\n  \"guami\": {_x000D_\n    \"plmnId\": {_x000D_\n      \"mcc\": \"311\", _x000D_\n      \"mnc\": \"480\"_x000D_\n    }, _x000D_\n    \"amfId\": \"8E02C2\"_x000D_\n  }_x000D_\n}",
+        "test_name": "test_5.12.6_Validate_Discovery_Request_with_guami_query_parameter_with_emptyList_and_forwarding_features_enabled",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?target-nf-type=AMF&requester-nf-type=AMF&guami=%7B%22plmnId%22%3A%7B%22mcc%22%3A%22311%22%2C%22mnc%22%3A%22480%22%7D%2C%22amfId%22%3A%228E02C2%22%7D\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "AMF",
+            "requester-nf-type": "AMF",
+            "guami": "{_x000D_\n    \"plmnId\": {_x000D_\n      \"mcc\": \"311\"",
+            "mnc": 480,
+            "amfId": "8E02C2"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      },
+      {
+        "row_number": 39,
+        "pattern_match": "{_x000D_\n  \"target-nf-type\": \"AMF\", _x000D_\n  \"requester-nf-type\": \"AMF\", _x000D_\n  \"guami\": {_x000D_\n    \"plmnId\": {_x000D_\n      \"mcc\": \"311\", _x000D_\n      \"mnc\": \"480\"_x000D_\n    }, _x000D_\n    \"amfId\": \"8E02C2\"_x000D_\n  }_x000D_\n}",
+        "test_name": "test_5.12.6_Validate_Discovery_Request_with_guami_query_parameter_with_emptyList_and_forwarding_features_enabled",
+        "pod_exec": "nrfconfiguration",
+        "command": "curl -v --http2-prior-knowledge -X GET http://{ocnrf-ingressgateway}:8081/nnrf-nfm/v1/nf-instances?target-nf-type=AMF&requester-nf-type=AMF&guami=%7B%22plmnId%22%3A%7B%22mcc%22%3A%22311%22%2C%22mnc%22%3A%22480%22%7D%2C%22amfId%22%3A%228E02C2%22%7D\" -H 'Content-Type:application/json'",
+        "expected_status": 200,
+        "converted_pattern": {
+          "pattern_type": "json_extracted",
+          "data": {
+            "target-nf-type": "AMF",
+            "requester-nf-type": "AMF",
+            "guami": "{_x000D_\n    \"plmnId\": {_x000D_\n      \"mcc\": \"311\"",
+            "mnc": 480,
+            "amfId": "8E02C2"
+          },
+          "conversion_method": "json_key_value_extraction"
+        }
+      }
+    ]
+  },
+  "conversion_statistics": {
+    "total_processed": 20,
+    "successful_conversions": 20,
+    "failed_conversions": 0,
+    "conversion_types": {
+      "json_like": 18,
+      "raw_value": 2
+    }
+  }
+}
