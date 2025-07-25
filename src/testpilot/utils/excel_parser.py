@@ -119,8 +119,11 @@ def parse_excel_to_flows(
         test_flows: Dict[str, TestFlow] = {}
 
         for row_idx, row in df.iterrows():
-            test_name = row.get("Test_Name") or f"row_{row_idx}"
+            # Always use Test_Name as test name
+            test_name = row.get("Test_Name")
             command = row.get("Command")
+            if not test_name:
+                test_name = f"row_{row_idx}"
 
             # Extract url, method, headers from command if missing
             url = row.get("URL")

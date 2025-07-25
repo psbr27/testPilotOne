@@ -136,6 +136,7 @@ def dry_run_commands(
     host_cli_map=None,
     show_table=True,
     display_mode="blessed",
+    test_name_filter=None,
 ):
     # Robustly handle connector=None for dry-run
     use_ssh = connector is not None and getattr(connector, "use_ssh", False)
@@ -151,6 +152,13 @@ def dry_run_commands(
 
     logger = logging.getLogger("TestPilot")
     logger.debug("--- DRY RUN MODE ENABLED ---")
+
+    # Debug log for test name filtering
+    if test_name_filter:
+        logger.debug(
+            f"[DRY RUN] Applying test name filter: '{test_name_filter}'"
+        )
+
     dry_run_results = []
 
     # Initialize dashboard if needed
@@ -186,6 +194,13 @@ def dry_run_commands(
             method = (
                 row.get("Method", "GET") if "Method" in row else "GET"
             )  # Extract method from row
+
+            # Apply test name filtering if specified
+            if test_name_filter and test_name != test_name_filter:
+                logger.debug(
+                    f"[DRY RUN] Skipping row {row_idx} in sheet '{sheet}': test_name '{test_name}' != filter '{test_name_filter}'"
+                )
+                continue
 
             if pd.notna(command):
                 # Determine hosts to process

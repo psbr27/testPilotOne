@@ -1072,6 +1072,7 @@ def main():
             host_cli_map=None,
             show_table=show_table,
             display_mode=args.display_mode,
+            test_name_filter=args.test_name,
         )
         return
 
@@ -1138,7 +1139,7 @@ def main():
     # Filter flows by test name if specified
     if args.test_name:
         flows = [flow for flow in flows if flow.test_name == args.test_name]
-        logger.debug(
+        logger.info(
             f"Filtered to {len(flows)} flows matching test name: {args.test_name}"
         )
     logger.debug(f"Parsed {len(flows)} test flows")

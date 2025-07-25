@@ -39,8 +39,8 @@
       }
     ],
     "sheets": [
-      "NRFRegistration",
-      "NRFDiscovery"
+      "NRFDiscovery",
+      "NRFRegistration"
     ]
   },
   "raw": {
@@ -94,8 +94,8 @@
       }
     ],
     "sheets": [
-      "NRFDiscovery",
-      "NRFFunctionalUseCases"
+      "NRFFunctionalUseCases",
+      "NRFDiscovery"
     ]
   }
 }
