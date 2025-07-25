@@ -1083,6 +1083,7 @@ def process_single_step(
             accumulated_raw_output += kubectl_raw_output
             pod_names.extend(kubectl_pod_names)
             duration = max(duration, kubectl_duration)
+            step_data["is_kubectl"] = True
 
         # Execute other commands sequentially (preserve existing behavior)
         for command in other_commands:
