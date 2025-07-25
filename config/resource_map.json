@@ -1,0 +1,7 @@
+{
+    "egressgateway": "provgw-prov-egressgateway",
+    "ingressgateway-prov": "ocslf-ingressgateway-prov",
+    "ingressgateway-sig": "ocslf-ingressgateway-sig",
+    "nudr-dr-provservice": "ocslf-nudr-dr-provservice",
+    "nudr-drservice": "ocslf-nudr-drservice"
+}

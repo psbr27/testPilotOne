@@ -1,0 +1,23 @@
+{
+    "wrap_text": false,
+    "urls_check": {
+        "nnrf-nfm/v1/": "ocnrf-ingressgateway"
+    },
+    "methods_check": {
+        "PUT": {
+            "found": [200, 201, "201", "200.0", 201.0],
+            "replace": "2xx"
+        },
+        "DELETE": {
+            "found": [200, 204, "204"],
+            "replace": "204"
+        },
+        "POST": {
+            "found": ["200", 201, 200.0],
+            "replace": "201"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

@@ -1,0 +1,79 @@
+{
+    "use_ssh": true,
+    "pod_mode": false,
+    "nf_name": "YOUR_NF_NAME",
+    "connect_to": "HOST_NAME_OR_ALL",
+    "html_generator": {
+        "use_nf_style": false,
+        "_comment": "Set to true for NF-style HTML reports, false for standard reports"
+    },
+    "system_under_test": {
+        "nf_type": "AMF",
+        "version": "v23.4.x",
+        "environment": "Test Lab Environment",
+        "deployment": "Kubernetes Cluster",
+        "description": "5G Core Network Function - Access and Mobility Management Function",
+        "_comment": "Details shown in NF-style HTML reports"
+    },
+    "ssh_settings": {
+        "auto_add_hosts": true,
+        "known_hosts_file": "~/.ssh/known_hosts",
+        "max_retries": 3,
+        "retry_delay": 2
+    },
+    "kubectl_logs_settings": {
+        "capture_duration": 30,
+        "since_duration": "1s",
+        "_comment": "kubectl logs configuration: capture_duration (seconds to capture), since_duration (how far back to look: 1s, 5s, 1m, 1h, etc.)"
+    },
+    "validation_settings": {
+        "json_match_threshold": 50,
+        "_comment": "JSON matching configuration: json_match_threshold (percentage above which JSON payloads are considered matching, default: 50)"
+    },
+    "hosts": [
+        {
+            "name": "example-host-1",
+            "hostname": "${HOST1_HOSTNAME}",
+            "username": "${HOST1_USERNAME}",
+            "key_file": "${HOST1_SSH_KEY_PATH}",
+            "password": "${HOST1_PASSWORD}",
+            "namespace": "${HOST1_NAMESPACE}",
+            "port": 22,
+            "_comment": "Use either key_file OR password, not both. Set unused to null"
+        },
+        {
+            "name": "example-host-2",
+            "hostname": "${HOST2_HOSTNAME}",
+            "username": "${HOST2_USERNAME}",
+            "key_file": "${HOST2_SSH_KEY_PATH}",
+            "password": "${HOST2_PASSWORD}",
+            "namespace": "${HOST2_NAMESPACE}",
+            "port": 22,
+            "_comment": "Environment variables will be automatically loaded if present"
+        }
+    ],
+    "_configuration_notes": {
+        "use_ssh": "Set to true for SSH connections, false for local execution",
+        "pod_mode": "Set to true when running inside a Kubernetes pod",
+        "connect_to": "Specify host name from hosts array or 'all' for all hosts",
+        "html_generator": "Controls HTML report style - standard vs NF-style layout",
+        "system_under_test": "Information about the system being tested (for NF-style reports)",
+        "kubectl_logs_settings": "Configure kubectl logs behavior: capture_duration (seconds to capture logs), since_duration (how far back to look for logs)",
+        "validation_settings": "Configure validation behavior: json_match_threshold (percentage threshold for JSON payload matching)",
+        "environment_variables": [
+            "Export environment variables before running:",
+            "export HOST1_HOSTNAME='your.host.com'",
+            "export HOST1_USERNAME='your_username'",
+            "export HOST1_PASSWORD='your_password'",
+            "export HOST1_SSH_KEY_PATH='/path/to/key'",
+            "export HOST1_NAMESPACE='your_namespace'"
+        ],
+        "security_best_practices": [
+            "Never commit this file with actual credentials",
+            "Use environment variables for sensitive data",
+            "Store SSH keys outside the project directory",
+            "Use key-based authentication instead of passwords when possible",
+            "Set proper file permissions (600) on SSH private keys"
+        ]
+    }
+}

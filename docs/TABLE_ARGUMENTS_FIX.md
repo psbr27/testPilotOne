@@ -176,7 +176,7 @@ Created `validate_table_arguments.py` script that:
 | host1     | Sheet1   | API Test     |        | PASS   | 1.25     |
 | host2     | Sheet2   | Login Test   |        | FAIL   | 0.50     |
 ```
-*Empty method column* 
+*Empty method column*
 
 ### After Fix:
 ```
@@ -185,7 +185,7 @@ Created `validate_table_arguments.py` script that:
 | host1     | Sheet1   | API Test     | GET    | PASS   | 1.25     |
 | host2     | Sheet2   | Login Test   | POST   | FAIL   | 0.50     |
 ```
-*Proper method display* 
+*Proper method display*
 
 ## 🚀 Additional Improvements
 

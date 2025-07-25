@@ -1,0 +1,40 @@
+{
+    "wrap_text": false,
+    "urls_check": {
+        "nnrf-nfm/v1/": "ocnrf-ingressgateway",
+        "nrf-configuration/v1/": "ocnrf-configuration"
+    },
+    "methods_check": {
+        "PUT": {
+            "found": [200, 201],
+            "replace": "2xx"
+        },
+        "PATCH": {
+            "found": "Content-Type:application/json",
+            "replace": "Content-Type:application/json-patch+json"
+        },
+        "POST": {
+            "found": "Content-Type:text/plain",
+            "replace": "Content-Type:application/json"
+        },
+        "GET": {
+            "found": "Accept:text/html",
+            "replace": "Accept:application/json"
+        },
+        "DELETE": {
+            "found": "Authorization:Basic dXNlcjpwYXNz",
+            "replace": "Authorization:Bearer {jwt-token}"
+        },
+        "HEAD": {
+            "found": "User-Agent:TestClient/1.0",
+            "replace": "User-Agent:NRF-Client/2.0"
+        },
+        "OPTIONS": {
+            "found": "Cache-Control:no-cache",
+            "replace": "Cache-Control:max-age=3600"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

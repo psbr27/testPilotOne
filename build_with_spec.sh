@@ -29,6 +29,10 @@ fi
 log_info "Cleaning previous builds..."
 rm -rf dist build *.spec
 
+# Update build info before creating spec file
+log_info "Updating build information..."
+python3 scripts/update_build_info.py
+
 # Create the spec file
 log_info "Creating testPilot.spec file..."
 cat > testPilot.spec << 'EOF'
@@ -42,36 +46,86 @@ sys.path.insert(0, project_root)
 
 def find_local_modules():
     modules = []
+    # Add root-level Python files
     for py_file in Path(project_root).glob('*.py'):
         if py_file.name != 'test_pilot.py':
             modules.append(py_file.stem)
-    
+
+    # Add src package and its modules
+    src_path = Path(project_root) / 'src'
+    if src_path.exists():
+        modules.append('src')
+        # Add testpilot package
+        testpilot_path = src_path / 'testpilot'
+        if testpilot_path.exists():
+            modules.append('src.testpilot')
+
+    # Add scripts package and its modules
+    scripts_path = Path(project_root) / 'scripts'
+    if scripts_path.exists():
+        modules.append('scripts')
+
+    # Add examples package and its modules
+    examples_path = Path(project_root) / 'examples'
+    if examples_path.exists():
+        modules.append('examples')
+        # Add examples/scripts if it exists
+        examples_scripts_path = examples_path / 'scripts'
+        if examples_scripts_path.exists():
+            modules.append('examples.scripts')
+
+    # Recursively find all packages and modules
     for init_file in Path(project_root).rglob('__init__.py'):
         package_path = init_file.parent
         relative_path = package_path.relative_to(project_root)
         module_name = str(relative_path).replace(os.sep, '.')
         modules.append(module_name)
-        
+
+        # Add all Python files in the package
         for py_file in package_path.glob('*.py'):
             if py_file.name != '__init__.py':
                 full_module = f"{module_name}.{py_file.stem}"
                 modules.append(full_module)
+
     return modules
 
 local_modules = find_local_modules()
 print(f"Auto-detected modules: {local_modules}")
 
-standard_imports = [
-    'pandas', 'tabulate', 'paramiko', 'openpyxl', 'xlrd', 'json', 're', 'deepdiff'
+# Add specific modules that might be missed by auto-detection
+specific_modules = [
+    'src.testpilot.core.test_pilot_core',
+    'src.testpilot.ui.console_table_fmt',
+    'src.testpilot.utils.config_resolver',
+    'src.testpilot.utils.excel_parser',
+    'src.testpilot.utils.logger',
+    'src.testpilot.utils.myutils',
+    'src.testpilot.utils.ssh_connector',
+    'examples.scripts.pattern_match_parser',
+    'examples.scripts.pattern_to_dict_converter'
 ]
 
-all_imports = standard_imports + local_modules
+# Add standard imports that are required
+standard_imports = [
+    'pandas', 'tabulate', 'paramiko', 'openpyxl', 'xlrd', 'json', 're', 'deepdiff',
+    'argparse', 'datetime', 'os', 'platform', 'subprocess', 'sys', 'time'
+]
+
+all_imports = standard_imports + local_modules + specific_modules
+
+# Remove duplicates while preserving order
+all_imports = list(dict.fromkeys(all_imports))
 
 a = Analysis(
     ['test_pilot.py'],
     pathex=[project_root],
     binaries=[],
-    datas=[],
+    datas=[
+        ('config', 'config'),
+        ('src/testpilot', 'src/testpilot'),
+        ('examples', 'examples'),
+        ('build_info.py', '.')
+    ],
     hiddenimports=all_imports,
     hookspath=[],
     hooksconfig={},
@@ -123,7 +177,7 @@ pyinstaller --clean testPilot.spec
 if [ -d "dist/testPilot" ]; then
     log_info "Build completed successfully!"
     log_info "Binary location: dist/testPilot/"
-    
+
     # Test the binary
     log_info "Testing binary..."
     if ./dist/testPilot/testPilot --help &> /dev/null; then

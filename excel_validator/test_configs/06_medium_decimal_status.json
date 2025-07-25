@@ -1,0 +1,13 @@
+{
+    "wrap_text": false,
+    "urls_check": {},
+    "methods_check": {
+        "PUT": {
+            "found": [200.0, 201.0, 204.0],
+            "replace": "2xx"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

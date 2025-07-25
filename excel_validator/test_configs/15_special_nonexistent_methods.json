@@ -1,0 +1,17 @@
+{
+    "wrap_text": false,
+    "urls_check": {},
+    "methods_check": {
+        "CUSTOM": {
+            "found": [200, 201],
+            "replace": "2xx"
+        },
+        "NONEXISTENT": {
+            "found": "Content-Type:application/json",
+            "replace": "Content-Type:application/xml"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": false
+    }
+}

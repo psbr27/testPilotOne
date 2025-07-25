@@ -1,0 +1,8 @@
+{
+    "wrap_text": false,
+    "urls_check": {},
+    "methods_check": {},
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

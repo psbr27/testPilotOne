@@ -1,0 +1,48 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Python package
+
+on:
+  push:
+    branches: [ "*" ]  # Run on push to any branch
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Install the package in editable mode so tests can import testpilot
+        pip install -e .
+    - name: Test with pytest
+      run: |
+        python -m pytest tests/ -v --tb=short
+    - name: Test by category
+      run: |
+        echo "Testing Core components..."
+        python -m pytest tests/core/ -v --tb=line || true
+        echo "Testing NRF components..."
+        python -m pytest tests/nrf/ -v --tb=line || true
+        echo "Testing Utils..."
+        python -m pytest tests/utils/ -v --tb=line || true
+        echo "Testing Validation..."
+        python -m pytest tests/validation/ -v --tb=line || true
+        echo "Testing Mock integration..."
+        python -m pytest tests/mock/ -v --tb=line || true

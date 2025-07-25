@@ -1,0 +1,35 @@
+{
+    "wrap_text": true,
+    "urls_check": {
+        "nnrf-nfm/v1/": "ocnrf-ingressgateway",
+        "nrf-configuration/v1/": "ocnrf-configuration",
+        "nnrf-disc/v1": "ocnrf-discovery",
+        "api/v2/": "ocnrf-api-gateway",
+        "health/": "ocnrf-health-check"
+    },
+    "methods_check": {
+        "PUT": {
+            "found": [200, 201, 202, 204],
+            "replace": "2xx"
+        },
+        "PATCH": {
+            "found": "Content-Type:application/json",
+            "replace": "Content-Type:application/json-patch+json"
+        },
+        "DELETE": {
+            "found": [200, 201, 202],
+            "replace": "204"
+        },
+        "POST": {
+            "found": [200, 204],
+            "replace": "201"
+        },
+        "GET": {
+            "found": [201, 204],
+            "replace": "200"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

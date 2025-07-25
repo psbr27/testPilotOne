@@ -1,0 +1,45 @@
+{
+  "summary": {
+    "total_tests": 3,
+    "passed": 2,
+    "failed": 1
+  },
+  "results": [
+    {
+      "sheet": "AutoCreateSubs",
+      "test_name": "test_auto_create_subs_1",
+      "command": "curl -X POST http://localhost:8080/api/v1/subscriptions -H 'Content-Type: application/json' -H 'Authorization: Bearer token123' -d '{\"subscriber_id\":\"12345\",\"plan\":\"premium\"}'",
+      "output": "{\"subscription_id\":\"sub_67890\",\"status\":\"active\",\"created_at\":\"2025-01-20T10:30:00Z\"}",
+      "error": "< HTTP/1.1 201 Created\n< Content-Type: application/json",
+      "status": "PASS",
+      "passed": true,
+      "duration": 150,
+      "timestamp": "2025-01-20T10:30:00Z",
+      "host": "localhost:8080"
+    },
+    {
+      "sheet": "AutoCreateSubs",
+      "test_name": "test_auto_create_subs_2",
+      "command": "curl -X GET http://localhost:8080/api/v1/subscriptions/sub_67890 -H 'Authorization: Bearer token123'",
+      "output": "{\"subscription_id\":\"sub_67890\",\"status\":\"active\",\"subscriber_id\":\"12345\",\"plan\":\"premium\"}",
+      "error": "< HTTP/1.1 200 OK\n< Content-Type: application/json",
+      "status": "PASS",
+      "passed": true,
+      "duration": 95,
+      "timestamp": "2025-01-20T10:30:01Z",
+      "host": "localhost:8080"
+    },
+    {
+      "sheet": "UserManagement",
+      "test_name": "test_user_login",
+      "command": "curl -X POST http://localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"testuser\",\"password\":\"testpass\"}'",
+      "output": "Unauthorized",
+      "error": "< HTTP/1.1 401 Unauthorized\n< Content-Type: text/plain",
+      "status": "FAIL",
+      "passed": false,
+      "duration": 200,
+      "timestamp": "2025-01-20T10:30:02Z",
+      "host": "localhost:8080"
+    }
+  ]
+}

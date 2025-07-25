@@ -1,0 +1,24 @@
+{
+    "wrap_text": true,
+    "urls_check": {
+        "nnrf-nfm/v1/": "ocnrf-ingressgateway",
+        "nrf-configuration/v1/": "ocnrf-configuration"
+    },
+    "methods_check": {
+        "PUT": {
+            "found": [200, 201, 204],
+            "replace": "2xx"
+        },
+        "POST": {
+            "found": [200],
+            "replace": "201"
+        },
+        "PATCH": {
+            "found": "Content-Type:application/json",
+            "replace": "Content-Type:application/json-patch+json"
+        }
+    },
+    "pattern_match_check": {
+        "json_fix": true
+    }
+}

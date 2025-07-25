@@ -19,14 +19,14 @@ The TestPilot blessed dashboard provides a modern, flicker-free terminal interfa
 
 Features:
 - Live updating table with test results
-- Real-time progress bar and statistics  
+- Real-time progress bar and statistics
 - Color-coded status indicators
 - Scrollable results window
 - Bottom status line with counters
 
 ```
 ================================================================================
-                        TestPilot - Live Test Results                          
+                        TestPilot - Live Test Results
 ================================================================================
 Elapsed: 45.2s | Rate: 3.2/sec | Total: 145
 
@@ -111,7 +111,7 @@ python test_pilot.py --file tests.xlsx --dry-run --display-mode blessed
 
 ### Cross-platform
 - **Unix/Linux**: Full feature support
-- **macOS**: Full feature support  
+- **macOS**: Full feature support
 - **Windows**: Full support with modern terminals
 - **CI/CD**: Works in headless environments
 
@@ -197,7 +197,7 @@ The blessed dashboard is a drop-in replacement:
 from rich_dashboard import RichDashboard
 dashboard = RichDashboard(total_steps)
 
-# New way  
+# New way
 from blessed_dashboard import create_blessed_dashboard
 dashboard = create_blessed_dashboard(mode="full")
 ```
