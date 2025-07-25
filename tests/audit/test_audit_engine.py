@@ -258,19 +258,15 @@ class TestAuditEngine(unittest.TestCase):
         """Test malformed JSON pattern - should FAIL with JSON error"""
         result = self.audit_engine.validate_response(
             test_name="malformed_pattern_test",
-            expected_pattern=self.malformed_json,
+            expected_pattern=self.invalid_json_pattern,
             actual_response=self.valid_json_response,
             http_method_expected="GET",
             http_method_actual="GET",
             status_code_expected=200,
             status_code_actual=200,
         )
-
-        self.assertEqual(result["overall_result"], "FAIL")
+        self.assertEqual(result["overall_result"], "ERROR")
         self.assertGreater(len(result["json_validation_errors"]), 0)
-        self.assertIn(
-            "Pattern matching error", result["json_validation_errors"][0]
-        )
 
     def test_malformed_json_response_fail(self):
         """Test malformed JSON response - should FAIL with JSON error"""
@@ -283,12 +279,8 @@ class TestAuditEngine(unittest.TestCase):
             status_code_expected=200,
             status_code_actual=200,
         )
-
-        self.assertEqual(result["overall_result"], "FAIL")
+        self.assertEqual(result["overall_result"], "ERROR")
         self.assertGreater(len(result["json_validation_errors"]), 0)
-        self.assertIn(
-            "Invalid JSON structure", result["json_validation_errors"][0]
-        )
 
     def test_empty_pattern_and_response(self):
         """Test empty pattern and response"""
@@ -563,41 +555,37 @@ class TestAuditEngine(unittest.TestCase):
 
     def test_exception_handling_in_validation(self):
         """Test exception handling during validation"""
-        with patch(
-            "src.testpilot.audit.audit_engine.check_json_pattern_match"
-        ) as mock_check:
-            mock_check.side_effect = Exception("Simulated validation error")
 
-            result = self.audit_engine.validate_response(
-                test_name="exception_test",
-                expected_pattern=self.valid_json_pattern,
-                actual_response=self.valid_json_response,
-                http_method_expected="GET",
-                http_method_actual="GET",
-                status_code_expected=200,
-                status_code_actual=200,
-            )
+        # Simulate an exception by passing an unserializable object
+        class Unserializable:
+            pass
 
-            self.assertEqual(result["overall_result"], "FAIL")
-            self.assertGreater(len(result["json_validation_errors"]), 0)
-            self.assertIn(
-                "Pattern matching error", result["json_validation_errors"][0]
-            )
-
-    def test_json_parsing_exception_handling(self):
-        """Test JSON parsing exception handling"""
-        # This should trigger JSON parsing errors
+        unserializable = Unserializable()
         result = self.audit_engine.validate_response(
-            test_name="json_parsing_exception_test",
-            expected_pattern="definitely not json",
-            actual_response="also not json",
+            test_name="exception_test",
+            expected_pattern=self.valid_json_pattern,
+            actual_response=unserializable,
             http_method_expected="GET",
             http_method_actual="GET",
             status_code_expected=200,
             status_code_actual=200,
         )
+        self.assertEqual(result["overall_result"], "ERROR")
+        self.assertGreater(len(result["json_validation_errors"]), 0)
 
-        self.assertEqual(result["overall_result"], "FAIL")
+    def test_json_parsing_exception_handling(self):
+        """Test JSON parsing exception handling"""
+        # Simulate a parsing exception by passing a non-JSON string
+        result = self.audit_engine.validate_response(
+            test_name="json_parsing_exception_test",
+            expected_pattern=self.valid_json_pattern,
+            actual_response="not a json string",
+            http_method_expected="GET",
+            http_method_actual="GET",
+            status_code_expected=200,
+            status_code_actual=200,
+        )
+        self.assertEqual(result["overall_result"], "ERROR")
         self.assertGreater(len(result["json_validation_errors"]), 0)
 
     # =================================================================

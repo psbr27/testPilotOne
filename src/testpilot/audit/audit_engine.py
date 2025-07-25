@@ -80,19 +80,6 @@ class AuditEngine:
     ) -> Dict[str, Any]:
         """
         Perform 100% strict validation of response against expected pattern.
-
-        Args:
-            test_name: Name of the test being executed
-            expected_pattern: Expected JSON pattern from Excel
-            actual_response: Actual server response
-            http_method_expected: Expected HTTP method
-            http_method_actual: Actual HTTP method used
-            status_code_expected: Expected HTTP status code
-            status_code_actual: Actual HTTP status code
-            request_details: Additional request metadata
-
-        Returns:
-            Dict containing comprehensive audit results
         """
         audit_result = {
             "test_name": test_name,
@@ -122,10 +109,25 @@ class AuditEngine:
                 status_code_expected, status_code_actual, audit_result
             )
 
-            # Step 3: JSON Structure Validation
+            # Step 3: JSON Structure Validation (actual_response)
             json_structure_valid = self._validate_json_structure(
                 actual_response, audit_result
             )
+            if audit_result["overall_result"] == "ERROR":
+                self.audit_results.append(audit_result)
+                return audit_result
+
+            # Step 3b: JSON Structure Validation (expected_pattern)
+            try:
+                if isinstance(expected_pattern, str):
+                    json.loads(expected_pattern)
+            except json.JSONDecodeError as e:
+                audit_result["json_validation_errors"].append(
+                    f"Invalid expected pattern JSON: {str(e)}"
+                )
+                audit_result["overall_result"] = "ERROR"
+                self.audit_results.append(audit_result)
+                return audit_result
 
             # Step 4: 100% Pattern Matching Validation
             pattern_match_valid = self._validate_pattern_match(
@@ -149,11 +151,11 @@ class AuditEngine:
             # Log result
             if overall_valid:
                 logger.info(
-                    f"✅ AUDIT PASS: {test_name} - 100% validation successful"
+                    f"	AUDIT PASS: {test_name} - 100% validation successful"
                 )
             else:
                 logger.warning(
-                    f"❌ AUDIT FAIL: {test_name} - Validation failures detected"
+                    f"	AUDIT FAIL: {test_name} - Validation failures detected"
                 )
 
         except Exception as e:
@@ -232,15 +234,32 @@ class AuditEngine:
         Perform 100% strict pattern matching validation.
         No partial matches allowed in audit mode.
         """
+        # Ensure json_validation_errors exists
+        if "json_validation_errors" not in audit_result:
+            audit_result["json_validation_errors"] = []
         try:
             # Parse JSON strings
             if isinstance(expected_pattern, str):
-                expected_dict = json.loads(expected_pattern)
+                try:
+                    expected_dict = json.loads(expected_pattern)
+                except json.JSONDecodeError as e:
+                    audit_result["json_validation_errors"].append(
+                        f"Invalid expected pattern JSON: {str(e)}"
+                    )
+                    audit_result["overall_result"] = "ERROR"
+                    return False
             else:
                 expected_dict = expected_pattern
 
             if isinstance(actual_response, str):
-                actual_dict = json.loads(actual_response)
+                try:
+                    actual_dict = json.loads(actual_response)
+                except json.JSONDecodeError as e:
+                    audit_result["json_validation_errors"].append(
+                        f"Invalid actual response JSON: {str(e)}"
+                    )
+                    audit_result["overall_result"] = "ERROR"
+                    return False
             else:
                 actual_dict = actual_response
 
@@ -284,6 +303,7 @@ class AuditEngine:
             audit_result["json_validation_errors"].append(
                 f"Pattern matching error: {str(e)}"
             )
+            audit_result["overall_result"] = "ERROR"
             return False
 
     def _strict_collect_differences(
