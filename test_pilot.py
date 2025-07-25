@@ -1138,6 +1138,8 @@ def main():
 
     # Filter flows by test name if specified
     if args.test_name:
+        # strip spaces for args.test_name
+        args.test_name = args.test_name.strip()
         flows = [flow for flow in flows if flow.test_name == args.test_name]
         logger.info(
             f"Filtered to {len(flows)} flows matching test name: {args.test_name}"

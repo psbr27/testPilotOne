@@ -122,8 +122,11 @@ def parse_excel_to_flows(
             # Always use Test_Name as test name
             test_name = row.get("Test_Name")
             command = row.get("Command")
-            if not test_name:
+
+            if not test_name or pd.isna(test_name) or not str(test_name).strip():
                 test_name = f"row_{row_idx}"
+            else:
+                test_name = str(test_name).strip()
 
             # Extract url, method, headers from command if missing
             url = row.get("URL")
