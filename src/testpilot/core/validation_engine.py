@@ -738,6 +738,10 @@ class KubectlPatternValidator(ValidationStrategy):
 
         # fetch the response body from server
         response_body = context.response_body
+        original_response_body = (
+            response_body  # Keep original for line splitting
+        )
+
         if isinstance(response_body, str):
             try:
                 response_body = json.loads(response_body)
@@ -747,10 +751,12 @@ class KubectlPatternValidator(ValidationStrategy):
             except json.JSONDecodeError:
                 response_body = response_body  # fallback to string
 
-        # now split the lines using \n
+        # now split the lines using \n (use original string version)
         try:
-            if response_body is not None:
-                lines = response_body.split("\n")
+            if original_response_body is not None and isinstance(
+                original_response_body, str
+            ):
+                lines = original_response_body.split("\n")
                 # Load validation config for enhanced response validation
                 validation_config = (
                     ValidationDispatcher()._get_validation_config(context.args)
@@ -773,10 +779,42 @@ class KubectlPatternValidator(ValidationStrategy):
                             f"Pattern '{context.pattern_match}' found in line: {line}"
                         )
                         return ValidationResult(True)
-            # If no pattern match found, return failure
-            logger.debug(
-                f"Pattern '{context.pattern_match}' not found in any line of response body"
-            )
+                # If no pattern match found in any line, return failure
+                logger.debug(
+                    f"Pattern '{context.pattern_match}' not found in any line of response body"
+                )
+            else:
+                # Handle case where response body is not a string (e.g., already parsed as dict/list)
+                logger.debug(
+                    f"Response body is not a string, treating as single entity for pattern matching. Type: {type(original_response_body)}"
+                )
+                # Load validation config for enhanced response validation
+                validation_config = (
+                    ValidationDispatcher()._get_validation_config(context.args)
+                )
+
+                result = validate_response_enhanced(
+                    context.pattern_match,
+                    context.response_headers,
+                    str(
+                        original_response_body
+                    ),  # Convert to string for pattern matching
+                    context.response_payload,
+                    logger,
+                    config=validation_config,
+                    args=context.args,  # Pass args
+                    sheet_name=context.sheet_name,  # Pass sheet name for enhanced pattern matching
+                    row_idx=context.row_idx,  # Pass row index for enhanced pattern matching
+                )
+                if result["pattern_match_overall"] is True:
+                    logger.info(
+                        f"Pattern '{context.pattern_match}' found in kubectl response"
+                    )
+                    return ValidationResult(True)
+                else:
+                    logger.debug(
+                        f"Pattern '{context.pattern_match}' not found in kubectl response"
+                    )
             return ValidationResult(
                 False,
                 fail_reason=f"Pattern '{context.pattern_match}' not found in any line of response body",
