@@ -26,6 +26,7 @@ class TestResult:
     )
     request_payload: Optional[Any] = None  # Request payload for reference
     response_payload: Optional[Any] = None  # Response payload from server
+    error_message: Optional[str] = None  # Error message for test failures
 
 
 class TestStep:
@@ -54,10 +55,15 @@ class TestStep:
 
 
 class TestFlow:
-    def __init__(self, sheet: str, test_name: str):
+    def __init__(
+        self,
+        sheet: str,
+        test_name: str,
+        steps: Optional[List[TestStep]] = None,
+    ):
         self.sheet = sheet
         self.test_name = test_name
-        self.steps: List[TestStep] = []
+        self.steps: List[TestStep] = steps if steps is not None else []
         self.context: Dict[str, Any] = {}  # For storing data between steps
 
     def add_step(self, step: TestStep):

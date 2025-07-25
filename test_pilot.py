@@ -639,6 +639,106 @@ def print_results_table(test_results):
             print(idx, *row.values())
 
 
+def execute_audit_flows(
+    flows,
+    connector,
+    target_hosts,
+    svc_maps,
+    placeholder_pattern,
+    host_cli_map=None,
+    show_table=True,
+    display_mode="blessed",
+    userargs=None,
+    step_delay=1,
+):
+    """
+    Execute flows in audit mode with 100% pattern matching validation
+    and comprehensive compliance reporting.
+    """
+    from src.testpilot.audit import AuditEngine, AuditExporter
+    from src.testpilot.audit.audit_processor import process_single_step_audit
+
+    # Initialize audit engine
+    audit_engine = AuditEngine()
+    test_results = []
+    dashboard = None
+
+    if show_table:
+        try:
+            from src.testpilot.ui.print_table import PrintTableDashboard
+
+            if display_mode == "blessed" or display_mode == "full":
+                dashboard = PrintTableDashboard(mode="full")
+            elif display_mode == "progress":
+                dashboard = PrintTableDashboard(mode="progress")
+            else:  # simple
+                dashboard = PrintTableDashboard(mode="simple")
+
+            dashboard.start()
+
+        except ImportError as e:
+            logger.warning(f"PrintTable dashboard not available: {e}")
+            # Fallback to simple print-based display
+            from src.testpilot.ui.console_table_fmt import LiveProgressTable
+
+            dashboard = LiveProgressTable()
+
+    for flow in flows:
+        for step in flow.steps:
+            # Process step with audit validation
+            process_single_step_audit(
+                step,
+                flow,
+                target_hosts,
+                svc_maps,
+                placeholder_pattern,
+                connector,
+                host_cli_map,
+                test_results,
+                audit_engine,
+                show_table,
+                dashboard,
+                args=userargs,
+                step_delay=step_delay,
+            )
+
+    # Print final summary if dashboard is present
+    if dashboard:
+        dashboard.print_final_summary()
+
+    # Close connections
+    if connector is not None:
+        connector.close_all()
+
+    # Generate comprehensive audit report
+    if audit_engine.get_audit_results():
+        audit_summary = audit_engine.generate_audit_summary()
+        exporter = AuditExporter()
+
+        # Export comprehensive audit report
+        audit_report_path = exporter.export_audit_results(
+            audit_engine.get_audit_results(), audit_summary
+        )
+
+        logger.info(
+            f"📊 Comprehensive audit report generated: {audit_report_path}"
+        )
+
+        # Also export standard results for compatibility
+        if test_results:
+            export_workflow_results(test_results, flows)
+
+        # Log audit summary
+        logger.info("🔍 AUDIT SUMMARY:")
+        logger.info(f"   Total Tests: {audit_summary['total_tests']}")
+        logger.info(f"   Passed: {audit_summary['passed_tests']}")
+        logger.info(f"   Failed: {audit_summary['failed_tests']}")
+        logger.info(f"   Pass Rate: {audit_summary['pass_rate']:.2f}%")
+        logger.info(
+            f"   Compliance Status: {audit_summary['compliance_status']}"
+        )
+
+
 def execute_flows(
     flows,
     connector,
@@ -1148,8 +1248,25 @@ def main():
 
     show_table = not args.no_table
 
-    # Execute flows based on execution mode
-    if args.execution_mode == "mock":
+    # Execute flows based on execution mode and module type
+    if args.module == "audit":
+        # Audit mode: use specialized audit execution
+        logger.info(
+            "🔍 Starting AUDIT mode with 100% pattern matching validation"
+        )
+        execute_audit_flows(
+            flows,
+            connector,
+            target_hosts,
+            svc_maps,
+            placeholder_pattern,
+            host_cli_map,
+            show_table,
+            args.display_mode,
+            args,
+            args.step_delay,
+        )
+    elif args.execution_mode == "mock":
         # Mock execution: use mock integration
         logger.info(
             f"🎭 Starting mock execution mode with server: {args.mock_server_url}"

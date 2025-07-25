@@ -5,7 +5,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
-import paramiko
+# Import paramiko with fallback
+try:
+    import paramiko
+
+    PARAMIKO_AVAILABLE = True
+except ImportError:
+    PARAMIKO_AVAILABLE = False
 
 from .config_resolver import (
     load_config_with_env,
@@ -42,7 +48,9 @@ class SSHConnector:
         self.config_file = config_file
         self.use_ssh = False
         self.host_configs: List[SSHHostConfig] = []
-        self.connections: Dict[str, paramiko.SSHClient] = {}
+        self.connections: Dict[str, any] = (
+            {}
+        )  # paramiko.SSHClient when available
         self.known_hosts_file = os.path.expanduser("~/.ssh/known_hosts")
         self.auto_add_hosts = False  # Secure by default
         self.max_retries = 3  # Default retry count
@@ -143,8 +151,15 @@ class SSHConnector:
 
     def _connect_host(
         self, host_config: SSHHostConfig
-    ) -> Tuple[str, Optional[paramiko.SSHClient]]:
+    ) -> Tuple[
+        str, Optional[any]
+    ]:  # Optional[paramiko.SSHClient] when available
         """Connect to a host with retry mechanism."""
+        if not PARAMIKO_AVAILABLE:
+            return (
+                f"SSH functionality not available - paramiko not installed",
+                None,
+            )
         last_exception = None
 
         for attempt in range(self.max_retries):

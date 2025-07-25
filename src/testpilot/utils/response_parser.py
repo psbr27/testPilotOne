@@ -3,8 +3,20 @@ import logging
 import re
 from typing import Any, Dict, Optional, Tuple, Union
 
-import jsondiff
-import pandas as pd
+# Import dependencies with fallbacks
+try:
+    import jsondiff
+
+    JSONDIFF_AVAILABLE = True
+except ImportError:
+    JSONDIFF_AVAILABLE = False
+
+try:
+    import pandas as pd
+
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 
 from . import parse_instant_utils as piu
 from .parse_utils import extract_request_json_manual
@@ -200,9 +212,15 @@ def _validate_get_method_comparison(
                     logger.debug(
                         "server_output is not valid JSON, using as-is"
                     )
-            diff_result = jsondiff.diff(server_output, ref_payload)
+            if JSONDIFF_AVAILABLE:
+                diff_result = jsondiff.diff(server_output, ref_payload)
+            else:
+                diff_result = server_output != ref_payload
         else:
-            diff_result = jsondiff.diff(response_payload, ref_payload)
+            if JSONDIFF_AVAILABLE:
+                diff_result = jsondiff.diff(response_payload, ref_payload)
+            else:
+                diff_result = response_payload != ref_payload
 
         if diff_result:
             fail_reason = f"GET response does not match {compare_with_key or 'reference payload'}. Diff: {diff_result}"
@@ -298,7 +316,10 @@ def _validate_pattern_match(
 
     # Use JSON diff if both are JSON
     if pattern_json_valid and isinstance(response_payload, (dict, list)):
-        diff_result = jsondiff.diff(response_payload, pattern_json)
+        if JSONDIFF_AVAILABLE:
+            diff_result = jsondiff.diff(response_payload, pattern_json)
+        else:
+            diff_result = response_payload != pattern_json
         pattern_found = not diff_result
         logger.debug(f"Pattern JSON diff: {diff_result}")
         if not pattern_found:
