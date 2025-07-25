@@ -14,7 +14,7 @@ jobs:
       image: rockylinux:8  # Rocky Linux 8 is RHEL-compatible
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install system dependencies
       run: |
@@ -33,7 +33,7 @@ jobs:
         ./build_with_spec.sh
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: testPilot-rhel8
         path: dist/testPilot/
