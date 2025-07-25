@@ -1,0 +1,39 @@
+name: Build Binary
+
+on:
+  push:
+    branches: [ main, test_pilot_5 ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-rhel:
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux:8  # Rocky Linux 8 is RHEL-compatible
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install system dependencies
+      run: |
+        dnf install -y python39 python39-pip git
+        alternatives --set python3 /usr/bin/python3.9
+
+    - name: Install Python dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip3 install -r requirements.txt
+        pip3 install pyinstaller
+
+    - name: Build binary
+      run: |
+        chmod +x build_with_spec.sh
+        ./build_with_spec.sh
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: testPilot-rhel8
+        path: dist/testPilot/
