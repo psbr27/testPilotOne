@@ -21,6 +21,11 @@
         "max_retries": 3,
         "retry_delay": 2
     },
+    "kubectl_logs_settings": {
+        "capture_duration": 30,
+        "since_duration": "1s",
+        "_comment": "kubectl logs configuration: capture_duration (seconds to capture), since_duration (how far back to look: 1s, 5s, 1m, 1h, etc.)"
+    },
     "hosts": [
         {
             "name": "example-host-1",
@@ -49,6 +54,7 @@
         "connect_to": "Specify host name from hosts array or 'all' for all hosts",
         "html_generator": "Controls HTML report style - standard vs NF-style layout",
         "system_under_test": "Information about the system being tested (for NF-style reports)",
+        "kubectl_logs_settings": "Configure kubectl logs behavior: capture_duration (seconds to capture logs), since_duration (how far back to look for logs)",
         "environment_variables": [
             "Export environment variables before running:",
             "export HOST1_HOSTNAME='your.host.com'",

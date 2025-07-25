@@ -572,7 +572,7 @@ def build_kubectl_logs_command(
 
 
 def _generate_logs_capture_command(base_command, namespace, connector, host):
-    """Generate kubectl logs command with real-time capture using --since=1s."""
+    """Generate kubectl logs command with real-time capture using configurable --since duration."""
     # Load kubectl_logs_settings from config
     config_file = (
         getattr(connector, "config_file", "config/hosts.json")
@@ -585,11 +585,13 @@ def _generate_logs_capture_command(base_command, namespace, connector, host):
             config = json.load(f)
         kubectl_settings = config.get("kubectl_logs_settings", {})
         capture_duration = kubectl_settings.get("capture_duration", 30)
+        since_duration = kubectl_settings.get("since_duration", "1s")
     except Exception as e:
         logger.warning(
             f"Failed to load kubectl_logs_settings: {e}, using defaults"
         )
         capture_duration = 30
+        since_duration = "1s"
 
     # Check if this is a kubectl logs command
     if "logs" in base_command:
@@ -611,8 +613,10 @@ def _generate_logs_capture_command(base_command, namespace, connector, host):
         # Reconstruct command without --tail
         base_command = " ".join(filtered_parts)
 
-        # Add -f and --since=1s flags
-        follow_command = base_command.replace("logs", "logs -f --since=1s", 1)
+        # Add -f and --since flags with configurable duration
+        follow_command = base_command.replace(
+            "logs", f"logs -f --since={since_duration}", 1
+        )
 
         # Create the capture command with background process
         capture_command = (
@@ -620,7 +624,7 @@ def _generate_logs_capture_command(base_command, namespace, connector, host):
         )
 
         logger.debug(
-            f"Generated kubectl logs capture command: {capture_command}"
+            f"Generated kubectl logs capture command with since={since_duration}, duration={capture_duration}s: {capture_command}"
         )
         return capture_command.strip()
 
