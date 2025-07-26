@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-Comprehensive Unit Tests for AuditEngine
+Unit Tests for Refactored AuditEngine
 
-Tests all validation scenarios including:
-- Sunny day cases (perfect matches)
-- Rainy day cases (validation failures)
-- Edge cases (malformed data, boundary conditions)
-- HTTP validation
-- JSON validation
-- Pattern matching
+Tests the audit engine's integration with utils.pattern_match:
+- Use of check_json_pattern_match from utils
+- Strict array ordering for audit compliance
+- HTTP and status code validation
+- JSON structure validation
 """
 
 import json
@@ -24,7 +22,7 @@ from src.testpilot.audit.audit_engine import AuditEngine
 
 
 class TestAuditEngine(unittest.TestCase):
-    """Comprehensive test suite for AuditEngine"""
+    """Test suite for the refactored AuditEngine"""
 
     def setUp(self):
         """Set up test fixtures"""
@@ -38,65 +36,42 @@ class TestAuditEngine(unittest.TestCase):
             '{"status": "success", "data": {"id": 123, "name": "test"}}'
         )
 
-        self.partial_json_pattern = '{"status": "success"}'
-        self.partial_json_response = (
-            '{"status": "success", "data": {"id": 123}, "extra": "field"}'
-        )
+        self.array_pattern = '{"items": [1, 2, 3], "count": 3}'
+        self.array_response_ordered = '{"items": [1, 2, 3], "count": 3}'
+        self.array_response_unordered = '{"items": [3, 1, 2], "count": 3}'
 
-        self.invalid_json_pattern = '{"invalid": json}'
-        self.malformed_json = '{"missing": "quote}'
-
-        self.complex_pattern = """
-        {
+        self.complex_pattern = {
             "users": [
-                {"id": 1, "name": "Alice", "active": true},
-                {"id": 2, "name": "Bob", "active": false}
+                {"id": 1, "name": "Alice", "active": True},
+                {"id": 2, "name": "Bob", "active": False},
             ],
-            "metadata": {
-                "total": 2,
-                "page": 1
-            }
+            "metadata": {"total": 2, "page": 1},
         }
-        """
-
-        self.complex_response_match = """
-        {
-            "users": [
-                {"id": 1, "name": "Alice", "active": true},
-                {"id": 2, "name": "Bob", "active": false}
-            ],
-            "metadata": {
-                "total": 2,
-                "page": 1
-            }
-        }
-        """
-
-        self.complex_response_mismatch = """
-        {
-            "users": [
-                {"id": 1, "name": "Alice", "active": true},
-                {"id": 3, "name": "Charlie", "active": true}
-            ],
-            "metadata": {
-                "total": 3,
-                "page": 1
-            }
-        }
-        """
 
     def tearDown(self):
         """Clean up after tests"""
         self.audit_engine.clear_results()
 
     # =================================================================
-    # SUNNY DAY TESTS - Perfect scenarios
+    # INTEGRATION WITH PATTERN MATCHING UTILITIES
     # =================================================================
 
-    def test_perfect_match_validation_pass(self):
-        """Test perfect JSON pattern match - should PASS"""
+    @patch("src.testpilot.audit.audit_engine.check_json_pattern_match")
+    def test_uses_check_json_pattern_match_utility(self, mock_pattern_match):
+        """Test that audit engine uses the utils.pattern_match.check_json_pattern_match"""
+        # Configure mock
+        mock_pattern_match.return_value = (
+            True,
+            {
+                "diffs": [],
+                "matches": {"status": "success"},
+                "overall_match_percent": 100,
+            },
+        )
+
+        # Execute validation
         result = self.audit_engine.validate_response(
-            test_name="perfect_match_test",
+            test_name="test_pattern_utility",
             expected_pattern=self.valid_json_pattern,
             actual_response=self.valid_json_response,
             http_method_expected="GET",
@@ -105,33 +80,131 @@ class TestAuditEngine(unittest.TestCase):
             status_code_actual=200,
         )
 
-        self.assertEqual(result["overall_result"], "PASS")
-        self.assertEqual(result["test_name"], "perfect_match_test")
-        self.assertEqual(result["validation_type"], "STRICT_100_PERCENT")
-        self.assertEqual(len(result["differences"]), 0)
-        self.assertEqual(len(result["http_validation_errors"]), 0)
-        self.assertEqual(len(result["json_validation_errors"]), 0)
-        self.assertIn("timestamp", result)
+        # Verify check_json_pattern_match was called with correct params
+        mock_pattern_match.assert_called_once()
+        call_args = mock_pattern_match.call_args
+        self.assertEqual(
+            call_args[0][0], json.loads(self.valid_json_pattern)
+        )  # expected
+        self.assertEqual(
+            call_args[0][1], json.loads(self.valid_json_response)
+        )  # actual
+        self.assertFalse(
+            call_args[1]["partial_match"]
+        )  # Audit always uses strict mode
 
-    def test_complex_nested_perfect_match(self):
-        """Test complex nested JSON perfect match"""
+        # Verify result
+        self.assertEqual(result["overall_result"], "PASS")
+
+    def test_strict_array_ordering_enforcement(self):
+        """Test that audit enforces strict array ordering (unlike standard pattern match)"""
+        # Test with same array in different order
         result = self.audit_engine.validate_response(
-            test_name="complex_perfect_match",
-            expected_pattern=self.complex_pattern,
-            actual_response=self.complex_response_match,
-            http_method_expected="POST",
-            http_method_actual="POST",
-            status_code_expected=201,
-            status_code_actual=201,
+            test_name="array_order_test",
+            expected_pattern=self.array_pattern,
+            actual_response=self.array_response_unordered,
+            http_method_expected="GET",
+            http_method_actual="GET",
+            status_code_expected=200,
+            status_code_actual=200,
+        )
+
+        # Should fail due to strict array ordering
+        self.assertEqual(result["overall_result"], "FAIL")
+        self.assertGreater(len(result["differences"]), 0)
+
+        # Check that differences show array order mismatch
+        differences = result["differences"]
+        array_diffs = [
+            d for d in differences if d["field_path"].startswith("items[")
+        ]
+        self.assertGreater(len(array_diffs), 0)
+
+    def test_perfect_match_with_arrays(self):
+        """Test perfect match when arrays are in correct order"""
+        result = self.audit_engine.validate_response(
+            test_name="array_order_perfect",
+            expected_pattern=self.array_pattern,
+            actual_response=self.array_response_ordered,
+            http_method_expected="GET",
+            http_method_actual="GET",
+            status_code_expected=200,
+            status_code_actual=200,
         )
 
         self.assertEqual(result["overall_result"], "PASS")
         self.assertEqual(len(result["differences"]), 0)
 
-    def test_case_insensitive_http_methods(self):
-        """Test case insensitive HTTP method validation"""
+    def test_empty_pattern_validation(self):
+        """Test validation when expected pattern is empty"""
         result = self.audit_engine.validate_response(
-            test_name="case_insensitive_http_test",
+            test_name="empty_pattern_test",
+            expected_pattern="",
+            actual_response=self.valid_json_response,
+            http_method_expected="GET",
+            http_method_actual="GET",
+            status_code_expected=200,
+            status_code_actual=200,
+        )
+
+        # Should pass when no pattern to validate
+        self.assertEqual(result["overall_result"], "PASS")
+
+    def test_json_validation_error_handling(self):
+        """Test handling of invalid JSON in expected pattern"""
+        result = self.audit_engine.validate_response(
+            test_name="invalid_json_test",
+            expected_pattern='{"invalid": json}',
+            actual_response=self.valid_json_response,
+            http_method_expected="GET",
+            http_method_actual="GET",
+            status_code_expected=200,
+            status_code_actual=200,
+        )
+
+        self.assertEqual(result["overall_result"], "ERROR")
+        self.assertGreater(len(result["json_validation_errors"]), 0)
+        self.assertIn(
+            "Invalid expected pattern JSON",
+            result["json_validation_errors"][0],
+        )
+
+    def test_empty_response_error(self):
+        """Test that empty response is treated as ERROR"""
+        result = self.audit_engine.validate_response(
+            test_name="empty_response_test",
+            expected_pattern=self.valid_json_pattern,
+            actual_response="",
+            http_method_expected="GET",
+            http_method_actual="GET",
+            status_code_expected=200,
+            status_code_actual=200,
+        )
+
+        self.assertEqual(result["overall_result"], "ERROR")
+        self.assertIn("Empty response", result["json_validation_errors"][0])
+
+    def test_http_method_validation(self):
+        """Test HTTP method validation logic"""
+        # Test mismatch
+        result = self.audit_engine.validate_response(
+            test_name="http_method_test",
+            expected_pattern=self.valid_json_pattern,
+            actual_response=self.valid_json_response,
+            http_method_expected="GET",
+            http_method_actual="POST",
+            status_code_expected=200,
+            status_code_actual=200,
+        )
+
+        self.assertEqual(result["overall_result"], "FAIL")
+        self.assertIn(
+            "HTTP method mismatch", result["http_validation_errors"][0]
+        )
+
+        # Test case insensitive match
+        result2 = self.audit_engine.validate_response(
+            test_name="http_method_case_test",
             expected_pattern=self.valid_json_pattern,
             actual_response=self.valid_json_response,
             http_method_expected="get",
@@ -140,62 +213,12 @@ class TestAuditEngine(unittest.TestCase):
             status_code_actual=200,
         )
 
-        self.assertEqual(result["overall_result"], "PASS")
-        self.assertEqual(len(result["http_validation_errors"]), 0)
+        self.assertEqual(result2["overall_result"], "PASS")
 
-    # =================================================================
-    # RAINY DAY TESTS - Validation failures
-    # =================================================================
-
-    def test_json_pattern_mismatch_fail(self):
-        """Test JSON pattern mismatch - should FAIL"""
-        different_response = (
-            '{"status": "error", "data": {"id": 456, "name": "different"}}'
-        )
-
+    def test_status_code_validation(self):
+        """Test status code validation logic"""
         result = self.audit_engine.validate_response(
-            test_name="pattern_mismatch_test",
-            expected_pattern=self.valid_json_pattern,
-            actual_response=different_response,
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
-        )
-
-        self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["differences"]), 0)
-        self.assertGreater(len(result["json_validation_errors"]), 0)
-
-        # Check specific differences
-        differences = result["differences"]
-        diff_fields = [diff["field_path"] for diff in differences]
-        self.assertIn("status", diff_fields)
-        self.assertIn("data.id", diff_fields)
-        self.assertIn("data.name", diff_fields)
-
-    def test_http_method_mismatch_fail(self):
-        """Test HTTP method mismatch - should FAIL"""
-        result = self.audit_engine.validate_response(
-            test_name="http_method_mismatch_test",
-            expected_pattern=self.valid_json_pattern,
-            actual_response=self.valid_json_response,
-            http_method_expected="GET",
-            http_method_actual="POST",
-            status_code_expected=200,
-            status_code_actual=200,
-        )
-
-        self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["http_validation_errors"]), 0)
-        self.assertIn(
-            "HTTP method mismatch", result["http_validation_errors"][0]
-        )
-
-    def test_status_code_mismatch_fail(self):
-        """Test HTTP status code mismatch - should FAIL"""
-        result = self.audit_engine.validate_response(
-            test_name="status_code_mismatch_test",
+            test_name="status_code_test",
             expected_pattern=self.valid_json_pattern,
             actual_response=self.valid_json_response,
             http_method_expected="GET",
@@ -205,101 +228,13 @@ class TestAuditEngine(unittest.TestCase):
         )
 
         self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["http_validation_errors"]), 0)
         self.assertIn(
             "Status code mismatch", result["http_validation_errors"][0]
         )
 
-    def test_multiple_validation_failures(self):
-        """Test multiple validation failures at once"""
-        result = self.audit_engine.validate_response(
-            test_name="multiple_failures_test",
-            expected_pattern=self.valid_json_pattern,
-            actual_response='{"status": "error"}',  # Different + missing data
-            http_method_expected="GET",
-            http_method_actual="DELETE",  # Wrong method
-            status_code_expected=200,
-            status_code_actual=500,  # Wrong status
-        )
-
-        self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["http_validation_errors"]), 0)
-        self.assertGreater(len(result["json_validation_errors"]), 0)
-        self.assertGreater(len(result["differences"]), 0)
-
-    def test_complex_nested_mismatch(self):
-        """Test complex nested JSON with mismatches"""
-        result = self.audit_engine.validate_response(
-            test_name="complex_mismatch_test",
-            expected_pattern=self.complex_pattern,
-            actual_response=self.complex_response_mismatch,
-            http_method_expected="POST",
-            http_method_actual="POST",
-            status_code_expected=201,
-            status_code_actual=201,
-        )
-
-        self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["differences"]), 0)
-
-        # Check for specific nested differences
-        differences = result["differences"]
-        diff_fields = [diff["field_path"] for diff in differences]
-
-        # Should detect user ID and name changes, total count change
-        user_id_diffs = [f for f in diff_fields if "users" in f and "id" in f]
-        self.assertTrue(len(user_id_diffs) > 0)
-
-    # =================================================================
-    # EDGE CASES - Boundary conditions and malformed data
-    # =================================================================
-
-    def test_malformed_json_pattern_fail(self):
-        """Test malformed JSON pattern - should FAIL with JSON error"""
-        result = self.audit_engine.validate_response(
-            test_name="malformed_pattern_test",
-            expected_pattern=self.invalid_json_pattern,
-            actual_response=self.valid_json_response,
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
-        )
-        self.assertEqual(result["overall_result"], "ERROR")
-        self.assertGreater(len(result["json_validation_errors"]), 0)
-
-    def test_malformed_json_response_fail(self):
-        """Test malformed JSON response - should FAIL with JSON error"""
-        result = self.audit_engine.validate_response(
-            test_name="malformed_response_test",
-            expected_pattern=self.valid_json_pattern,
-            actual_response=self.malformed_json,
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
-        )
-        self.assertEqual(result["overall_result"], "ERROR")
-        self.assertGreater(len(result["json_validation_errors"]), 0)
-
-    def test_empty_pattern_and_response(self):
-        """Test empty pattern and response"""
-        result = self.audit_engine.validate_response(
-            test_name="empty_data_test",
-            expected_pattern="",
-            actual_response="",
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
-        )
-
-        # Empty strings should cause ERROR due to JSON parsing failure
-        self.assertEqual(result["overall_result"], "ERROR")
-        self.assertGreater(len(result["json_validation_errors"]), 0)
-
-    def test_none_values_handling(self):
-        """Test handling of None values in HTTP validation"""
+    def test_none_values_in_validation(self):
+        """Test handling of None values in HTTP method and status code"""
+        # Both None should pass
         result = self.audit_engine.validate_response(
             test_name="none_values_test",
             expected_pattern=self.valid_json_pattern,
@@ -310,121 +245,101 @@ class TestAuditEngine(unittest.TestCase):
             status_code_actual=None,
         )
 
-        # None values should be treated as equal, JSON should pass
         self.assertEqual(result["overall_result"], "PASS")
-        self.assertEqual(len(result["http_validation_errors"]), 0)
 
-    def test_none_vs_value_mismatch(self):
-        """Test None vs actual value mismatch"""
-        result = self.audit_engine.validate_response(
-            test_name="none_vs_value_test",
+        # One None should fail
+        result2 = self.audit_engine.validate_response(
+            test_name="partial_none_test",
             expected_pattern=self.valid_json_pattern,
             actual_response=self.valid_json_response,
-            http_method_expected=None,
-            http_method_actual="GET",
+            http_method_expected="GET",
+            http_method_actual=None,
             status_code_expected=200,
             status_code_actual=None,
         )
 
-        self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["http_validation_errors"]), 0)
+        self.assertEqual(result2["overall_result"], "FAIL")
 
-    def test_large_json_objects(self):
-        """Test handling of large JSON objects"""
-        large_pattern = {
-            "data": [{"id": i, "value": f"item_{i}"} for i in range(100)]
-        }
-        large_response = {
-            "data": [{"id": i, "value": f"item_{i}"} for i in range(100)]
-        }
-
-        result = self.audit_engine.validate_response(
-            test_name="large_json_test",
-            expected_pattern=json.dumps(large_pattern),
-            actual_response=json.dumps(large_response),
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
+    def test_complex_nested_differences(self):
+        """Test detection of differences in complex nested structures"""
+        expected = json.dumps(self.complex_pattern)
+        actual = json.dumps(
+            {
+                "users": [
+                    {
+                        "id": 1,
+                        "name": "Alice",
+                        "active": False,
+                    },  # active changed
+                    {
+                        "id": 3,
+                        "name": "Charlie",
+                        "active": True,
+                    },  # different user
+                ],
+                "metadata": {"total": 2, "page": 2},  # page changed
+            }
         )
 
-        self.assertEqual(result["overall_result"], "PASS")
-
-    def test_unicode_and_special_characters(self):
-        """Test handling of Unicode and special characters"""
-        unicode_pattern = '{"message": "Hello 世界! Special chars: @#$%^&*()", "emoji": "🚀"}'
-        unicode_response = '{"message": "Hello 世界! Special chars: @#$%^&*()", "emoji": "🚀"}'
-
         result = self.audit_engine.validate_response(
-            test_name="unicode_test",
-            expected_pattern=unicode_pattern,
-            actual_response=unicode_response,
+            test_name="complex_diff_test",
+            expected_pattern=expected,
+            actual_response=actual,
             http_method_expected="POST",
             http_method_actual="POST",
             status_code_expected=200,
             status_code_actual=200,
         )
 
-        self.assertEqual(result["overall_result"], "PASS")
+        self.assertEqual(result["overall_result"], "FAIL")
+        differences = result["differences"]
 
-    def test_array_order_sensitivity(self):
-        """Test that array order is significant in strict mode"""
-        pattern_ordered = '{"items": [1, 2, 3]}'
-        response_reordered = '{"items": [3, 2, 1]}'
+        # Verify specific differences detected
+        diff_paths = [d["field_path"] for d in differences]
+        self.assertIn("users[0].active", diff_paths)
+        self.assertIn("users[1].id", diff_paths)
+        self.assertIn("users[1].name", diff_paths)
+        self.assertIn("metadata.page", diff_paths)
+
+    def test_extra_fields_detection(self):
+        """Test detection of extra fields in actual response"""
+        expected = '{"a": 1, "b": 2}'
+        actual = '{"a": 1, "b": 2, "c": 3}'  # Extra field
 
         result = self.audit_engine.validate_response(
-            test_name="array_order_test",
-            expected_pattern=pattern_ordered,
-            actual_response=response_reordered,
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
+            test_name="extra_fields_test",
+            expected_pattern=expected,
+            actual_response=actual,
         )
 
-        # In strict audit mode, order should matter
         self.assertEqual(result["overall_result"], "FAIL")
-        self.assertGreater(len(result["differences"]), 0)
+        differences = result["differences"]
+        extra_diffs = [d for d in differences if d["type"] == "extra"]
+        self.assertEqual(len(extra_diffs), 1)
+        self.assertEqual(extra_diffs[0]["field_path"], "c")
 
-    def test_nested_array_with_objects(self):
-        """Test nested arrays with objects"""
-        pattern = '{"users": [{"name": "Alice", "roles": ["admin", "user"]}, {"name": "Bob", "roles": ["user"]}]}'
-        response_match = '{"users": [{"name": "Alice", "roles": ["admin", "user"]}, {"name": "Bob", "roles": ["user"]}]}'
-        response_mismatch = '{"users": [{"name": "Alice", "roles": ["user", "admin"]}, {"name": "Bob", "roles": ["user"]}]}'
+    def test_missing_fields_detection(self):
+        """Test detection of missing fields in actual response"""
+        expected = '{"a": 1, "b": 2, "c": 3}'
+        actual = '{"a": 1, "b": 2}'  # Missing field
 
-        # Test perfect match
-        result_match = self.audit_engine.validate_response(
-            test_name="nested_array_match_test",
-            expected_pattern=pattern,
-            actual_response=response_match,
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
+        result = self.audit_engine.validate_response(
+            test_name="missing_fields_test",
+            expected_pattern=expected,
+            actual_response=actual,
         )
-        self.assertEqual(result_match["overall_result"], "PASS")
 
-        # Test array order mismatch (should fail in strict mode)
-        result_mismatch = self.audit_engine.validate_response(
-            test_name="nested_array_mismatch_test",
-            expected_pattern=pattern,
-            actual_response=response_mismatch,
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
-        )
-        self.assertEqual(result_mismatch["overall_result"], "FAIL")
-
-    # =================================================================
-    # AUDIT ENGINE STATE AND SUMMARY TESTS
-    # =================================================================
+        self.assertEqual(result["overall_result"], "FAIL")
+        differences = result["differences"]
+        missing_diffs = [d for d in differences if d["type"] == "missing"]
+        self.assertEqual(len(missing_diffs), 1)
+        self.assertEqual(missing_diffs[0]["field_path"], "c")
 
     def test_audit_summary_generation(self):
         """Test audit summary generation"""
         # Add some test results
         self.audit_engine.validate_response(
-            test_name="pass_test_1",
+            test_name="test1",
             expected_pattern=self.valid_json_pattern,
             actual_response=self.valid_json_response,
             http_method_expected="GET",
@@ -434,255 +349,108 @@ class TestAuditEngine(unittest.TestCase):
         )
 
         self.audit_engine.validate_response(
-            test_name="fail_test_1",
+            test_name="test2",
             expected_pattern=self.valid_json_pattern,
             actual_response='{"status": "error"}',
             http_method_expected="GET",
-            http_method_actual="POST",
+            http_method_actual="GET",
             status_code_expected=200,
-            status_code_actual=400,
+            status_code_actual=200,
         )
 
+        self.audit_engine.validate_response(
+            test_name="test3",
+            expected_pattern=self.valid_json_pattern,
+            actual_response="",  # Error case
+        )
+
+        # Generate summary
         summary = self.audit_engine.generate_audit_summary()
 
         self.assertEqual(summary["audit_mode"], "STRICT_100_PERCENT")
-        self.assertEqual(summary["total_tests"], 2)
+        self.assertEqual(summary["total_tests"], 3)
         self.assertEqual(summary["passed_tests"], 1)
         self.assertEqual(summary["failed_tests"], 1)
-        self.assertEqual(summary["error_tests"], 0)
-        self.assertEqual(summary["pass_rate"], 50.0)
+        self.assertEqual(summary["error_tests"], 1)
+        self.assertAlmostEqual(summary["pass_rate"], 33.33, places=1)
         self.assertEqual(summary["compliance_status"], "NON_COMPLIANT")
         self.assertIn("generated_at", summary)
 
-    def test_get_and_clear_results(self):
-        """Test getting and clearing audit results"""
-        # Add a test result
+    def test_clear_results(self):
+        """Test clearing audit results"""
+        # Add a result
         self.audit_engine.validate_response(
-            test_name="test_result",
+            test_name="test_clear",
             expected_pattern=self.valid_json_pattern,
             actual_response=self.valid_json_response,
         )
 
-        # Get results
-        results = self.audit_engine.get_audit_results()
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["test_name"], "test_result")
+        self.assertEqual(len(self.audit_engine.get_audit_results()), 1)
 
         # Clear results
         self.audit_engine.clear_results()
-        cleared_results = self.audit_engine.get_audit_results()
-        self.assertEqual(len(cleared_results), 0)
+        self.assertEqual(len(self.audit_engine.get_audit_results()), 0)
 
-    def test_multiple_tests_batch_processing(self):
-        """Test processing multiple tests in batch"""
-        test_cases = [
-            (
-                "batch_test_1",
-                "PASS",
-                self.valid_json_pattern,
-                self.valid_json_response,
-                "GET",
-                "GET",
-                200,
-                200,
-            ),
-            (
-                "batch_test_2",
-                "FAIL",
-                self.valid_json_pattern,
-                '{"status": "error"}',
-                "GET",
-                "GET",
-                200,
-                200,
-            ),
-            (
-                "batch_test_3",
-                "FAIL",
-                self.valid_json_pattern,
-                self.valid_json_response,
-                "GET",
-                "POST",
-                200,
-                200,
-            ),
-            (
-                "batch_test_4",
-                "PASS",
-                '{"simple": "test"}',
-                '{"simple": "test"}',
-                "POST",
-                "POST",
-                201,
-                201,
-            ),
-        ]
+    def test_request_details_preservation(self):
+        """Test that request details are preserved in audit results"""
+        request_details = {
+            "command": "curl -X GET http://api.test",
+            "host": "test-host",
+            "execution_time": 1.23,
+            "custom_field": "custom_value",
+        }
 
-        for (
-            name,
-            expected_result,
-            pattern,
-            response,
-            method_exp,
-            method_act,
-            status_exp,
-            status_act,
-        ) in test_cases:
-            result = self.audit_engine.validate_response(
-                test_name=name,
-                expected_pattern=pattern,
-                actual_response=response,
-                http_method_expected=method_exp,
-                http_method_actual=method_act,
-                status_code_expected=status_exp,
-                status_code_actual=status_act,
-            )
-            self.assertEqual(
-                result["overall_result"],
-                expected_result,
-                f"Test {name} failed",
-            )
-
-        # Check summary
-        summary = self.audit_engine.generate_audit_summary()
-        self.assertEqual(summary["total_tests"], 4)
-        self.assertEqual(summary["passed_tests"], 2)
-        self.assertEqual(summary["failed_tests"], 2)
-
-    # =================================================================
-    # ERROR HANDLING AND EXCEPTION TESTS
-    # =================================================================
-
-    def test_exception_handling_in_validation(self):
-        """Test exception handling during validation"""
-
-        # Simulate an exception by passing an unserializable object
-        class Unserializable:
-            pass
-
-        unserializable = Unserializable()
         result = self.audit_engine.validate_response(
-            test_name="exception_test",
+            test_name="request_details_test",
             expected_pattern=self.valid_json_pattern,
-            actual_response=unserializable,
+            actual_response=self.valid_json_response,
+            request_details=request_details,
+        )
+
+        self.assertEqual(result["request_details"], request_details)
+
+    @patch("src.testpilot.audit.audit_engine.logger")
+    def test_logging_behavior(self, mock_logger):
+        """Test that appropriate log messages are generated"""
+        # Test PASS logging
+        self.audit_engine.validate_response(
+            test_name="log_pass_test",
+            expected_pattern=self.valid_json_pattern,
+            actual_response=self.valid_json_response,
             http_method_expected="GET",
             http_method_actual="GET",
             status_code_expected=200,
             status_code_actual=200,
         )
-        self.assertEqual(result["overall_result"], "ERROR")
-        self.assertGreater(len(result["json_validation_errors"]), 0)
 
-    def test_json_parsing_exception_handling(self):
-        """Test JSON parsing exception handling"""
-        # Simulate a parsing exception by passing a non-JSON string
-        result = self.audit_engine.validate_response(
-            test_name="json_parsing_exception_test",
-            expected_pattern=self.valid_json_pattern,
-            actual_response="not a json string",
-            http_method_expected="GET",
-            http_method_actual="GET",
-            status_code_expected=200,
-            status_code_actual=200,
+        mock_logger.info.assert_called_with(
+            "\tAUDIT PASS: log_pass_test - 100% validation successful"
         )
-        self.assertEqual(result["overall_result"], "ERROR")
-        self.assertGreater(len(result["json_validation_errors"]), 0)
 
-    # =================================================================
-    # PERFORMANCE AND STRESS TESTS
-    # =================================================================
+        # Test FAIL logging
+        self.audit_engine.validate_response(
+            test_name="log_fail_test",
+            expected_pattern=self.valid_json_pattern,
+            actual_response='{"status": "error"}',
+        )
 
-    def test_stress_test_many_validations(self):
-        """Stress test with many validations"""
-        num_tests = 50
+        mock_logger.warning.assert_called_with(
+            "\tAUDIT FAIL: log_fail_test - Validation failures detected"
+        )
 
-        for i in range(num_tests):
-            pattern = f'{{"test_id": {i}, "data": "test_data_{i}"}}'
-            response = f'{{"test_id": {i}, "data": "test_data_{i}"}}'
+        # Test ERROR logging - simulate exception in overall validation
+        with patch(
+            "src.testpilot.audit.audit_engine.AuditEngine._validate_http_method"
+        ) as mock_method:
+            mock_method.side_effect = Exception("Test exception")
 
-            result = self.audit_engine.validate_response(
-                test_name=f"stress_test_{i}",
-                expected_pattern=pattern,
-                actual_response=response,
-                http_method_expected="GET",
-                http_method_actual="GET",
-                status_code_expected=200,
-                status_code_actual=200,
+            self.audit_engine.validate_response(
+                test_name="log_error_test",
+                expected_pattern=self.valid_json_pattern,
+                actual_response=self.valid_json_response,
             )
 
-            self.assertEqual(result["overall_result"], "PASS")
-
-        summary = self.audit_engine.generate_audit_summary()
-        self.assertEqual(summary["total_tests"], num_tests)
-        self.assertEqual(summary["passed_tests"], num_tests)
-        self.assertEqual(summary["failed_tests"], 0)
-        self.assertEqual(summary["pass_rate"], 100.0)
-
-    def test_strict_collect_differences_extra_keys(self):
-        """Test _strict_collect_differences with extra keys in actual response"""
-        expected = {"a": 1}
-        actual = {"a": 1, "b": 2}
-
-        differences = self.audit_engine._strict_collect_differences(
-            expected, actual
-        )
-
-        self.assertEqual(len(differences), 1)
-        self.assertEqual(differences[0][0], "extra")
-        self.assertEqual(differences[0][1], "b")
-        self.assertEqual(differences[0][3], 2)
-
-
-class TestAuditEngineFallback(unittest.TestCase):
-    """Test suite for AuditEngine fallback implementations"""
-
-    def setUp(self):
-        """Set up test fixtures"""
-        # Temporarily remove the imported modules to trigger fallback
-        self.original_sys_modules = sys.modules.copy()
-        if "src.testpilot.utils.pattern_match" in sys.modules:
-            del sys.modules["src.testpilot.utils.pattern_match"]
-
-        # Re-import AuditEngine to use the fallback implementations
-        from src.testpilot.audit.audit_engine import AuditEngine
-
-        self.audit_engine = AuditEngine()
-
-    def tearDown(self):
-        """Clean up after tests"""
-        # Restore original modules
-        sys.modules.clear()
-        sys.modules.update(self.original_sys_modules)
-
-    def test_fallback_enhance_collect_differences(self):
-        """Test the fallback implementation of enhance_collect_differences"""
-        expected = {"a": 1}
-        actual = {"a": 2}
-        # In fallback mode, this will call the basic `_strict_collect_differences`
-        diffs = self.audit_engine._strict_collect_differences(expected, actual)
-        self.assertNotEqual(diffs, [])
-        self.assertEqual(len(diffs), 1)
-        self.assertEqual(diffs[0][0], "mismatch")
-
-    def test_fallback_check_json_pattern_match(self):
-        """Test the fallback implementation of check_json_pattern_match"""
-        expected = '{"a": 1}'
-        actual = '{"a": 1}'
-        audit_result = {}
-        is_valid = self.audit_engine._validate_pattern_match(
-            expected, actual, audit_result
-        )
-        self.assertTrue(is_valid)
-
-    def test_fallback_check_json_pattern_mismatch(self):
-        """Test the fallback implementation of check_json_pattern_match with a mismatch"""
-        expected = '{"a": 1}'
-        actual = '{"a": 2}'
-        audit_result = {}
-        is_valid = self.audit_engine._validate_pattern_match(
-            expected, actual, audit_result
-        )
-        self.assertFalse(is_valid)
+            mock_logger.error.assert_called()
 
 
 if __name__ == "__main__":

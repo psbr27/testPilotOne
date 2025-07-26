@@ -9,52 +9,13 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-# Import with fallback for logger
-try:
-    from ..utils.logger import get_logger
+from ..utils.logger import get_logger
+from ..utils.pattern_match import (
+    check_json_pattern_match,
+    enhance_collect_differences,
+)
 
-    logger = get_logger("TestPilot.Audit")
-except ImportError:
-    import logging
-
-    logger = logging.getLogger("TestPilot.Audit")
-
-# Import pattern matching with fallback
-try:
-    from ..utils.pattern_match import (
-        check_json_pattern_match,
-        enhance_collect_differences,
-    )
-except ImportError:
-    # Provide basic fallback implementations
-    def enhance_collect_differences(expected, actual):
-        """Fallback difference collection"""
-        differences = []
-        if expected != actual:
-            differences.append(("mismatch", "root", expected, actual))
-        return differences
-
-    def check_json_pattern_match(expected, actual, partial_match=False):
-        """Fallback pattern matching"""
-        import json
-
-        try:
-            if isinstance(expected, str):
-                expected = json.loads(expected)
-            if isinstance(actual, str):
-                actual = json.loads(actual)
-            match = expected == actual
-            return match, {
-                "diffs": [],
-                "matches": [],
-                "overall_match_percent": 100 if match else 0,
-            }
-        except json.JSONDecodeError:
-            return False, {
-                "diffs": [("error", "json_parse", "Invalid JSON", None)],
-                "matches": [],
-                "overall_match_percent": 0,
-            }
+logger = get_logger("TestPilot.Audit")
 
 
 class AuditEngine:
@@ -119,7 +80,10 @@ class AuditEngine:
 
             # Step 3b: JSON Structure Validation (expected_pattern)
             try:
-                if isinstance(expected_pattern, str):
+                if (
+                    isinstance(expected_pattern, str)
+                    and expected_pattern.strip()
+                ):
                     json.loads(expected_pattern)
             except json.JSONDecodeError as e:
                 audit_result["json_validation_errors"].append(
@@ -151,11 +115,11 @@ class AuditEngine:
             # Log result
             if overall_valid:
                 logger.info(
-                    f"	AUDIT PASS: {test_name} - 100% validation successful"
+                    f"\tAUDIT PASS: {test_name} - 100% validation successful"
                 )
             else:
                 logger.warning(
-                    f"	AUDIT FAIL: {test_name} - Validation failures detected"
+                    f"\tAUDIT FAIL: {test_name} - Validation failures detected"
                 )
 
         except Exception as e:
@@ -231,12 +195,17 @@ class AuditEngine:
         self, expected_pattern: str, actual_response: str, audit_result: Dict
     ) -> bool:
         """
-        Perform 100% strict pattern matching validation.
+        Perform 100% strict pattern matching validation using existing utilities.
         No partial matches allowed in audit mode.
         """
         # Ensure json_validation_errors exists
         if "json_validation_errors" not in audit_result:
             audit_result["json_validation_errors"] = []
+
+        # Skip pattern matching if expected pattern is empty
+        if not expected_pattern or not expected_pattern.strip():
+            return True
+
         try:
             # Parse JSON strings
             if isinstance(expected_pattern, str):
@@ -263,12 +232,13 @@ class AuditEngine:
             else:
                 actual_dict = actual_response
 
-            # Use strict pattern matching (partial_match=False)
+            # Use existing pattern matching utility with strict mode (partial_match=False)
             match_result, match_details = check_json_pattern_match(
                 expected_dict, actual_dict, partial_match=False
             )
 
-            # Collect all differences for audit trail using strict comparison
+            # For audit mode, we need to enforce strict array ordering
+            # So we collect differences using our own strict method
             differences = self._strict_collect_differences(
                 expected_dict, actual_dict
             )
