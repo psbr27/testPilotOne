@@ -1,0 +1,40 @@
+# Core Jenkins plugins for TestPilot execution
+# Essential pipeline plugins
+workflow-aggregator:latest
+pipeline-model-definition:latest
+pipeline-stage-view:latest
+
+# Git and SCM
+git:latest
+git-client:latest
+scm-api:latest
+
+# Kubernetes support
+kubernetes:latest
+kubernetes-client-api:latest
+kubernetes-credentials:latest
+
+# Credentials and security
+credentials:latest
+credentials-binding:latest
+plain-credentials:latest
+ssh-credentials:latest
+
+# Basic utilities
+timestamper:latest
+ansicolor:latest
+ws-cleanup:latest
+
+# Reporting
+junit:latest
+htmlpublisher:latest
+
+# Jenkins configuration
+configuration-as-code:latest
+job-dsl:latest
+
+# Matrix authorization
+matrix-auth:latest
+
+# Pipeline utilities
+pipeline-utility-steps:latest

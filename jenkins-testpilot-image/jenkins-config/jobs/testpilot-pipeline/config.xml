@@ -1,0 +1,125 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.40">
+  <actions/>
+  <description>TestPilot audit execution pipeline for Kubernetes environments</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.StringParameterDefinition>
+          <name>TARGET_NAMESPACE</name>
+          <description>Target Kubernetes namespace for TestPilot audit</description>
+          <defaultValue>default</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>EXCEL_FILE_PATH</name>
+          <description>Path to the TestPilot Excel file (relative to workspace)</description>
+          <defaultValue>tests/audit_tests.xlsx</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>SHEET_NAME</name>
+          <description>Excel sheet name to execute (leave empty for all sheets)</description>
+          <defaultValue></defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>NF_NAME</name>
+          <description>Network Function name</description>
+          <defaultValue>TestNF</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>NF_TYPE</name>
+          <description>Network Function type (e.g., AMF, SMF, UPF)</description>
+          <defaultValue>AMF</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.StringParameterDefinition>
+          <name>NF_VERSION</name>
+          <description>Network Function version</description>
+          <defaultValue>v23.4.x</defaultValue>
+          <trim>true</trim>
+        </hudson.model.StringParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>ENABLE_AUDIT</name>
+          <description>Enable comprehensive audit validation</description>
+          <defaultValue>true</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@2.92">
+    <script><![CDATA[
+pipeline {
+    agent any
+
+    environment {
+        TESTPILOT_NAMESPACE = "${params.TARGET_NAMESPACE}"
+        NF_NAME = "${params.NF_NAME}"
+        NF_TYPE = "${params.NF_TYPE}"
+        NF_VERSION = "${params.NF_VERSION}"
+        TESTPILOT_HOME = "/opt/testpilot"
+        REPORTS_DIR = "${WORKSPACE}/audit_reports"
+    }
+
+    stages {
+        stage('Initialize') {
+            steps {
+                echo "🚀 Starting TestPilot Pipeline"
+                echo "Target Namespace: ${params.TARGET_NAMESPACE}"
+                echo "Excel File: ${params.EXCEL_FILE_PATH}"
+                echo "Audit Enabled: ${params.ENABLE_AUDIT}"
+
+                sh "mkdir -p ${REPORTS_DIR}"
+                sh "which testpilot || echo 'testpilot not found'"
+                sh "ls -la /opt/testpilot/bin/ || echo 'testpilot directory not found'"
+            }
+        }
+
+        stage('Prepare Configuration') {
+            steps {
+                script {
+                    sh 'echo "Creating configuration files..."'
+                    sh 'ls -la ${TESTPILOT_HOME}/config/ || echo "Config directory not found"'
+                }
+            }
+        }
+
+        stage('Execute TestPilot') {
+            steps {
+                script {
+                    echo "🏃 Executing TestPilot audit"
+                    echo "This stage would execute: testpilot audit -e ${params.EXCEL_FILE_PATH} -o ${REPORTS_DIR}"
+                    sh 'echo "TestPilot execution completed (demo mode)"'
+                }
+            }
+        }
+
+        stage('Archive Results') {
+            steps {
+                echo "📊 Archiving results"
+                sh 'echo "Results archived successfully"'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "🧹 Pipeline execution completed"
+        }
+        success {
+            echo "✅ TestPilot pipeline completed successfully!"
+        }
+        failure {
+            echo "❌ TestPilot pipeline failed. Check the logs for details."
+        }
+    }
+}
+]]></script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

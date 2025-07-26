@@ -36,6 +36,23 @@ except ImportError:
 
     logger = logging.getLogger("TestPilot.AuditExporter")
 
+# Import pod mode manager
+try:
+    from .pod_mode import pod_mode_manager
+except ImportError:
+    # Fallback for environments without pod mode support
+    class MockPodModeManager:
+        def is_pod_mode(self):
+            return False
+
+        def should_create_logs_folder(self):
+            return True
+
+        def get_output_directory(self, default_dir):
+            return default_dir
+
+    pod_mode_manager = MockPodModeManager()
+
 
 class AuditExporter:
     """
@@ -58,14 +75,25 @@ class AuditExporter:
         Export comprehensive audit results to Excel with multiple sheets
         and proper JSON formatting.
 
+        Pod mode aware: Uses appropriate output directory and logging strategy.
+
         Args:
             audit_results: List of detailed audit results
             audit_summary: Overall audit summary
             output_dir: Directory to save audit reports
+            force_json: Force JSON export (useful for testing and pod mode)
 
         Returns:
             str: Path to generated Excel file
         """
+        # Use pod mode aware output directory
+        output_dir = pod_mode_manager.get_output_directory(output_dir)
+
+        # Log pod mode status for audit trail
+        if pod_mode_manager.is_pod_mode():
+            logger.info("🏗️  Exporting audit results in pod mode")
+        else:
+            logger.info("🖥️  Exporting audit results in standard mode")
         # Check dependencies or force JSON export
         if force_json or not PANDAS_AVAILABLE or not OPENPYXL_AVAILABLE:
             if force_json:

@@ -1,0 +1,31 @@
+{
+  "comment": "Sample resources_map.json for TestPilot Audit Pod Mode",
+  "description": "This file maps placeholder patterns to actual resource names/URLs for pod mode execution",
+
+  "service_endpoints": {
+    "user_service": "http://user-service:8080",
+    "auth_service": "http://auth-service:8081",
+    "api_gateway": "http://api-gateway:8082"
+  },
+
+  "kubernetes_services": {
+    "egressgateway": "provgw-prov-egressgateway",
+    "ingressgateway-prov": "ocslf-ingressgateway-prov",
+    "ingressgateway-sig": "ocslf-ingressgateway-sig",
+    "nudr-dr-provservice": "ocslf-nudr-dr-provservice",
+    "nudr-drservice": "ocslf-nudr-drservice"
+  },
+
+  "environment_specific": {
+    "namespace": "default",
+    "cluster_name": "test-cluster",
+    "environment": "staging"
+  },
+
+  "common_placeholders": {
+    "base_url": "http://api.test.com",
+    "api_version": "v1",
+    "tenant_id": "test-tenant",
+    "user_id": "test-user-123"
+  }
+}

@@ -1,0 +1,258 @@
+#!/usr/bin/env groovy
+
+pipeline {
+    agent {
+        kubernetes {
+            label 'testpilot'
+            // Note: Update the image name below to match your registry
+            yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: agent
+spec:
+  serviceAccountName: jenkins
+  containers:
+  - name: testpilot
+    image: testpilot-jenkins:latest
+    imagePullPolicy: IfNotPresent
+    command:
+    - cat
+    tty: true
+    env:
+    - name: POD_MODE
+      value: "true"
+    - name: JENKINS_POD
+      value: "true"
+    volumeMounts:
+    - name: workspace
+      mountPath: /home/jenkins/agent
+  volumes:
+  - name: workspace
+    emptyDir: {}
+"""
+        }
+    }
+
+    environment {
+        // TestPilot environment configuration
+        TESTPILOT_NAMESPACE = "${params.TARGET_NAMESPACE}"
+        NF_NAME = "${params.NF_NAME}"
+        NF_TYPE = "${params.NF_TYPE}"
+        NF_VERSION = "${params.NF_VERSION}"
+        DEPLOYMENT_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+
+        // Paths
+        TESTPILOT_HOME = "/opt/testpilot"
+        WORKSPACE_DIR = "${WORKSPACE}"
+        REPORTS_DIR = "${WORKSPACE}/audit_reports"
+    }
+
+    stages {
+        stage('Initialize') {
+            steps {
+                container('testpilot') {
+                    script {
+                        echo "🚀 Initializing TestPilot Pipeline"
+                        echo "Target Namespace: ${params.TARGET_NAMESPACE}"
+                        echo "Excel File: ${params.EXCEL_FILE_PATH}"
+                        echo "Audit Enabled: ${params.ENABLE_AUDIT}"
+
+                        // Verify TestPilot installation
+                        sh '''
+                            echo "TestPilot Binary Location:"
+                            which testpilot || echo "testpilot not in PATH"
+                            ls -la /opt/testpilot/bin/ || echo "TestPilot bin directory not found"
+
+                            echo -e "\\nTestPilot Version:"
+                            testpilot --version || echo "Failed to get version"
+                        '''
+
+                        // Create reports directory
+                        sh "mkdir -p ${REPORTS_DIR}"
+                    }
+                }
+            }
+        }
+
+        stage('Prepare Configuration') {
+            steps {
+                container('testpilot') {
+                    script {
+                        // Check if resources_map.json exists, create if needed
+                        sh '''
+                            if [ ! -f "${TESTPILOT_HOME}/config/resources_map.json" ]; then
+                                echo "Creating default resources_map.json..."
+                                cat > ${TESTPILOT_HOME}/config/resources_map.json << 'EOF'
+{
+    "namespace": "${TESTPILOT_NAMESPACE}",
+    "jenkins_build": "${BUILD_NUMBER}",
+    "jenkins_job": "${JOB_NAME}",
+    "environment": "jenkins-pod",
+    "common_placeholders": {
+        "base_url": "http://api.${TESTPILOT_NAMESPACE}.svc.cluster.local",
+        "api_version": "v1"
+    }
+}
+EOF
+                            fi
+                        '''
+
+                        // Display configuration
+                        sh '''
+                            echo -e "\\n📋 Current Configuration:"
+                            echo "hosts.json:"
+                            cat ${TESTPILOT_HOME}/config/hosts.json | jq . || cat ${TESTPILOT_HOME}/config/hosts.json
+
+                            echo -e "\\nresources_map.json:"
+                            cat ${TESTPILOT_HOME}/config/resources_map.json | jq . || cat ${TESTPILOT_HOME}/config/resources_map.json
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Upload Test Files') {
+            when {
+                expression { fileExists(params.EXCEL_FILE_PATH) }
+            }
+            steps {
+                container('testpilot') {
+                    script {
+                        echo "📤 Uploading test files..."
+                        sh "cp ${params.EXCEL_FILE_PATH} ${WORKSPACE}/"
+                    }
+                }
+            }
+        }
+
+        stage('Execute TestPilot') {
+            steps {
+                container('testpilot') {
+                    script {
+                        def excelFileName = params.EXCEL_FILE_PATH.split('/').last()
+                        def testpilotCmd = "testpilot"
+
+                        // Build command based on parameters
+                        if (params.ENABLE_AUDIT) {
+                            testpilotCmd += " audit"
+                        }
+
+                        testpilotCmd += " -e ${WORKSPACE}/${excelFileName}"
+
+                        if (params.SHEET_NAME?.trim()) {
+                            testpilotCmd += " -s '${params.SHEET_NAME}'"
+                        }
+
+                        testpilotCmd += " -o ${REPORTS_DIR}"
+
+                        echo "🏃 Executing: ${testpilotCmd}"
+
+                        // Execute TestPilot
+                        def exitCode = sh(
+                            script: testpilotCmd,
+                            returnStatus: true
+                        )
+
+                        if (exitCode != 0) {
+                            error("TestPilot execution failed with exit code: ${exitCode}")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Process Results') {
+            steps {
+                container('testpilot') {
+                    script {
+                        echo "📊 Processing test results..."
+
+                        // List generated reports
+                        sh '''
+                            echo "Generated Reports:"
+                            ls -la ${REPORTS_DIR}/ || echo "No reports found"
+
+                            # Count test results if Excel report exists
+                            if [ -f "${REPORTS_DIR}/audit_results.xlsx" ]; then
+                                echo -e "\\n✅ Audit report generated successfully"
+                            fi
+
+                            # Check for HTML dashboard
+                            if [ -f "${REPORTS_DIR}/audit_dashboard.html" ]; then
+                                echo "📈 HTML dashboard generated successfully"
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                container('testpilot') {
+                    script {
+                        // Archive all reports
+                        archiveArtifacts artifacts: 'audit_reports/**/*',
+                                       allowEmptyArchive: false,
+                                       fingerprint: true
+
+                        // Publish HTML reports if available
+                        publishHTML([
+                            allowMissing: false,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: 'audit_reports',
+                            reportFiles: '*.html',
+                            reportName: 'TestPilot Audit Dashboard',
+                            reportTitles: 'Audit Results'
+                        ])
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            container('testpilot') {
+                script {
+                    // Clean up workspace if needed
+                    echo "🧹 Pipeline execution completed"
+
+                    // Display summary
+                    sh '''
+                        echo -e "\\n📋 Execution Summary:"
+                        echo "Build Number: ${BUILD_NUMBER}"
+                        echo "Target Namespace: ${TESTPILOT_NAMESPACE}"
+                        echo "Duration: ${currentBuild.durationString}"
+                    '''
+                }
+            }
+        }
+
+        success {
+            echo "✅ TestPilot pipeline completed successfully!"
+        }
+
+        failure {
+            echo "❌ TestPilot pipeline failed. Check the logs for details."
+        }
+
+        unstable {
+            echo "⚠️ TestPilot pipeline completed with warnings."
+        }
+    }
+}
+
+// Helper function to validate parameters
+def validateParameters() {
+    if (!params.EXCEL_FILE_PATH?.trim()) {
+        error("Excel file path is required")
+    }
+
+    if (!params.TARGET_NAMESPACE?.trim()) {
+        error("Target namespace is required")
+    }
+}
