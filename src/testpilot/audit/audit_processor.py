@@ -187,7 +187,7 @@ def process_single_step_audit_pod_mode(
             logger.error(
                 f"Invalid curl command in step {step.row_idx}: {command}"
             )
-            return
+            return  # Early return - no test results should be created
 
         # Execute command in pod mode
         stdout, stderr, return_code = pod_mode_manager.execute_curl_command(
@@ -214,6 +214,7 @@ def process_single_step_audit_pod_mode(
             passed=return_code == 0,
             fail_reason=stderr if return_code != 0 else None,
             test_name=getattr(step, "test_name", None)
+            or getattr(step, "name", None)
             or f"step_{step.row_idx}",
             duration=0.0,  # Pod mode execution timing handled separately
             method=_extract_http_method_from_command(command),
