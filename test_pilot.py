@@ -45,6 +45,7 @@ from src.testpilot.utils.config_resolver import (
     mask_sensitive_data,
 )
 from src.testpilot.utils.excel_parser import ExcelParser, parse_excel_to_flows
+from src.testpilot.utils.excel_validator_integration import validate_excel_input, add_validation_args
 from src.testpilot.utils.logger import get_logger, set_global_log_level
 from src.testpilot.utils.myutils import set_pdb_trace
 from src.testpilot.utils.ssh_connector import SSHConnector
@@ -169,6 +170,10 @@ def parse_args():
         default="mock_data/test_results_20250719_122220.json",
         help="Real response data file for mock server (default: mock_data/test_results_20250719_122220.json)",
     )
+    
+    # Add Excel validation arguments
+    add_validation_args(parser)
+    
     return parser.parse_args()
 
 
@@ -239,8 +244,20 @@ def check_config_security(config):
 """
 
 
-def load_excel_and_sheets(input_path):
-    excel_parser = ExcelParser(input_path)
+def load_excel_and_sheets(input_path, validate_input=True, force_validation=False):
+    # Validate Excel input file if requested
+    if validate_input:
+        validated_path = validate_excel_input(
+            input_path, 
+            validate_input=validate_input,
+            force_validation=force_validation
+        )
+        logger.info(f"Using Excel file: {validated_path}")
+    else:
+        validated_path = input_path
+        logger.info(f"Using original Excel file (validation skipped): {input_path}")
+    
+    excel_parser = ExcelParser(validated_path)
     valid_sheets = excel_parser.list_valid_sheets()
     logger.debug(f"Valid sheets loaded: {valid_sheets}")
     return excel_parser, valid_sheets
@@ -1101,8 +1118,12 @@ def main():
         logger.debug(f"Logs will be written to directory: {args.log_dir}")
     config_file = "config/hosts.json"
 
-    # Only parse Excel and extract placeholders before dry-run
-    excel_parser, valid_sheets = load_excel_and_sheets(args.input)
+    # Parse Excel and extract placeholders with validation
+    excel_parser, valid_sheets = load_excel_and_sheets(
+        args.input,
+        validate_input=not args.skip_validation,
+        force_validation=args.force_validation
+    )
 
     if args.sheet:
         # Parse the sheet names from the argument

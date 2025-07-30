@@ -1,0 +1,101 @@
+{
+  "json_object": {
+    "count": 7,
+    "examples": [
+      {
+        "original": "{ \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\", \"nfType\": \"SMF\", \"nfStatus\": \"REGISTERED\", \"smfInfo\": { \"vsmfSupportInd\":true } }",
+        "converted": {
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "smfInfo": {
+            "vsmfSupportInd": true
+          }
+        }
+      },
+      {
+        "original": "{\n    \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c\",\n    \"nfType\": \"SMF\",\n    \"nfStatus\": \"REGISTERED\",\n    \"fqdn\": \"SMF.d5g.oracle.com\",\n    \"smfInfoList\": {\n        \"vsmfSupportInd\": true\n    }\n}",
+        "converted": {
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5c",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "fqdn": "SMF.d5g.oracle.com",
+          "smfInfoList": {
+            "vsmfSupportInd": true
+          }
+        }
+      },
+      {
+        "original": "{ \"nfInstanceId\": \"6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a\", \"nfType\": \"SMF\", \"nfStatus\": \"REGISTERED\", \"fqdn\": \"SMF.d5g.oracle.com\", \"smfInfo\": { \"vsmfSupportInd\": false } }",
+        "converted": {
+          "nfInstanceId": "6faf1bbc-6e4a-4454-a507-a14ef8e1bc5a",
+          "nfType": "SMF",
+          "nfStatus": "REGISTERED",
+          "fqdn": "SMF.d5g.oracle.com",
+          "smfInfo": {
+            "vsmfSupportInd": false
+          }
+        }
+      }
+    ],
+    "sheets": [
+      "NRFDiscovery",
+      "NRFRegistration"
+    ]
+  },
+  "raw": {
+    "count": 2,
+    "examples": [
+      {
+        "original": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\"",
+        "converted": {
+          "raw_value": "?service-names=namf-mt&target-nf-type=AMF&requester-nf-type=PCF\""
+        }
+      },
+      {
+        "original": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\"",
+        "converted": {
+          "raw_value": "?target-nf-type=PCF&requester-nf-type=NRF&preferred-locality=USEast\""
+        }
+      }
+    ],
+    "sheets": [
+      "NRFDiscovery"
+    ]
+  },
+  "json_extracted": {
+    "count": 11,
+    "examples": [
+      {
+        "original": "{  \"target-nf-type\" : \"PCF\",_x000D_\n  \"requester-nf-type\" : \"NRF\",_x000D_\n  \"preferred-locality\": \"US East\",_x000D_\n  \"service-names\" : \"npcf-am-policy-control\"}",
+        "converted": {
+          "target-nf-type": "PCF",
+          "requester-nf-type": "NRF",
+          "preferred-locality": "US East",
+          "service-names": "npcf-am-policy-control"
+        }
+      },
+      {
+        "original": "{_x000D_\n\"target-nf-type\" : \"UDR\",_x000D_\n\"requester-nf-type\" : \"NEF\",_x000D_\n\"data-set\" : \"A_PFD\"_x000D_\n}",
+        "converted": {
+          "target-nf-type": "UDR",
+          "requester-nf-type": "NEF",
+          "data-set": "A_PFD"
+        }
+      },
+      {
+        "original": "{_x000D_\n  \"target-nf-type\" : \"UDR\",_x000D_\n  \"requester-nf-type\" : \"NEF\",_x000D_\n  \"data-set\" : \"APPLICATION\",_x000D_\n  \"supi\" : 10000005_x000D_\n}",
+        "converted": {
+          "target-nf-type": "UDR",
+          "requester-nf-type": "NEF",
+          "data-set": "APPLICATION",
+          "supi": "10000005_x000D_\n"
+        }
+      }
+    ],
+    "sheets": [
+      "NRFFunctionalUseCases",
+      "NRFDiscovery"
+    ]
+  }
+}
