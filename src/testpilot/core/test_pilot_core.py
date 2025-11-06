@@ -24,6 +24,7 @@ from ..utils.myutils import (
 )
 from ..utils.resource_map_utils import map_localhost_url
 from ..utils.response_parser import parse_curl_output
+from ..utils.rate_limiter import parse_excel_rate_limit
 from .test_result import TestFlow, TestResult, TestStep
 from .validation_engine import ValidationContext, ValidationDispatcher
 
@@ -981,6 +982,7 @@ def process_single_step(
     dashboard,
     args=None,
     step_delay=1,
+    rate_limiter=None,
 ):
     step_data = extract_step_data(step)
     if step_data["command"] is None or pd.isna(step_data["command"]):
@@ -988,6 +990,14 @@ def process_single_step(
 
     step_data["save_key"] = step.other_fields.get("Save_As")
     manage_workflow_context(flow, step_data)
+
+    # Parse rate limit from Excel column if available
+    excel_rate_limit = None
+    if rate_limiter is not None:
+        excel_rate_limit = parse_excel_rate_limit(step.other_fields)
+        if excel_rate_limit is not None:
+            rate_limiter.set_rate(excel_rate_limit)
+            logger.debug(f"Using Excel rate limit: {excel_rate_limit} reqs/sec for row {step.row_idx}")
     parsed_output = {}
     output = None
     error = None
@@ -1094,6 +1104,13 @@ def process_single_step(
                 )
                 logger.info(f"[CALLFLOW] Executing command on host {host}...")
 
+            # Apply rate limiting before command execution
+            if rate_limiter is not None:
+                delay = rate_limiter.acquire(host)
+                if delay > 0:
+                    logger.debug(f"Rate limiting: waiting {delay:.2f}s for host {host}")
+                    time.sleep(delay)
+
             output, error, cmd_duration = execute_command(
                 command, host, connector
             )
@@ -1149,4 +1166,12 @@ def process_single_step(
         if show_table and dashboard is not None:
             dashboard.add_result(final_result)
         log_test_result(final_result, flow, step)
-        time.sleep(step_delay)
+
+        # Apply delay - either from rate limiter or fallback to step_delay
+        if rate_limiter is not None:
+            # Rate limiter handles timing, but we might still need a minimum delay
+            # Only sleep step_delay if no rate limiting was applied
+            pass  # Rate limiting already handled above in acquire()
+        else:
+            # Fallback to original step_delay behavior when rate limiting is disabled
+            time.sleep(step_delay)

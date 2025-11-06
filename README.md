@@ -13,6 +13,7 @@ TestPilot is a comprehensive test automation framework designed for API testing 
 - **NRF integration**: Specialized support for Network Repository Function testing with instance tracking
 - **Enhanced validation**: Comprehensive response validation with array matching and nested key validation
 - **Kubectl integration**: Built-in support for Kubernetes log retrieval and analysis
+- **Rate limiting**: Configurable requests/second rate limiting with Excel column, CLI, and config support
 
 ## Installation
 
@@ -26,6 +27,17 @@ pip install -e .
 ### Main Test Runner
 ```bash
 python test_pilot.py -i your_test_file.xlsx -m otp
+```
+
+### Rate Limiting
+Control request rates using Excel columns, CLI arguments, or configuration:
+
+```bash
+# CLI rate limiting (5 requests per second)
+python test_pilot.py -i tests.xlsx -m config --rate-limit 5.0
+
+# Excel column: add 'reqs_sec' column with desired rate
+# Config: enable in config/hosts.json
 ```
 
 ### CLI Interface
@@ -68,6 +80,7 @@ testPilotOne/
 │       ├── excel_parser.py      # Excel file parsing
 │       ├── kubectl_logs_search.py # Kubernetes log utilities
 │       ├── pattern_match.py     # Pattern matching engine
+│       ├── rate_limiter.py      # Rate limiting utilities
 │       ├── ssh_connector.py     # SSH connectivity
 │       └── nrf/                 # NRF-specific utilities
 │           ├── instance_tracker.py # NF instance tracking
@@ -89,6 +102,7 @@ testPilotOne/
 ### Core Engine
 - **Test Execution**: Robust test execution with error handling and retry logic
 - **Response Validation**: Advanced JSON response validation with pattern matching
+- **Rate Limiting**: Token bucket algorithm for controlling request rates per host or globally
 - **Result Processing**: Comprehensive result processing and analysis
 
 ### Mock Server
@@ -105,6 +119,35 @@ testPilotOne/
 - **Instance Tracking**: Track NF instances across test sequences
 - **Sequence Management**: Manage complex test sequences for NRF testing
 - **Registration Flows**: Support for NF registration and discovery flows
+
+## Rate Limiting Configuration
+
+### Excel Column Support
+Add a `reqs_sec` column to your Excel test files:
+
+| Test_Name | URL | Method | reqs_sec |
+|-----------|-----|--------|----------|
+| Login API | /api/login | POST | 3 |
+| Get Users | /api/users | GET | 10 |
+
+### Configuration File
+Enable in `config/hosts.json`:
+```json
+{
+  "rate_limiting": {
+    "enabled": true,
+    "default_reqs_per_sec": 10,
+    "per_host": false,
+    "burst_size": null
+  }
+}
+```
+
+### Priority Order
+1. Excel `reqs_sec` column (highest priority)
+2. CLI `--rate-limit` argument
+3. Config `default_reqs_per_sec`
+4. Default `--step-delay` behavior (when disabled)
 
 ## Requirements
 
@@ -130,6 +173,7 @@ pytest tests/validation/    # Validation tests
 
 ## Recent Updates
 
+- **Rate limiting support**: Added configurable requests/second rate limiting with Excel, CLI, and config support
 - Enhanced NRF testing capabilities with instance tracking
 - Improved HTML report generation with NF-style formatting
 - Advanced pattern matching for complex validation scenarios

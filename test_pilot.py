@@ -44,6 +44,7 @@ from src.testpilot.utils.config_resolver import (
     load_config_with_env,
     mask_sensitive_data,
 )
+from src.testpilot.utils.rate_limiter import create_rate_limiter_from_config
 from src.testpilot.utils.excel_parser import ExcelParser, parse_excel_to_flows
 from src.testpilot.utils.logger import get_logger, set_global_log_level
 from src.testpilot.utils.myutils import set_pdb_trace
@@ -147,6 +148,11 @@ def parse_args():
         "--no-file-logging",
         action="store_true",
         help="Disable file logging (console only)",
+    )
+    parser.add_argument(
+        "--rate-limit",
+        type=float,
+        help="Maximum requests per second (overrides config and Excel settings)",
     )
     parser.add_argument(
         "--log-dir",
@@ -650,6 +656,7 @@ def execute_flows(
     display_mode="blessed",
     userargs=None,
     step_delay=1,
+    rate_limiter=None,
 ):
     test_results = []
     dashboard = None
@@ -689,6 +696,7 @@ def execute_flows(
                 dashboard,
                 args=userargs,
                 step_delay=step_delay,
+                rate_limiter=rate_limiter,
             )
     # Print final summary if dashboard is present
     if dashboard:
@@ -1054,6 +1062,19 @@ def main():
     with open(config_file, "r") as f:
         config = json.load(f)
         target_hosts = config.get("hosts", [])
+
+    # Initialize rate limiter from config and CLI args
+    rate_limiter = create_rate_limiter_from_config(config)
+    if args.rate_limit is not None:
+        # CLI argument overrides config
+        if rate_limiter is None:
+            from src.testpilot.utils.rate_limiter import RateLimiter
+            rate_limiter = RateLimiter(default_rate=args.rate_limit)
+        else:
+            rate_limiter.set_rate(args.rate_limit)
+        logger.info(f"Rate limiting enabled from CLI: {args.rate_limit} reqs/sec")
+    elif rate_limiter is not None:
+        logger.info(f"Rate limiting enabled from config: {rate_limiter.default_rate} reqs/sec")
     if args.dry_run:
         show_table = not args.no_table
         # Use dummy mapping for dry-run: map each placeholder to a dummy value for each host
@@ -1183,6 +1204,7 @@ def main():
                 args.display_mode,
                 args,
                 args.step_delay,
+                rate_limiter,
             )
 
         except ImportError:
@@ -1203,6 +1225,7 @@ def main():
             args.display_mode,
             args,
             args.step_delay,
+            rate_limiter,
         )
 
 

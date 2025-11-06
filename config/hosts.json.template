@@ -30,6 +30,14 @@
         "json_match_threshold": 50,
         "_comment": "JSON matching configuration: json_match_threshold (percentage above which JSON payloads are considered matching, default: 50)"
     },
+    "rate_limiting": {
+        "enabled": false,
+        "default_reqs_per_sec": 10,
+        "per_host": false,
+        "burst_size": null,
+        "mode": "token_bucket",
+        "_comment": "Rate limiting configuration: enabled (true/false), default_reqs_per_sec (requests per second), per_host (separate limits per host), burst_size (max burst tokens, defaults to rate*2), mode (token_bucket or fixed_rate)"
+    },
     "hosts": [
         {
             "name": "example-host-1",
@@ -60,6 +68,7 @@
         "system_under_test": "Information about the system being tested (for NF-style reports)",
         "kubectl_logs_settings": "Configure kubectl logs behavior: capture_duration (seconds to capture logs), since_duration (how far back to look for logs)",
         "validation_settings": "Configure validation behavior: json_match_threshold (percentage threshold for JSON payload matching)",
+        "rate_limiting": "Control request rate: enabled (enable rate limiting), default_reqs_per_sec (global rate), per_host (separate rates per host), burst_size (max burst tokens)",
         "environment_variables": [
             "Export environment variables before running:",
             "export HOST1_HOSTNAME='your.host.com'",
